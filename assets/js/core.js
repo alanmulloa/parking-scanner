@@ -38,3 +38,11 @@ const ensureQr=()=>loadExternal('qr',['https://cdnjs.cloudflare.com/ajax/libs/qr
 const ensureScanner=()=>loadExternal('scanner',['https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js','https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'],'Html5Qrcode');
 function qrTarget(token){const base=WEB_APP_URL||location.href.split('?')[0];return base+'?q='+encodeURIComponent(token)}
 function qrSize(){return Math.max(220,Math.min(280,window.innerWidth-80))}
+
+function downloadCsv(filename,rows,columns){
+  const cols=columns&&columns.length?columns:[...new Set((rows||[]).flatMap(r=>Object.keys(r||{})))];
+  const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const csv='\ufeff'+[cols.map(cell).join(';'),...(rows||[]).map(r=>cols.map(c=>cell(r[c])).join(';'))].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
