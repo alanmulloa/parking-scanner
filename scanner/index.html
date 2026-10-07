@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Escáner QR · Parking Comunidad</title>
+  <link rel="stylesheet" href="scanner.css?v=1.2.0">
+</head>
+<body>
+<main>
+  <section class="hero"><h1>Escáner QR</h1><p>Parking Comunidad</p></section>
+  <section class="card">
+    <div id="status" class="message">Iniciando cámara…</div>
+    <div id="reader"></div>
+    <div class="actions"><button id="fallback" type="button">▣ ABRIR CÁMARA</button><button id="back" class="secondary" type="button">← VOLVER</button></div>
+    <p class="muted" style="font-size:.85rem">Apunta al QR. Al detectarlo, volverás automáticamente a Parking Comunidad con el resultado.</p>
+  </section>
+</main>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="scanner.js?v=1.2.0"></script>
+</body>
+</html>
