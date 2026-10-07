@@ -22,6 +22,28 @@ async function vehicleHistoryView(id,backFn=null){
 }
 
 function selectedVehicleIds(){return [...document.querySelectorAll('.bulk-vehicle:checked')].map(x=>x.value)}
-async function runBulkVehicleAction(action){const ids=selectedVehicleIds();if(!ids.length){toast('Selecciona al menos un vehículo.',true);return}const labels={SUSPENDER:'suspender',BAJA:'dar de baja',REVOCAR_QR:'revocar el QR de'};if(!confirm(`¿${labels[action]||action} ${ids.length} vehículo(s)?`))return;try{const out=await call('bulkVehicleAction',{ids,action});invalidateClientParkingData();toast(`${out.changed} vehículo(s) actualizados.`);manager('vehicles')}catch(e){err(e)}}
+async function runBulkVehicleAction(action){
+  const ids=selectedVehicleIds();if(!ids.length){toast('Selecciona al menos un vehículo.',true);return}
+  try{const p=await call('bulkVehiclePreview',{ids,action}),label={SUSPENDER:'Suspender',BAJA:'Dar de baja',REVOCAR_QR:'Revocar QR'}[action]||action;
+    const lines=[`${p.selected} seleccionado(s): ${p.cars} vehículo(s) con slot y ${p.motos} moto(s).`];
+    if(p.stateChanges)lines.push(`${p.stateChanges} cambiarán de estado.`);if(p.slotsReleased)lines.push(`${p.slotsReleased} slot(s) serán liberados.`);if(p.qrRevoked)lines.push(`${p.qrRevoked} QR serán revocados.`);if(p.temporalsAnnulled)lines.push(`${p.temporalsAnnulled} temporal(es) vigente(s) serán anulados.`);if(p.qrSkippedMotos)lines.push(`${p.qrSkippedMotos} moto(s) se omitirán porque no usan QR.`);
+    if(!confirm(`${label}\n\n${lines.join('\n')}\n\n¿Confirmar operación?`))return;
+    const out=await call('bulkVehicleAction',{ids,action});invalidateClientParkingData();toast(`${out.changed} vehículo(s) actualizados.`);manager('vehicles')
+  }catch(e){err(e)}
+}
 
 function exportRowsFromCurrent(kind,rows){const filtered=state.cache.currentFilteredRows||rows||[];downloadCsv(`parking_${kind}_${new Date().toISOString().slice(0,10)}.csv`,filtered)}
+
+
+async function consistencyReviewView(){
+  renderLoading('dataReview');try{const d=await call('consistencyReport'),items=d.items||[];
+  $('#main').innerHTML=`<div class="head"><div><h1>Revisión de datos</h1><div class="muted">Comprobaciones automáticas de integridad y coherencia.</div></div><button class="secondary" id="review-refresh">Revisar nuevamente</button></div><div class="summary-grid"><article class="summary-card ${d.errors?'alert':''}"><b>${esc(d.errors)}</b><span>Errores</span></article><article class="summary-card ${d.warnings?'alert':''}"><b>${esc(d.warnings)}</b><span>Avisos</span></article><article class="summary-card"><b>${esc(items.length)}</b><span>Total detectado</span></article></div><section class="card" style="margin-top:1rem"><div class="tablebox compact-table"><table class="table"><thead><tr><th>Nivel</th><th>Comprobación</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>${items.map((x,i)=>`<tr><td><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity)}</span></td><td><b>${esc(x.label)}</b><span class="subtle">${esc(x.code)}</span></td><td>${esc(x.detail||'—')}</td><td><button class="secondary review-open" data-i="${i}">Ir al registro</button></td></tr>`).join('')}</tbody></table>${items.length?'':'<div class="empty">No se detectaron inconsistencias.</div>'}</div></section>`;
+  $('#review-refresh').onclick=consistencyReviewView;document.querySelectorAll('.review-open').forEach(b=>b.onclick=()=>openConsistencyItem(items[Number(b.dataset.i)]));
+  }catch(e){err(e)}
+}
+function openConsistencyItem(x){if(!x)return;if(x.view==='requests'){go('requests');return}if(x.view==='incidents'){go('incidents');return}if(x.housingId&&x.view==='housing'){housingDetailView(x.housingId);return}if(x.vehicleId){state.cache.tablePreset={kind:'vehicles',search:''};go('vehicles');setTimeout(()=>{const input=$('#table-search');if(input){input.value=x.vehicleId;input.dispatchEvent(new Event('input'))}},50);return}go('vehicles')}
+
+function replaceVehicleView(v){
+  const host=$('#editor');if(!host)return;host.innerHTML=`<form class="card form" id="replace-vehicle-form"><h2 class="wide">Reemplazar vehículo · ${esc(v.MatriculaHabitual)}</h2><div class="message wide">El vehículo actual pasará a <b>Baja</b>, su QR quedará revocado y cualquier temporal vigente será anulado. El nuevo vehículo conservará la misma vivienda. Si corresponde, conservará el slot liberado.</div><div class="field"><label>Nueva matrícula habitual</label><input name="MatriculaHabitual" required></div><div class="field"><label>Tipo</label><select name="Tipo">${['Particular','Empresa','Alquiler','Moto','Otro'].map(x=>`<option ${x===v.Tipo?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>Marca</label><input name="Marca"></div><div class="field"><label>Modelo</label><input name="Modelo"></div><div class="field wide"><label>Observaciones</label><textarea name="Observaciones"></textarea></div><div class="wide actions"><button>Revisar y reemplazar</button><button type="button" class="secondary" id="replace-cancel">Cancelar</button></div></form>`;
+  $('#replace-cancel').onclick=()=>host.innerHTML='';$('#replace-vehicle-form').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target)),moto=data.Tipo==='Moto',slotText=v.Tipo==='Moto'&&!moto?'Se asignará el primer slot libre disponible.':v.Tipo!=='Moto'&&!moto?`El nuevo vehículo conservará el Slot ${v.Slot}.`:'No utilizará slot.';if(!confirm(`REEMPLAZO DE VEHÍCULO\n\nAnterior: ${v.MatriculaHabitual} → Baja\nNuevo: ${data.MatriculaHabitual}\n${slotText}\n${v.PeriodoTemporalActual?'El temporal vigente será anulado.\n':''}\n¿Confirmar?`))return;const b=e.submitter;busy(b);try{const out=await call('replaceVehicle',Object.assign({ID_Vehiculo:v.ID_Vehiculo},data));invalidateClientParkingData();toast(`Vehículo reemplazado por ${out.newVehicle.MatriculaHabitual}.`);manager('vehicles')}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})
+}

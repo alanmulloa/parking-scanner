@@ -47,7 +47,6 @@ function downloadCsv(filename,rows,columns){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-
 function userRoles(){return String(state.user?.Rol||'').split(',').map(x=>x.trim()).filter(Boolean)}
 function hasUiRole(role){return userRoles().includes(role)}
 async function init(){if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;shell();if(INITIAL_TOKEN&&(hasUiRole('ADMIN')||hasUiRole('CONTROL'))){state.view='control';renderNav();control(INITIAL_TOKEN)}else go(hasUiRole('ADMIN')?'dashboard':hasUiRole('CONTROL')?'control':'ownerHousing')}catch(e){login(e.message)}}
@@ -56,11 +55,11 @@ function login(message=''){
   $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);shell();if(INITIAL_TOKEN&&(hasUiRole('ADMIN')||hasUiRole('CONTROL'))){state.view='control';renderNav();await control(INITIAL_TOKEN)}else go(hasUiRole('ADMIN')?'dashboard':hasUiRole('CONTROL')?'control':'ownerHousing')}catch(x){toast(x.message,true);busy(b,false)}}
 }
 function shell(){$('#app').innerHTML=`<header class="top"><div class="brand">Parking Comunidad</div><nav class="nav" id="nav"></nav><div class="who"><b>${esc(state.user.Nombre)}</b><br>${esc(userRoles().join(" · "))}</div><button class="secondary" id="logout">Salir</button></header><main class="wrap" id="main"></main>`;$('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');state.token='';login()};renderNav()}
-function renderNav(){const map={ADMIN:[['dashboard','Resumen'],['search','Buscar'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control']],CONTROL:[['control','Control'],['search','Buscar'],['incidents','Incidencias']],PROPIETARIO:[['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerRequests','Mis solicitudes'],['profile','Mis datos']]};const items=[],seen=new Set();userRoles().forEach(role=>(map[role]||[]).forEach(item=>{if(!seen.has(item[0])){seen.add(item[0]);items.push(item)}}));$('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.view))}
+function renderNav(){const map={ADMIN:[['dashboard','Resumen'],['search','Buscar'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control']],CONTROL:[['control','Control'],['search','Buscar'],['incidents','Incidencias']],PROPIETARIO:[['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerRequests','Mis solicitudes'],['profile','Mis datos']]};const items=[],seen=new Set();userRoles().forEach(role=>(map[role]||[]).forEach(item=>{if(!seen.has(item[0])){seen.add(item[0]);items.push(item)}}));$('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.view))}
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
-function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',profile:'Mis datos'};return labels[view]||'Parking'}
+function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',profile:'Mis datos'};return labels[view]||'Parking'}
 function renderLoading(view){const main=$('#main');if(!main)return;main.innerHTML=`<section class="card loading-state"><div class="spinner"></div><h2>${esc(viewLabel(view))}</h2><p class="muted">Cargando datos…</p></section>`}
-function go(view){stopScanner();state.view=view;state.navSeq++;renderNav();renderLoading(view);const fn=({dashboard,search:globalSearchView,users,housing,vehicles,incidents,requests,audit,control,ownerHousing,ownerVehicles,ownerRequests,profile}[view]||ownerHousing);Promise.resolve().then(fn).catch(err)}
+function go(view){stopScanner();state.view=view;state.navSeq++;renderNav();renderLoading(view);const fn=({dashboard,search:globalSearchView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHousing,ownerVehicles,ownerRequests,profile}[view]||ownerHousing);Promise.resolve().then(fn).catch(err)}
 function err(e){
   const message=(e&&e.message)||String(e)||'No se pudo cargar la información.';
   toast(message,true);
@@ -73,7 +72,6 @@ function err(e){
     $('#retry-home').onclick=()=>go(hasUiRole('ADMIN')?'dashboard':hasUiRole('CONTROL')?'control':'ownerHousing');
   }
 }
-
 async function dashboard(){
   try{
     const d=await call('dashboard'),pct=d.slotCapacity?Math.round((d.occupiedSlots/d.slotCapacity)*100):0;
@@ -119,7 +117,6 @@ function openSummaryAction(action){
   if(action==='vehicles'){go('vehicles')}
 }
 function openSummaryAttention(item){if(!item)return;if(item.requestId){state.cache.requestFocus=item.requestId;go('requests');return}if(item.incidentId){state.cache.incidentFocus=item.incidentId;go('incidents');return}if(item.vehicleId){state.cache.tablePreset={kind:'vehicles',search:item.label.split(' · ')[0]};go('vehicles');return}if(item.housingId){state.cache.tablePreset={kind:'housing',search:item.label};go('housing')}}
-
 const configs={
  users:{action:'listUsers',save:'saveUser',id:'ID_Usuario',title:'Usuarios',cols:['Nombre','Email','Telefono','Rol','Estado','LastAccessAt'],fields:[['Email','Email','email'],['Nombre','Nombre','text'],['Telefono','Teléfono','tel'],['Rol','Perfiles','roles'],['Estado','Estado','select:Activo|Inactivo']]},
  housing:{action:'listHousing',save:'saveHousing',id:'ID_Vivienda',title:'Viviendas',cols:['Vivienda','Responsable','Estado'],fields:[['Bloque','Bloque','text'],['Planta','Planta','text'],['Apartamento','Apartamento','text'],['Responsable','Propietario','owner'],['Estado','Estado','select:Activa|Inactiva'],['Observaciones','Observaciones','textarea']]},
@@ -146,7 +143,7 @@ async function manager(kind){
   try{
     const data=await call('managerData',{kind}),rows=data.rows,opts=data.options;
     state.cache[kind]=rows;if(opts)state.cache.formOptions=opts;if(kind==='vehicles'){state.cache.adminRequests=data.requests||[];state.cache.adminIncidents=data.incidents||[];}
-    const actions=(r,i)=>{if(kind==='users')return `<button class="secondary edit" data-i="${i}">Editar</button><button class="secondary password" data-i="${i}">Contraseña</button><button class="secondary close-sessions" data-i="${i}">Cerrar sesiones</button>`;if(kind==='housing')return `<button class="secondary housing-detail" data-i="${i}">Ficha</button><button class="secondary edit" data-i="${i}">Editar</button><button class="secondary housing-vehicles" data-i="${i}">Vehículos</button>`;if(kind==='vehicles'){const qr=r.Tipo==='Moto'?'':`<button class="secondary qr" data-i="${i}">QR</button>`,renew=r.Tipo!=='Moto'&&r.Estado==='Activo'?`<button class="secondary renew" data-i="${i}">Renovar</button>`:'';return `<button class="secondary vehicle-history" data-i="${i}">Historial</button><button class="secondary edit" data-i="${i}">Editar</button><button class="secondary periods" data-i="${i}">Temporales</button>${qr}${renew}`}return `<button class="secondary edit" data-i="${i}">Editar</button>`};
+    const actions=(r,i)=>{if(kind==='users')return `<button class="secondary edit" data-i="${i}">Editar</button><button class="secondary password" data-i="${i}">Contraseña</button><button class="secondary close-sessions" data-i="${i}">Cerrar sesiones</button>`;if(kind==='housing')return `<button class="secondary housing-detail" data-i="${i}">Ficha</button><button class="secondary edit" data-i="${i}">Editar</button><button class="secondary housing-vehicles" data-i="${i}">Vehículos</button>`;if(kind==='vehicles'){const qr=r.Tipo==='Moto'?'':`<button class="secondary qr" data-i="${i}">QR</button>`,renew=r.Tipo!=='Moto'&&r.Estado==='Activo'?`<button class="secondary renew" data-i="${i}">Renovar</button>`:'';return `<button class="secondary vehicle-history" data-i="${i}">Historial</button>${r.Estado==='Activo'?`<button class="secondary replace-vehicle" data-i="${i}">Reemplazar</button>`:''}<button class="secondary edit" data-i="${i}">Editar</button><button class="secondary periods" data-i="${i}">Temporales</button>${qr}${renew}`}return `<button class="secondary edit" data-i="${i}">Editar</button>`};
     $('#main').innerHTML=`<div class="head"><h1>${c.title}</h1><div class="actions"><button class="secondary" id="export-current">Exportar filtrado CSV</button><button id="new">＋ Nuevo</button></div></div><div id="editor"></div>${kind==='vehicles'?`<div class="card" id="bulk-vehicle-bar" style="margin-bottom:.8rem"><b>Acciones masivas</b><div class="actions" style="margin-top:.6rem"><button class="secondary" id="bulk-suspend">Suspender</button><button class="secondary" id="bulk-revoke">Revocar QR</button><button class="danger" id="bulk-low">Dar de baja</button></div></div>`:''}${renderFilterBar(kind)}<div class="tablebox"><table class="table"><thead><tr>${kind==='vehicles'?'<th><input type="checkbox" id="bulk-all"></th>':''}${c.cols.map(x=>`<th>${esc(columnLabel(x))}</th>`).join('')}${kind==='vehicles'?'<th>Solicitudes</th><th>Incidencias</th>':''}<th>Acciones</th></tr></thead><tbody id="data-body">${rows.map((r,i)=>`<tr data-i="${i}">${kind==='vehicles'?`<td><input class="bulk-vehicle" type="checkbox" value="${esc(r.ID_Vehiculo)}"></td>`:''}${c.cols.map(x=>`<td>${esc(displayCell(kind,r,x))}</td>`).join('')}${kind==='vehicles'?`<td>${requestSummaryForVehicle(r.ID_Vehiculo)}</td><td>${incidentSummaryForVehicle(r.ID_Vehiculo)}</td>`:''}<td><div class="actions">${actions(r,i)}</div></td></tr>`).join('')}</tbody></table>${rows.length?'':'<div class="empty">No hay registros.</div>'}</div>`;
     $('#new').onclick=()=>editor(kind,null);$('#export-current').onclick=()=>exportRowsFromCurrent(kind,rows);
     document.querySelectorAll('.edit').forEach(b=>b.onclick=()=>editor(kind,rows[b.dataset.i]));
@@ -154,6 +151,7 @@ async function manager(kind){
     if(kind==='housing'){document.querySelectorAll('.housing-detail').forEach(b=>b.onclick=()=>housingDetailView(rows[b.dataset.i].ID_Vivienda));document.querySelectorAll('.housing-vehicles').forEach(b=>b.onclick=()=>housingVehicles(rows[b.dataset.i]));}
     if(kind==='vehicles'){
       document.querySelectorAll('.vehicle-history').forEach(b=>b.onclick=()=>vehicleHistoryView(rows[b.dataset.i].ID_Vehiculo));
+      document.querySelectorAll('.replace-vehicle').forEach(b=>b.onclick=()=>replaceVehicleView(rows[b.dataset.i]));
       document.querySelectorAll('.qr').forEach(b=>b.onclick=()=>showQr(rows[b.dataset.i]));
       document.querySelectorAll('.periods').forEach(b=>b.onclick=()=>temporaryPeriodsPanel(rows[b.dataset.i],()=>manager('vehicles')));
       document.querySelectorAll('.renew').forEach(b=>b.onclick=async()=>{if(!confirm('El QR anterior dejará de ser válido. ¿Continuar?'))return;try{await call('renewQr',{id:rows[b.dataset.i].ID_Vehiculo});invalidateClientParkingData();toast('QR renovado.');manager(kind)}catch(e){err(e)}});
@@ -197,7 +195,6 @@ function vehicleEditor(row,contextHousing=null){
 }
 
 async function showQr(v,backFn=null){if(v.Tipo==='Moto'){toast('Las motos se controlan por matrícula y no utilizan QR.',true);return}const valid=v.Estado==='Activo'&&v.QR_Estado==='Activo';$('#main').innerHTML=`<div class="head"><h1>QR del vehículo</h1><button class="secondary" id="back-list">Volver</button></div><div class="grid"><div class="card result ${valid?'':'bad'}"><span class="status ${valid?'':'bad'}">${esc(v.Estado)} · QR ${esc(v.QR_Estado)}</span>${qrVehicleIdentityHtml(v)}</div><div class="card" style="text-align:center"><h2>Código QR</h2>${valid?`<div id="qr"><div class="spinner"></div></div><p class="muted">Este QR identifica al vehículo y valida la matrícula habitual o la temporal vigente.</p><button id="print">Imprimir</button>`:`<div class="message bad">Este vehículo no tiene un QR válido. Debe estar Activo y con QR Activo.</div>`}</div></div>`;$('#back-list').onclick=backFn||vehicles;if(!valid)return;$('#print').onclick=()=>window.print();try{await ensureQr();$('#qr').innerHTML='';const size=qrSize();new QRCode($('#qr'),{text:qrTarget(v.QR_Token),width:size,height:size,correctLevel:QRCode.CorrectLevel.L})}catch(e){$('#qr').innerHTML=`<div class="message bad">${esc(e.message)}</div>`}}
-
 function trendText(t){if(!t)return '';const d=(Number(t.current)||0)-(Number(t.previous)||0);return `${d===0?'=':d>0?'▲':'▼'} ${Math.abs(d)} vs. 30 días anteriores`}
 async function globalSearchView(initial=''){
   $('#main').innerHTML=`<section class="hero"><h1>Búsqueda global</h1><p>Busca matrículas, viviendas, propietarios, incidencias y solicitudes.</p></section><section class="card"><form id="global-search-form" class="actions"><input id="global-search-input" class="search" placeholder="Matrícula, vivienda, propietario, incidencia..." value="${esc(initial)}" minlength="2" required><button>Buscar</button></form></section><div id="global-search-results" style="margin-top:1rem"></div>`;
@@ -222,10 +219,31 @@ async function vehicleHistoryView(id,backFn=null){
 }
 
 function selectedVehicleIds(){return [...document.querySelectorAll('.bulk-vehicle:checked')].map(x=>x.value)}
-async function runBulkVehicleAction(action){const ids=selectedVehicleIds();if(!ids.length){toast('Selecciona al menos un vehículo.',true);return}const labels={SUSPENDER:'suspender',BAJA:'dar de baja',REVOCAR_QR:'revocar el QR de'};if(!confirm(`¿${labels[action]||action} ${ids.length} vehículo(s)?`))return;try{const out=await call('bulkVehicleAction',{ids,action});invalidateClientParkingData();toast(`${out.changed} vehículo(s) actualizados.`);manager('vehicles')}catch(e){err(e)}}
+async function runBulkVehicleAction(action){
+  const ids=selectedVehicleIds();if(!ids.length){toast('Selecciona al menos un vehículo.',true);return}
+  try{const p=await call('bulkVehiclePreview',{ids,action}),label={SUSPENDER:'Suspender',BAJA:'Dar de baja',REVOCAR_QR:'Revocar QR'}[action]||action;
+    const lines=[`${p.selected} seleccionado(s): ${p.cars} vehículo(s) con slot y ${p.motos} moto(s).`];
+    if(p.stateChanges)lines.push(`${p.stateChanges} cambiarán de estado.`);if(p.slotsReleased)lines.push(`${p.slotsReleased} slot(s) serán liberados.`);if(p.qrRevoked)lines.push(`${p.qrRevoked} QR serán revocados.`);if(p.temporalsAnnulled)lines.push(`${p.temporalsAnnulled} temporal(es) vigente(s) serán anulados.`);if(p.qrSkippedMotos)lines.push(`${p.qrSkippedMotos} moto(s) se omitirán porque no usan QR.`);
+    if(!confirm(`${label}\n\n${lines.join('\n')}\n\n¿Confirmar operación?`))return;
+    const out=await call('bulkVehicleAction',{ids,action});invalidateClientParkingData();toast(`${out.changed} vehículo(s) actualizados.`);manager('vehicles')
+  }catch(e){err(e)}
+}
 
 function exportRowsFromCurrent(kind,rows){const filtered=state.cache.currentFilteredRows||rows||[];downloadCsv(`parking_${kind}_${new Date().toISOString().slice(0,10)}.csv`,filtered)}
 
+
+async function consistencyReviewView(){
+  renderLoading('dataReview');try{const d=await call('consistencyReport'),items=d.items||[];
+  $('#main').innerHTML=`<div class="head"><div><h1>Revisión de datos</h1><div class="muted">Comprobaciones automáticas de integridad y coherencia.</div></div><button class="secondary" id="review-refresh">Revisar nuevamente</button></div><div class="summary-grid"><article class="summary-card ${d.errors?'alert':''}"><b>${esc(d.errors)}</b><span>Errores</span></article><article class="summary-card ${d.warnings?'alert':''}"><b>${esc(d.warnings)}</b><span>Avisos</span></article><article class="summary-card"><b>${esc(items.length)}</b><span>Total detectado</span></article></div><section class="card" style="margin-top:1rem"><div class="tablebox compact-table"><table class="table"><thead><tr><th>Nivel</th><th>Comprobación</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>${items.map((x,i)=>`<tr><td><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity)}</span></td><td><b>${esc(x.label)}</b><span class="subtle">${esc(x.code)}</span></td><td>${esc(x.detail||'—')}</td><td><button class="secondary review-open" data-i="${i}">Ir al registro</button></td></tr>`).join('')}</tbody></table>${items.length?'':'<div class="empty">No se detectaron inconsistencias.</div>'}</div></section>`;
+  $('#review-refresh').onclick=consistencyReviewView;document.querySelectorAll('.review-open').forEach(b=>b.onclick=()=>openConsistencyItem(items[Number(b.dataset.i)]));
+  }catch(e){err(e)}
+}
+function openConsistencyItem(x){if(!x)return;if(x.view==='requests'){go('requests');return}if(x.view==='incidents'){go('incidents');return}if(x.housingId&&x.view==='housing'){housingDetailView(x.housingId);return}if(x.vehicleId){state.cache.tablePreset={kind:'vehicles',search:''};go('vehicles');setTimeout(()=>{const input=$('#table-search');if(input){input.value=x.vehicleId;input.dispatchEvent(new Event('input'))}},50);return}go('vehicles')}
+
+function replaceVehicleView(v){
+  const host=$('#editor');if(!host)return;host.innerHTML=`<form class="card form" id="replace-vehicle-form"><h2 class="wide">Reemplazar vehículo · ${esc(v.MatriculaHabitual)}</h2><div class="message wide">El vehículo actual pasará a <b>Baja</b>, su QR quedará revocado y cualquier temporal vigente será anulado. El nuevo vehículo conservará la misma vivienda. Si corresponde, conservará el slot liberado.</div><div class="field"><label>Nueva matrícula habitual</label><input name="MatriculaHabitual" required></div><div class="field"><label>Tipo</label><select name="Tipo">${['Particular','Empresa','Alquiler','Moto','Otro'].map(x=>`<option ${x===v.Tipo?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label>Marca</label><input name="Marca"></div><div class="field"><label>Modelo</label><input name="Modelo"></div><div class="field wide"><label>Observaciones</label><textarea name="Observaciones"></textarea></div><div class="wide actions"><button>Revisar y reemplazar</button><button type="button" class="secondary" id="replace-cancel">Cancelar</button></div></form>`;
+  $('#replace-cancel').onclick=()=>host.innerHTML='';$('#replace-vehicle-form').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target)),moto=data.Tipo==='Moto',slotText=v.Tipo==='Moto'&&!moto?'Se asignará el primer slot libre disponible.':v.Tipo!=='Moto'&&!moto?`El nuevo vehículo conservará el Slot ${v.Slot}.`:'No utilizará slot.';if(!confirm(`REEMPLAZO DE VEHÍCULO\n\nAnterior: ${v.MatriculaHabitual} → Baja\nNuevo: ${data.MatriculaHabitual}\n${slotText}\n${v.PeriodoTemporalActual?'El temporal vigente será anulado.\n':''}\n¿Confirmar?`))return;const b=e.submitter;busy(b);try{const out=await call('replaceVehicle',Object.assign({ID_Vehiculo:v.ID_Vehiculo},data));invalidateClientParkingData();toast(`Vehículo reemplazado por ${out.newVehicle.MatriculaHabitual}.`);manager('vehicles')}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})
+}
 async function control(token=''){
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
@@ -280,7 +298,6 @@ function qrVehicleIdentityHtml(v){
   }
   return `<div class="details"><div style="text-align:center"><small>Matrícula habitual</small></div></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaHabitual||'—')}</div>${v.Marca||v.Modelo?`<p>${esc(v.Marca)} ${esc(v.Modelo)}</p>`:''}`;
 }
-
 async function requests(openId=''){
   try{
     const focusId=openId||state.cache.requestFocus||'';delete state.cache.requestFocus;
@@ -304,7 +321,6 @@ async function requests(openId=''){
     const reset=()=>{page=1;render()};$('#req-search').oninput=reset;$('#req-state').onchange=reset;$('#req-type').onchange=reset;render();if(focusId){const target=rows.find(r=>r.ID_Solicitud===focusId);if(target)detail(target)}
   }catch(e){err(e)}
 }
-
 async function incidents(openId=''){
   try{
     const focusId=openId||state.cache.incidentFocus||'';delete state.cache.incidentFocus;
@@ -341,18 +357,17 @@ function incidentScenarioHelp(type,locked){const map={'Matrícula no registrada'
 function normalizePlateClient(v){return String(v||'').replace(/[\s-]/g,'').toUpperCase()}
 function incidentForm(prefill=state.scanResult){
   const p=prefill||{},v=p.vehicle||{},plate=p.query||p.currentPlate||'',status=p.status||'',origin=p.source||'',host=state.view==='control'?$('#control-body'):$('#incident-editor'),allowedTypes=incidentTypesForContext(p),locked=allowedTypes.length===1&&!!incidentTypeFromStatus(status),selected=allowedTypes[0]||'Otro';
-  host.innerHTML=`<form class="card form" id="incident-form"><h2 class="wide">Registrar incidencia</h2><div class="field"><label>Matrícula observada</label><input name="MatriculaObservada" id="incident-observed-plate" value="${esc(plate)}" ${locked&&plate?'readonly':''}></div><div class="field"><label>Escenario detectado</label><input value="${esc(status||'Registro manual')}" disabled></div><div class="field"><label>Tipo</label><select name="Tipo" id="incident-create-type" ${locked?'disabled':''}>${allowedTypes.map(x=>`<option ${x===selected?'selected':''}>${x}</option>`).join('')}</select>${locked?`<input type="hidden" name="Tipo" value="${esc(selected)}">`:''}</div><div class="field hide" id="incident-authorized-field"><label>Matrícula asociada al QR</label><input name="MatriculaAutorizada" id="incident-authorized-plate" value="${esc(p.currentPlate||v.MatriculaHabitual||'')}" readonly></div><div class="message wide" id="incident-scenario-help"></div><div class="field wide"><label>Descripción</label><textarea name="Descripcion" required></textarea></div><div class="field"><label>Foto</label><input id="photo" type="file" accept="image/*" capture="environment"></div><input type="hidden" name="Foto"><input type="hidden" name="EstadoOrigen" value="${esc(status)}"><input type="hidden" name="OrigenControl" value="${esc(origin||'Manual')}"><div class="wide actions"><button>REGISTRAR INCIDENCIA</button><button type="button" class="secondary" id="cancel-inc">Cancelar</button></div></form>`;
+  host.innerHTML=`<form class="card form" id="incident-form"><h2 class="wide">Registrar incidencia</h2><div class="field"><label>Matrícula observada</label><input name="MatriculaObservada" id="incident-observed-plate" value="${esc(plate)}" ${locked&&plate?'readonly':''}></div><div class="field"><label>Escenario detectado</label><input value="${esc(status||'Registro manual')}" disabled></div><div class="field"><label>Tipo</label><select name="Tipo" id="incident-create-type" ${locked?'disabled':''}>${allowedTypes.map(x=>`<option ${x===selected?'selected':''}>${x}</option>`).join('')}</select>${locked?`<input type="hidden" name="Tipo" value="${esc(selected)}">`:''}</div><div class="field hide" id="incident-authorized-field"><label>Matrícula asociada al QR</label><input name="MatriculaAutorizada" id="incident-authorized-plate" value="${esc(p.currentPlate||v.MatriculaHabitual||'')}" readonly></div><div class="message wide" id="incident-scenario-help"></div><div class="field wide"><label>Descripción</label><textarea name="Descripcion" required></textarea></div><div class="field"><label>Foto *</label><input id="photo" type="file" accept="image/*" capture="environment" required><span class="subtle">Obligatoria para registrar la incidencia.</span></div><input type="hidden" name="Foto"><input type="hidden" name="EstadoOrigen" value="${esc(status)}"><input type="hidden" name="OrigenControl" value="${esc(origin||'Manual')}"><div class="wide actions"><button>REGISTRAR INCIDENCIA</button><button type="button" class="secondary" id="cancel-inc">Cancelar</button></div></form>`;
   const typeSel=$('#incident-create-type'),authorized=$('#incident-authorized-field'),authorizedInput=$('#incident-authorized-plate'),observed=$('#incident-observed-plate'),help=$('#incident-scenario-help');
   const currentType=()=>locked?selected:typeSel.value;
   const refresh=()=>{const t=currentType(),mismatch=t==='QR no corresponde con matrícula';authorized.classList.toggle('hide',!mismatch);if(mismatch&&origin==='QR'&&observed.value&&normalizePlateClient(observed.value)===normalizePlateClient(authorizedInput.value))observed.value='';observed.readOnly=!!(locked&&plate&&!mismatch);help.textContent=incidentScenarioHelp(t,locked)};if(typeSel&&!locked)typeSel.onchange=refresh;refresh();
   $('#cancel-inc').onclick=()=>state.view==='control'?control():incidents();
-  $('#photo').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>12*1024*1024){toast('La foto original no puede superar 12 MB.',true);return}toast('Optimizando fotografía…');try{const dataUrl=await optimizedImageData(file);const out=await call('uploadPhoto',{dataUrl});$('#incident-form [name=Foto]').value=out.url;toast('Foto subida.')}catch(x){err(x)}};
-  $('#incident-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));if(locked)data.Tipo=selected;Object.assign(data,{ID_Vivienda:v.ID_Vivienda||'',ID_Vehiculo:v.ID_Vehiculo||''});try{const out=await call('saveIncident',data);toast('Incidencia '+out.ID_Incidencia+' registrada.');state.scanResult=null;state.view==='control'?control():incidents()}catch(x){toast(x.message,true);busy(b,false)}};
+  $('#photo').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>12*1024*1024){toast('La foto original no puede superar 12 MB.',true);e.target.value='';return}const submit=$('#incident-form button[type=submit],#incident-form button:not([type])');busy(submit);toast('Optimizando fotografía…');try{const dataUrl=await optimizedImageData(file);const out=await call('uploadPhoto',{dataUrl});$('#incident-form [name=Foto]').value=out.url;toast('Foto subida.')}catch(x){e.target.value='';$('#incident-form [name=Foto]').value='';err(x)}finally{busy(submit,false)}};
+  $('#incident-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));if(!data.Foto){toast('Debes adjuntar una fotografía antes de registrar la incidencia.',true);busy(b,false);return}if(locked)data.Tipo=selected;Object.assign(data,{ID_Vivienda:v.ID_Vivienda||'',ID_Vehiculo:v.ID_Vehiculo||''});try{const out=await call('saveIncident',data);toast('Incidencia '+out.ID_Incidencia+' registrada.');state.scanResult=null;state.view==='control'?control():incidents()}catch(x){toast(x.message,true);busy(b,false)}};
   host.scrollIntoView({behavior:'smooth'});
 }
 function fileData(file){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(file)})}
 async function optimizedImageData(file){try{const bitmap=await createImageBitmap(file),scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);if(bitmap.close)bitmap.close();return canvas.toDataURL('image/jpeg',.82)}catch(e){return fileData(file)}}
-
 function auditValue(value,name){if(!value)return '—';return name?`<b>${esc(name)}</b><span class="subtle">${esc(value)}</span>`:esc(value)}
 function auditDateOnly(v){return String(v||'').slice(0,10)}
 function auditPresetRange(preset){
@@ -389,7 +404,6 @@ async function audit(){
     applyPreset();
   }catch(e){err(e)}
 }
-
 async function ownerData(force=false){
   if(!force&&state.cache.ownerHousing&&state.cache.ownerVehicles&&state.cache.ownerRequests)return {hs:state.cache.ownerHousing,vs:state.cache.ownerVehicles,reqs:state.cache.ownerRequests};
   const bundle=await call('ownerBundle');
@@ -413,7 +427,6 @@ function profile(){
   $('#profile-form').onsubmit=async e=>{e.preventDefault();try{state.user=await call('updateProfile',Object.fromEntries(new FormData(e.target)));toast('Datos actualizados.');shell();go('profile')}catch(x){err(x)}};
   $('#change-password-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{await call('changePassword',Object.fromEntries(new FormData(e.target)));e.target.reset();toast('Contraseña actualizada.')}catch(x){toast(x.message,true)}finally{busy(b,false)}}
 }
-
 window.addEventListener('unhandledrejection',e=>{if(e&&e.reason)err(e.reason instanceof Error?e.reason:new Error(String(e.reason)))});
 window.addEventListener('error',e=>{if(e&&e.error)err(e.error)});
 init();
