@@ -18,3 +18,11 @@ async function temporaryPeriodsPanel(vehicle,backFn){
     $('#tmp-new')&&($('#tmp-new').onclick=()=>openEditor(null));document.querySelectorAll('.tmp-edit').forEach(b=>b.onclick=()=>openEditor(rows[b.dataset.i]));document.querySelectorAll('.tmp-delete').forEach(b=>b.onclick=async()=>{const p=rows[b.dataset.i];if(!confirm(`¿Anular el período ${p.MatriculaTemporal} del ${dateEs(p.Desde)} al ${dateEs(p.Hasta)}?`))return;try{await call('deleteTemporaryPeriod',{ID_Periodo:p.ID_Periodo});invalidateClientParkingData();toast('Período anulado.');temporaryPeriodsPanel(vehicle,backFn)}catch(e){err(e)}})
   }catch(e){err(e)}
 }
+
+function qrVehicleIdentityHtml(v){
+  const hasTemporary=temporaryActive(v);
+  if(hasTemporary){
+    return `<div class="message" style="text-align:center"><b>TEMPORAL VIGENTE</b></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaTemporal)}</div><p class="muted" style="text-align:center">Válida hasta ${esc(dateEs(v.TemporalHasta))}</p><div class="details"><div style="text-align:center"><small>Matrícula habitual</small><b style="font-size:1.35rem">${esc(v.MatriculaHabitual||'—')}</b></div></div>`;
+  }
+  return `<div class="details"><div style="text-align:center"><small>Matrícula habitual</small></div></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaHabitual||'—')}</div>${v.Marca||v.Modelo?`<p>${esc(v.Marca)} ${esc(v.Modelo)}</p>`:''}`;
+}
