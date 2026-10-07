@@ -21,9 +21,9 @@ async function dashboard(){
         ${card(d.temporaryExpiring7,'Temporales que vencen ≤ 7 días','Revisar próximos vencimientos','vehicles-temporary-expiring',d.temporaryExpiring7>0)}
       </div></section>
       <section class="summary-section"><div class="head"><h2>Actividad últimos 30 días</h2></div><div class="summary-grid">
-        ${card(d.incidents30,'Incidencias registradas','','incidents')}
-        ${card(d.requests30,'Solicitudes registradas','','requests')}
-        ${card(d.newVehicles30,'Altas de vehículos','','vehicles')}
+        ${card(d.incidents30,'Incidencias registradas',trendText(d.trends?.incidents),'incidents')}
+        ${card(d.requests30,'Solicitudes registradas',trendText(d.trends?.requests),'requests')}
+        ${card(d.newVehicles30,'Altas de vehículos',trendText(d.trends?.vehicles),'vehicles')}
       </div></section>
       <section class="summary-section"><div class="head"><h2>Requiere atención</h2></div><div class="attention-list">${attention}</div></section>`;
     document.querySelectorAll('[data-summary-action]').forEach(el=>el.onclick=()=>openSummaryAction(el.dataset.summaryAction));

@@ -1,7 +1,7 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{},scanResult:null,scanner:null,libs:{},navSeq:0};
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SERVER_TIMEOUT_MS=18000;
-const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listAudit','listRequests','ownerBundle','listTemporaryPeriods']);
+const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listAudit','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 function server(fn,...args){
   return new Promise((resolve,reject)=>{
