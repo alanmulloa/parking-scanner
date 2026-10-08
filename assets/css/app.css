@@ -45,4 +45,4 @@
   }
 }
 
-.quick-plate{display:flex;gap:.35rem;align-items:center;max-width:310px}.quick-plate input{width:180px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:9px;padding:.5rem .65rem;font:inherit}.quick-plate input::placeholder{color:#cfe3df}.quick-plate button{padding:.5rem .7rem;font-size:.78rem}@media(max-width:900px){.quick-plate{grid-column:1/-1;max-width:none;order:3}.quick-plate input{flex:1;width:auto}.top{grid-template-columns:1fr auto}.nav{order:4}}
+@media(max-width:900px){.top{grid-template-columns:1fr auto}.nav{order:4}}
