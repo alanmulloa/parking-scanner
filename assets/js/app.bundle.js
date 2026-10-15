@@ -141,9 +141,9 @@ function login(message=''){
 function shell(){
   const roles=userRoles(),active=activeUiRole();
   const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
-  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav></div><main class="wrap" id="main"></main>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger global-search-trigger-mobile" id="global-search-trigger-mobile" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><main class="wrap" id="main"></main>`;
   const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
-  const searchBtn=$('#global-search-trigger');if(searchBtn)searchBtn.addEventListener('click',()=>openGlobalSearchOverlay());
+  document.querySelectorAll('.global-search-trigger').forEach(searchBtn=>searchBtn.addEventListener('click',()=>openGlobalSearchOverlay()));
   const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
   $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
   renderNav();
@@ -151,16 +151,13 @@ function shell(){
 function renderNav(){
   const role=activeUiRole();
   const map={
-    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes']],
+    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control'],['config','Configuración']],
     CONTROL:[['control','Control'],['incidents','Incidencias']],
     PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
   };
-  const secondary=role==='ADMIN'?[['audit','Auditoría'],['control','Control'],['config','Configuración']]:[];
   const items=map[role]||[];
-  const direct=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
-  const more=secondary.length?`<details class="nav-more ${secondary.some(([v])=>state.view===v)?'active':''}"><summary>Más</summary><div class="nav-more-panel">${secondary.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('')}</div></details>`:'';
-  $('#nav').innerHTML=direct+more;
-  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const d=b.closest('.nav-more');if(d)d.removeAttribute('open');go(b.dataset.view)});
+  $('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
+  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
 }
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
@@ -435,6 +432,41 @@ async function openGlobalSearchOverlay(initial=''){
   requestAnimationFrame(()=>input.focus());if(initial)run();
 }
 
+
+function colorHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('')}
+function colorMix(a,b,t){
+  const p=x=>[parseInt(x.slice(1,3),16),parseInt(x.slice(3,5),16),parseInt(x.slice(5,7),16)],A=p(a),B=p(b);
+  return colorHex(A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t)
+}
+function colorDistance(a,b){return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2])}
+async function suggestColorsFromLogo(url){
+  if(!url)throw new Error('Primero indica la URL del logo.');
+  const img=new Image();img.crossOrigin='anonymous';img.referrerPolicy='no-referrer';
+  await new Promise((ok,ko)=>{img.onload=ok;img.onerror=()=>ko(new Error('No se pudo cargar el logo para analizar sus colores.'));img.src=url+(url.includes('?')?'&':'?')+'_color='+Date.now()});
+  const c=document.createElement('canvas'),ctx=c.getContext('2d',{willReadFrequently:true}),size=96;c.width=size;c.height=size;
+  const s=Math.min(size/img.naturalWidth,size/img.naturalHeight),w=img.naturalWidth*s,h=img.naturalHeight*s;
+  ctx.clearRect(0,0,size,size);ctx.drawImage(img,(size-w)/2,(size-h)/2,w,h);
+  let data;try{data=ctx.getImageData(0,0,size,size).data}catch(e){throw new Error('El servidor del logo no permite analizar sus colores. Prueba con otra URL de imagen.');}
+  const bins=new Map();
+  for(let i=0;i<data.length;i+=16){
+    const a=data[i+3];if(a<100)continue;let r=data[i],g=data[i+1],b=data[i+2];
+    const max=Math.max(r,g,b),min=Math.min(r,g,b),sat=max-min,lum=(r+g+b)/3;
+    if(lum>242||lum<18||sat<16)continue;
+    r=Math.round(r/24)*24;g=Math.round(g/24)*24;b=Math.round(b/24)*24;
+    const k=`${r},${g},${b}`,v=bins.get(k)||{rgb:[r,g,b],count:0,sat:0};v.count++;v.sat+=sat;bins.set(k,v);
+  }
+  const ranked=[...bins.values()].map(v=>({...v,score:v.count*(1+Math.min(1,v.sat/Math.max(1,v.count)/90))})).sort((a,b)=>b.score-a.score);
+  if(!ranked.length)throw new Error('No se detectaron colores suficientes en el logo.');
+  const mainRgb=ranked[0].rgb,main=colorHex(...mainRgb);
+  const alt=ranked.find(v=>colorDistance(v.rgb,mainRgb)>95);
+  let secondary=alt?colorHex(...alt.rgb):colorMix(main,'#102f2d',0.68);
+  const secRgb=[parseInt(secondary.slice(1,3),16),parseInt(secondary.slice(3,5),16),parseInt(secondary.slice(5,7),16)];
+  const secLum=(secRgb[0]*299+secRgb[1]*587+secRgb[2]*114)/1000;
+  if(secLum>145)secondary=colorMix(main,'#102f2d',0.72);
+  const accent=colorMix(main,'#ffffff',0.86);
+  return {ColorPrincipal:main,ColorSecundario:secondary,ColorAcento:accent};
+}
+
 async function configurationView(){
   renderLoading('config');
   try{
@@ -450,13 +482,14 @@ async function configurationView(){
       </div></section>
       <aside class="settings-side">
         <section class="card settings-logo"><h2>Logo</h2><p class="muted">Se utiliza en el login y en la cabecera. Si no hay logo, se muestra la P por defecto.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div></section>
-        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Se aplican a la interfaz al guardar.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}</section>
+        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Puedes elegirlos manualmente o sugerirlos automáticamente a partir del logo.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}<button type="button" class="secondary settings-color-suggest" id="settings-colors-suggest">Sugerir desde logo</button><div class="muted settings-color-hint" id="settings-color-hint">La sugerencia no se guarda hasta pulsar “Guardar configuración”.</div></section>
       </aside>
       <div class="settings-save"><button type="submit">Guardar configuración</button></div>
     </form>`;
     const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
     logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
     document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
+    const suggest=$('#settings-colors-suggest');if(suggest)suggest.onclick=async()=>{busy(suggest);try{const colors=await suggestColorsFromLogo(logo.value.trim());Object.entries(colors).forEach(([n,v])=>{const c=document.querySelector(`[data-color-name="${n}"]`),t=document.querySelector(`[data-color-text="${n}"]`);if(c)c.value=v;if(t)t.value=v});const hint=$('#settings-color-hint');if(hint)hint.textContent='Colores sugeridos desde el logo. Revísalos y guarda para aplicarlos.';toast('Colores sugeridos desde el logo.');busy(suggest,false)}catch(x){toast(x.message||x,true);busy(suggest,false)}};
     form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
   }catch(e){err(e)}
 }

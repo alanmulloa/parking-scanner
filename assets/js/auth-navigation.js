@@ -17,9 +17,9 @@ function login(message=''){
 function shell(){
   const roles=userRoles(),active=activeUiRole();
   const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
-  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav></div><main class="wrap" id="main"></main>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger global-search-trigger-mobile" id="global-search-trigger-mobile" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><main class="wrap" id="main"></main>`;
   const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
-  const searchBtn=$('#global-search-trigger');if(searchBtn)searchBtn.addEventListener('click',()=>openGlobalSearchOverlay());
+  document.querySelectorAll('.global-search-trigger').forEach(searchBtn=>searchBtn.addEventListener('click',()=>openGlobalSearchOverlay()));
   const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
   $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
   renderNav();
@@ -27,16 +27,13 @@ function shell(){
 function renderNav(){
   const role=activeUiRole();
   const map={
-    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes']],
+    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control'],['config','Configuración']],
     CONTROL:[['control','Control'],['incidents','Incidencias']],
     PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
   };
-  const secondary=role==='ADMIN'?[['audit','Auditoría'],['control','Control'],['config','Configuración']]:[];
   const items=map[role]||[];
-  const direct=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
-  const more=secondary.length?`<details class="nav-more ${secondary.some(([v])=>state.view===v)?'active':''}"><summary>Más</summary><div class="nav-more-panel">${secondary.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('')}</div></details>`:'';
-  $('#nav').innerHTML=direct+more;
-  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const d=b.closest('.nav-more');if(d)d.removeAttribute('open');go(b.dataset.view)});
+  $('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
+  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
 }
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
