@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.27';
+const APP_FRONTEND_VERSION='1.2.12.28';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -22,17 +22,27 @@ function server(fn,...args){
     }catch(e){finish(reject,e instanceof Error?e:new Error(String(e)))}
   })
 }
+const CLIENT_CALL_METRICS=[];
+function recordClientCall(action,ms,ok=true){
+  if(/^systemPerformanceHistory$/.test(action))return;
+  CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,at:Date.now()});
+  if(CLIENT_CALL_METRICS.length>160)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
+}
+function clientCallSummary(){
+  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,total:0,max:0,errors:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);if(!x.ok)m.errors++});
+  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count))})).sort((a,b)=>b.total-a.total);
+}
 async function call(action,payload={}){
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
-  let last;
+  let last;const callStarted=performance.now();
   for(let i=0;i<attempts;i++){
-    try{return await server('api',state.token,action,payload)}catch(e){
+    try{const value=await server('api',state.token,action,payload);recordClientCall(action,performance.now()-callStarted,true);return value}catch(e){
       last=e;
-      if(/sesión|session/i.test(e.message)){localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
+      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false);localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
       if(i+1<attempts)await sleep(650);
     }
   }
-  throw last;
+  recordClientCall(action,performance.now()-callStarted,false);throw last;
 }
 function busy(el,on=true){if(el)el.disabled=on}
 function toast(message,bad=false){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.className='message '+(bad?'bad':'');t.textContent=message;t.style.cssText='position:fixed;right:1rem;bottom:1rem;z-index:99;max-width:420px';clearTimeout(t.timer);t.timer=setTimeout(()=>t.remove(),4500)}
@@ -564,10 +574,12 @@ async function configurationView(initialTab='identity'){
             <div class="system-meta-grid"><div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div><div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div><div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div><div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div><div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div><div><span>Hojas</span><b>${Number(st.sheetCount||0)}</b></div></div></section>
             <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-service-grid">${serviceCards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'} · ${Number(st.performance&&st.performance.totalMs||0)} ms</div></section>
             <section class="card performance-card"><div class="system-status-head"><div><h2>Rendimiento y diagnóstico</h2><p class="muted">Mide tiempos reales de lectura desde Apps Script, Sheets y Drive sin modificar datos.</p></div></div>
-              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-control">Medir Control</button><button type="button" class="secondary" id="diag-volume">Prueba de volumen</button><button type="button" class="secondary" id="diag-sheets">Benchmark Sheets</button></div>
+              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-control">Medir Control</button><button type="button" class="secondary" id="diag-volume">Prueba de volumen</button><button type="button" class="secondary" id="diag-sheets">Benchmark Sheets</button><button type="button" class="secondary" id="diag-roundtrip">Round-trip</button><button type="button" class="secondary" id="diag-concurrency">Concurrencia</button></div>
               <div id="diag-result" class="diagnostic-empty"><b>Sin prueba ejecutada</b><span>La prueba rápida comprueba disponibilidad. El diagnóstico completo fuerza lecturas de los principales conjuntos de datos.</span></div>
               <div id="diag-special" class="diagnostic-empty"><b>Pruebas avanzadas</b><span>Control mide matrícula/QR sin registrar accesos. Volumen simula 1.000, 5.000 y 20.000 registros en memoria sin modificar datos.</span></div>
               <div id="diag-benchmark" class="diagnostic-empty"><b>Benchmark real de Sheets</b><span>Crea un Spreadsheet temporal con 20.000 filas, mide lecturas reales y lo envía a la papelera al finalizar. No modifica la BBDD operativa.</span></div>
+              <div id="diag-network" class="diagnostic-empty"><b>Latencia y concurrencia</b><span>Round-trip separa ejecución servidor de espera/transporte. Concurrencia lanza lotes de 5, 10 y 20 lecturas desde este navegador.</span></div>
+              <div id="diag-calls" class="diagnostic-empty"><b>Llamadas de esta sesión</b><span>Se mostrarán las acciones más costosas realizadas desde que abriste la aplicación.</span></div>
               <div id="perf-overview"><div class="diagnostic-running"><div class="spinner"></div><span>Cargando resumen de salud…</span></div></div>
               <p class="muted diagnostic-note">Estas comprobaciones no sustituyen una prueba externa de concurrencia. El histórico técnico no almacena datos personales.</p>
             </section>`;
@@ -577,18 +589,41 @@ async function configurationView(initialTab='identity'){
           $('#diag-control').onclick=()=>runSpecialDiagnostic('control');
           $('#diag-volume').onclick=()=>runSpecialDiagnostic('volume');
           $('#diag-sheets').onclick=()=>runSheetsBenchmark();
+          $('#diag-roundtrip').onclick=()=>runRoundTrip();
+          $('#diag-concurrency').onclick=()=>runConcurrency();
+          renderSessionCalls();
           refreshPerfOverview();
         }catch(e){panel.innerHTML=`<section class="card"><div class="message bad">${esc(e.message||String(e))}</div><button type="button" class="secondary" id="system-retry">Reintentar</button></section>`;$('#system-retry').onclick=loadStatus}
       }
       function renderPerfOverview(perf){
         const el=$('#perf-overview');if(!el)return;
         const health=(perf.health||[]).map(x=>`<div class="health-card ${esc(x.tone||'neutral')}"><span>${esc(x.label||'')}</span><b>${esc(x.value||'—')}</b><small>${esc(x.detail||'')}</small></div>`).join('');
-        const typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real'};
+        const typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real',roundtrip:'Round-trip',concurrency:'Concurrencia'};
         const history=(perf.history||[]).slice(0,8).map(x=>{const slow=(x.metrics||[]).slice().sort((a,b)=>Number(b.ms||0)-Number(a.ms||0))[0];return `<div class="perf-history-row"><div><b>${esc(typeLabel[x.type]||x.type||'Prueba')}</b><span>${esc(x.checkedAt||'')}</span></div><div><span>${slow?esc(slow.label)+' · '+Number(slow.ms||0)+' ms':''}</span><strong class="perf-badge ${x.ok===false?'bad':systemPerfClientLevel(Number(x.totalMs||0))}">${Number(x.totalMs||0)} ms</strong></div></div>`}).join('');
         el.innerHTML=`<section class="perf-health"><h3>Resumen de salud</h3><div class="health-grid">${health}</div></section><section class="perf-history"><div class="system-status-head"><div><h3>Histórico de diagnósticos</h3><p class="muted">Últimas comprobaciones técnicas guardadas sin datos personales.</p></div></div>${history||'<div class="diagnostic-empty"><span>Todavía no hay histórico suficiente.</span></div>'}</section>`;
       }
       function systemPerfClientLevel(ms){return ms<=500?'good':ms<=1500?'warn':'slow'}
       async function refreshPerfOverview(){try{renderPerfOverview(await call('systemPerformanceHistory'))}catch(e){const el=$('#perf-overview');if(el)el.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}}
+      function renderSessionCalls(){
+        const box=$('#diag-calls');if(!box)return;const rows=clientCallSummary().slice(0,10);
+        if(!rows.length){box.className='diagnostic-empty';box.innerHTML='<b>Llamadas de esta sesión</b><span>Todavía no hay suficientes llamadas registradas.</span>';return}
+        box.className='diagnostic-result';box.innerHTML='<div class="diagnostic-summary"><div><b>Llamadas de esta sesión</b><span>Top por tiempo acumulado</span></div></div><div class="call-stats-grid">'+rows.map(x=>`<div class="call-stat"><b>${esc(x.action)}</b><span>${x.count} llamada${x.count===1?'':'s'} · media ${x.avg} ms · máx. ${x.max} ms${x.errors?' · '+x.errors+' error(es)':''}</span></div>`).join('')+'</div>';
+      }
+      async function runRoundTrip(){
+        const box=$('#diag-network'),b=$('#diag-roundtrip');if(!box||!b)return;b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Midiendo latencia navegador ↔ Apps Script…</span>';
+        try{const samples=[];for(let i=0;i<3;i++){const t=performance.now(),r=await call('systemRoundTripPing',{seq:i+1}),total=Math.round(performance.now()-t),serverMs=Number(r.serverMs||0);samples.push({total,serverMs,overhead:Math.max(0,total-serverMs)})}
+          const avg=k=>Math.round(samples.reduce((a,x)=>a+x[k],0)/samples.length),totalAvg=avg('total'),serverAvg=avg('serverMs'),overAvg=avg('overhead');
+          box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Round-trip navegador ↔ backend</b><span>Promedio de 3 muestras</span></div><span class="perf-badge ${systemPerfClientLevel(totalAvg)}">${totalAvg} ms</span></div><div class="diagnostic-grid"><div class="diagnostic-row"><div><b>Respuesta total</b><small>Tiempo percibido por el navegador</small></div><span>${totalAvg} ms</span></div><div class="diagnostic-row"><div><b>Ejecución servidor</b><small>Trabajo medido dentro de Apps Script</small></div><span>${serverAvg} ms</span></div><div class="diagnostic-row"><div><b>Transporte / espera</b><small>Diferencia aproximada entre navegador y servidor</small></div><span>${overAvg} ms</span></div></div>`;
+          await call('systemRecordClientPerformance',{type:'roundtrip',totalMs:totalAvg,metrics:[{label:'Servidor',ms:serverAvg,ok:true},{label:'Transporte / espera',ms:overAvg,ok:true}]});
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
+      }
+      async function runConcurrency(){
+        const box=$('#diag-network'),b=$('#diag-concurrency');if(!box||!b)return;if(!confirm('La prueba lanzará lotes de 5, 10 y 20 lecturas simultáneas de solo lectura desde este navegador. No modifica datos. ¿Continuar?'))return;b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando concurrencia controlada…</span>';
+        try{const batches=[];for(const n of [5,10,20]){const started=performance.now();const jobs=Array.from({length:n},(_,i)=>{const t=performance.now();return call('systemRoundTripPing',{seq:i+1}).then(r=>({ok:true,ms:Math.round(performance.now()-t),serverMs:Number(r.serverMs||0)})).catch(()=>({ok:false,ms:Math.round(performance.now()-t),serverMs:0}))});const r=await Promise.all(jobs),batchMs=Math.round(performance.now()-started),ok=r.filter(x=>x.ok),fails=n-ok.length;batches.push({n,batchMs,avg:ok.length?Math.round(ok.reduce((a,x)=>a+x.ms,0)/ok.length):0,max:ok.length?Math.max(...ok.map(x=>x.ms)):0,fails})}
+          const worst=Math.max(...batches.map(x=>x.batchMs)),allOk=batches.every(x=>!x.fails);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Concurrencia controlada</b><span>Simulación desde un único navegador</span></div><span class="system-pill ${allOk?'ok':'bad'}">${allOk?'Correcto':'Revisar'}</span></div><div class="diagnostic-grid">${batches.map(x=>`<div class="diagnostic-row"><div><b>${x.n} simultáneas</b><small>Media ${x.avg} ms · máximo ${x.max} ms${x.fails?' · '+x.fails+' fallos':''}</small></div><span class="perf-badge ${systemPerfClientLevel(x.batchMs)}">${x.batchMs} ms lote</span></div>`).join('')}</div><p class="muted diagnostic-note">Prueba útil para detectar saturación del navegador/Apps Script, pero no sustituye una prueba multiusuario externa.</p>`;
+          await call('systemRecordClientPerformance',{type:'concurrency',ok:allOk,totalMs:worst,metrics:batches.map(x=>({label:x.n+' simultáneas',ms:x.batchMs,ok:x.fails===0}))});
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
+      }
       async function runSheetsBenchmark(){
         const box=$('#diag-benchmark'),b=$('#diag-sheets');if(!box||!b)return;
         if(!confirm('El benchmark creará temporalmente un Spreadsheet con 20.000 filas para medir lectura real. No modificará la base operativa y el archivo se enviará a la papelera al finalizar. ¿Continuar?'))return;

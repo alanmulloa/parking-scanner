@@ -949,3 +949,11 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .perf-history-row:first-of-type{border-top:0}.perf-history-row>div{display:flex;gap:.5rem;align-items:center;min-width:0}.perf-history-row>div:last-child{justify-content:flex-end}.perf-history-row span{color:#607370;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:900px){.health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.perf-history-row{grid-template-columns:1fr}.perf-history-row>div:last-child{justify-content:space-between}}
 @media(max-width:520px){.health-grid{grid-template-columns:1fr}.performance-actions #diag-sheets{width:100%}.perf-health,.perf-history{padding:.8rem}.perf-history-row>div{align-items:flex-start;flex-wrap:wrap}}
+
+
+/* 1.2.12.28 - round-trip, concurrencia y llamadas de sesión */
+#diag-network,#diag-calls{margin-top:.75rem}
+.call-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:.65rem}
+.call-stat{border:1px solid #dde7e5;border-radius:10px;background:#fff;padding:.65rem .75rem;display:flex;flex-direction:column;gap:.2rem;min-width:0}
+.call-stat b{font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.call-stat span{font-size:.76rem;color:#657774;line-height:1.3}
+@media(max-width:720px){.call-stats-grid{grid-template-columns:1fr}.performance-actions #diag-roundtrip,.performance-actions #diag-concurrency{width:100%!important}}
