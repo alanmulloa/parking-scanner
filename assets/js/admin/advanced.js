@@ -143,17 +143,17 @@ async function configurationView(){
   renderLoading('config');
   try{
     const s=await call('getSettings');
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de Parking Comunidad.</div></div></div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de la comunidad. Los cambios se aplican al login y a la cabecera.</div></div></div>
     <form id="configuration-form" class="settings-layout">
       <section class="card settings-main"><h2>Datos principales</h2><p class="muted">Información visible dentro de la aplicación.</p><div class="form">
         <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
-        <div class="field"><label>Nombre corto</label><input name="NombreCorto" value="${esc(s.NombreCorto||'Parking')}"></div>
+        <div class="field"><label>Descripción</label><input name="Descripcion" value="${esc(s.Descripcion||s.NombreCorto||'Gestión de acceso y parking de la comunidad')}" placeholder="Gestión de acceso y parking de la comunidad"></div>
         <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
         <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
         <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="https://..."></div>
       </div></section>
       <aside class="settings-side">
-        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Vista previa de la identidad.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div></section>
+        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Se utiliza en el login y en la cabecera. Si no hay logo, se muestra la P por defecto.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div></section>
         <section class="card settings-colors"><h2>Colores</h2><p class="muted">Se aplican a la interfaz al guardar.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}</section>
       </aside>
       <div class="settings-save"><button type="submit">Guardar configuración</button></div>
