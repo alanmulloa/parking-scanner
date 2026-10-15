@@ -971,3 +971,52 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .incident-create-form .message{align-self:end}
 .incident-thresholds{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:700px){.incident-thresholds{grid-template-columns:1fr}.incident-create-form .field{min-width:0}.incident-timeline{margin-top:.75rem}}
+
+/* 1.2.13.2 - alta de incidencia en móvil */
+@media(max-width:720px){body.incident-entry-mode{padding-bottom:0!important}body.incident-entry-mode #mobile-nav{display:none!important}.incident-create-form{margin-bottom:1rem!important;padding-bottom:1.25rem!important}.incident-create-form .incident-form-actions{position:sticky;bottom:0;background:#fff;padding-top:.65rem;padding-bottom:calc(.35rem + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}.incident-create-form .incident-form-actions button{min-height:48px}}
+
+/* 1.2.13.3 - Incidencias móvil: Acciones igual al patrón de Vehículos */
+@media(max-width:720px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
+    display:grid!important;
+    grid-template-columns:minmax(92px,34%) minmax(0,1fr)!important;
+    column-gap:.7rem!important;
+    align-items:center!important;
+    padding:.52rem 0!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{
+    display:block!important;
+    content:"ACCIONES"!important;
+    font-size:.68rem!important;
+    line-height:1.2!important;
+    text-transform:uppercase!important;
+    font-weight:850!important;
+    color:#6a7d80!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu{
+    width:auto!important;
+    min-width:0!important;
+    justify-self:start!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
+    width:auto!important;
+    min-width:132px!important;
+    max-width:100%!important;
+    min-height:44px!important;
+    padding:.58rem .78rem!important;
+    justify-content:center!important;
+    font-size:.82rem!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu-panel{
+    width:min(230px,calc(100vw - 2.5rem))!important;
+    min-width:0!important;
+  }
+}
+@media(max-width:420px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
+    grid-template-columns:92px minmax(0,1fr)!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
+    min-width:124px!important;
+  }
+}
