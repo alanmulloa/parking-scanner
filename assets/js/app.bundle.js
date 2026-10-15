@@ -141,13 +141,28 @@ function login(message=''){
 function shell(){
   const roles=userRoles(),active=activeUiRole();
   const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
-  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger global-search-trigger-mobile" id="global-search-trigger-mobile" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><main class="wrap" id="main"></main>`;
+  const mobileRoleSelector=roles.length>1?`<label class="mobile-role-row"><span>Perfil</span><select id="mobile-role-switch" class="role-switch mobile-role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<div class="mobile-role-row"><span>Perfil</span><b>${esc(active)}</b></div>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><div class="mobile-header-actions"><button type="button" class="mobile-icon-btn global-search-trigger" id="global-search-trigger-mobile" aria-label="Buscar" title="Buscar">⌕</button><button type="button" class="mobile-icon-btn mobile-user-trigger" id="mobile-user-trigger" aria-label="Abrir menú de usuario" title="Usuario">☰</button></div><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button><div class="mobile-user-menu" id="mobile-user-menu" aria-hidden="true"><div class="mobile-user-summary"><b>${esc(state.user.Nombre)}</b><span>${esc(state.user.Email||'')}</span></div>${mobileRoleSelector}<button type="button" class="mobile-menu-action" id="mobile-profile-link">Mis datos</button><button type="button" class="mobile-menu-action danger-text" id="mobile-logout">Salir</button></div></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><nav class="mobile-dock" id="mobile-nav" aria-label="Navegación principal"></nav><div class="mobile-more-sheet" id="mobile-more-sheet" aria-hidden="true"><button type="button" class="mobile-sheet-backdrop" id="mobile-more-backdrop" aria-label="Cerrar menú"></button><section class="mobile-sheet-panel"><div class="mobile-sheet-handle"></div><div class="mobile-sheet-head"><b>Más opciones</b><button type="button" class="mobile-sheet-close" id="mobile-more-close" aria-label="Cerrar">×</button></div><div class="mobile-more-list" id="mobile-more-list"></div></section></div><main class="wrap" id="main"></main>`;
   const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
   document.querySelectorAll('.global-search-trigger').forEach(searchBtn=>searchBtn.addEventListener('click',()=>openGlobalSearchOverlay()));
   const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
-  $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
+  const mrs=$('#mobile-role-switch');if(mrs)mrs.addEventListener('change',()=>setActiveUiRole(mrs.value));
+  const logoutAction=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
+  $('#logout').onclick=logoutAction;
+  $('#mobile-logout').onclick=logoutAction;
+  $('#mobile-profile-link').onclick=()=>{closeMobileMenus();go('profile')};
+  $('#mobile-user-trigger').onclick=e=>{e.stopPropagation();toggleMobileUserMenu()};
+  $('#mobile-more-close').onclick=closeMobileMore;
+  $('#mobile-more-backdrop').onclick=closeMobileMore;
+  document.addEventListener('click',mobileOutsideClick,{once:true});
   renderNav();
 }
+function mobileOutsideClick(e){const menu=$('#mobile-user-menu'),trigger=$('#mobile-user-trigger');if(menu&&menu.classList.contains('open')&&!menu.contains(e.target)&&e.target!==trigger)closeMobileUserMenu()}
+function toggleMobileUserMenu(){const menu=$('#mobile-user-menu');if(!menu)return;const open=!menu.classList.contains('open');closeMobileMore();menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));if(open)setTimeout(()=>document.addEventListener('click',mobileOutsideClick,{once:true}),0)}
+function closeMobileUserMenu(){const menu=$('#mobile-user-menu');if(menu){menu.classList.remove('open');menu.setAttribute('aria-hidden','true')}}
+function openMobileMore(){const sheet=$('#mobile-more-sheet');if(!sheet)return;closeMobileUserMenu();sheet.classList.add('open');sheet.setAttribute('aria-hidden','false');document.body.classList.add('mobile-sheet-open')}
+function closeMobileMore(){const sheet=$('#mobile-more-sheet');if(sheet){sheet.classList.remove('open');sheet.setAttribute('aria-hidden','true')}document.body.classList.remove('mobile-sheet-open')}
+function closeMobileMenus(){closeMobileUserMenu();closeMobileMore()}
 function renderNav(){
   const role=activeUiRole();
   const map={
@@ -155,9 +170,17 @@ function renderNav(){
     CONTROL:[['control','Control'],['incidents','Incidencias']],
     PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
   };
+  const mobilePrimary={
+    ADMIN:[['dashboard','Inicio','⌂'],['housing','Viviendas','⌂'],['vehicles','Vehículos','▣']],
+    CONTROL:[['control','Control','⌁'],['incidents','Incidencias','!']],
+    PROPIETARIO:[['ownerHome','Inicio','⌂'],['ownerHousing','Viviendas','⌂'],['ownerVehicles','Vehículos','▣']]
+  };
   const items=map[role]||[];
-  $('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
-  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
+  const nav=$('#nav');if(nav){nav.innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');nav.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view))}
+  const primary=mobilePrimary[role]||[],primaryViews=new Set(primary.map(x=>x[0])),moreItems=items.filter(([v])=>!primaryViews.has(v));
+  if(role==='PROPIETARIO'&&!moreItems.some(([v])=>v==='profile'))moreItems.push(['profile','Mis datos']);
+  const mobileNav=$('#mobile-nav');if(mobileNav){const moreActive=!primaryViews.has(state.view);mobileNav.innerHTML=primary.map(([v,l,icon])=>`<button type="button" data-view="${v}" class="mobile-dock-item ${state.view===v?'active':''}"><span class="mobile-dock-icon">${icon}</span><span>${l}</span></button>`).join('')+`<button type="button" id="mobile-more-btn" class="mobile-dock-item ${moreActive?'active':''}"><span class="mobile-dock-icon">•••</span><span>Más</span></button>`;mobileNav.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{closeMobileMenus();go(b.dataset.view)});$('#mobile-more-btn').onclick=openMobileMore}
+  const moreList=$('#mobile-more-list');if(moreList){moreList.innerHTML=moreItems.map(([v,l])=>`<button type="button" data-view="${v}" class="mobile-more-item ${state.view===v?'active':''}"><span>${l}</span><span>›</span></button>`).join('');moreList.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{closeMobileMore();go(b.dataset.view)})}
 }
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
