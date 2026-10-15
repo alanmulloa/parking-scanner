@@ -777,149 +777,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .details>div{grid-template-columns:92px minmax(0,1fr)!important}
 }
 
-/* 1.2.12.23 - móvil: Acciones unificadas + Mis vehículos igual a Vehículos ADMIN */
-@media(max-width:720px){
-  /* Patrón común de acciones: mismo comportamiento que Viviendas */
-  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"]{
-    display:grid!important;
-    grid-template-columns:minmax(100px,34%) minmax(0,1fr)!important;
-    gap:.65rem!important;
-    align-items:center!important;
-    padding:.52rem 0!important;
-  }
-  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"]:before,
-  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"]:before,
-  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"]:before{
-    display:block!important;
-    content:"ACCIONES"!important;
-  }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu,
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
-  }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{
-    min-height:46px!important;
-    justify-content:center!important;
-    padding:.65rem .8rem!important;
-    font-size:.9rem!important;
-  }
-
-  /* Vehículos ADMIN: no convertir Acciones en fila completa; seguir patrón Viviendas */
-  body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Acciones"]{
-    grid-template-columns:minmax(112px,34%) minmax(0,1fr)!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Acciones"]:before{
-    display:block!important;
-    content:"ACCIONES"!important;
-  }
-
-  /* Incidencias / Solicitudes ADMIN: mismo ancho visual de botón */
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td[data-label="Acciones"],
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
-    grid-template-columns:100px minmax(0,1fr)!important;
-  }
-
-  /* Mis vehículos PROPIETARIO: mismo layout responsive que Vehículos ADMIN */
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like{
-    overflow:visible!important;
-    background:transparent!important;
-    border:0!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table{
-    display:block!important;
-    width:100%!important;
-    min-width:0!important;
-    table-layout:auto!important;
-    background:transparent!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table thead{
-    display:none!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table tbody{
-    display:grid!important;
-    grid-template-columns:1fr!important;
-    width:100%!important;
-    gap:.75rem!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table tr{
-    display:block!important;
-    width:100%!important;
-    min-width:0!important;
-    max-width:100%!important;
-    padding:.8rem .85rem!important;
-    margin:0!important;
-    border:1px solid var(--line)!important;
-    border-radius:15px!important;
-    background:#fff!important;
-    box-shadow:0 5px 18px rgba(15,48,47,.05)!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td,
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td:nth-child(n){
-    display:grid!important;
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
-    grid-template-columns:minmax(112px,34%) minmax(0,1fr)!important;
-    gap:.65rem!important;
-    align-items:center!important;
-    padding:.42rem 0!important;
-    border:0!important;
-    border-bottom:1px dashed #edf1f1!important;
-    white-space:normal!important;
-    overflow:visible!important;
-    word-break:normal!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td:last-child{
-    border-bottom:0!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td:before{
-    min-width:0!important;
-    font-size:.67rem!important;
-    line-height:1.2!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td>*{
-    min-width:0!important;
-    max-width:100%!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Matrícula habitual"] b,
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Matrícula temporal"] b{
-    display:inline-block!important;
-    white-space:nowrap!important;
-    overflow-wrap:normal!important;
-    word-break:normal!important;
-    font-size:1.08rem!important;
-    letter-spacing:.02em;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Solicitudes"] .link-chip,
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Incidencias"] .link-chip{
-    width:auto!important;
-    max-width:100%!important;
-    justify-self:start!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Acciones"]{
-    grid-template-columns:minmax(112px,34%) minmax(0,1fr)!important;
-  }
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Acciones"]:before{
-    display:block!important;
-    content:"ACCIONES"!important;
-  }
-}
-@media(max-width:420px){
-  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"],
-  body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Acciones"],
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td,
-  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td:nth-child(n){
-    grid-template-columns:92px minmax(0,1fr)!important;
-  }
-}
-
-
 /* 1.2.12.24 - Sistema: rendimiento y diagnóstico */
 .perf-badge{display:inline-flex;align-items:center;justify-content:center;width:max-content;margin-top:.2rem;border-radius:999px;padding:.18rem .5rem;font-size:.68rem;font-weight:850;background:#e8f6ef;color:#087448}.perf-badge.warn{background:#fff4d6;color:#8a5a00}.perf-badge.slow,.perf-badge.bad{background:#fee4e1;color:#b42318}
 .performance-card{display:grid;gap:.9rem}.performance-actions{display:flex;gap:.65rem;flex-wrap:wrap}.diagnostic-empty,.diagnostic-running{border:1px dashed var(--line);border-radius:13px;padding:1rem;display:flex;align-items:center;gap:.7rem;color:var(--muted);background:#fafcfc}.diagnostic-empty{display:grid;gap:.25rem}.diagnostic-empty b{color:var(--ink)}.diagnostic-note{margin:0!important}
@@ -975,52 +832,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 /* 1.2.13.2 - alta de incidencia en móvil */
 @media(max-width:720px){body.incident-entry-mode{padding-bottom:0!important}body.incident-entry-mode #mobile-nav{display:none!important}.incident-create-form{margin-bottom:1rem!important;padding-bottom:1.25rem!important}.incident-create-form .incident-form-actions{position:sticky;bottom:0;background:#fff;padding-top:.65rem;padding-bottom:calc(.35rem + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}.incident-create-form .incident-form-actions button{min-height:48px}}
 
-/* 1.2.13.6 - Incidencias móvil: Acciones igual al patrón de Vehículos */
-@media(max-width:720px){
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
-    display:grid!important;
-    grid-template-columns:minmax(92px,34%) minmax(0,1fr)!important;
-    column-gap:.7rem!important;
-    align-items:center!important;
-    padding:.52rem 0!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{
-    display:block!important;
-    content:"ACCIONES"!important;
-    font-size:.68rem!important;
-    line-height:1.2!important;
-    text-transform:uppercase!important;
-    font-weight:850!important;
-    color:#6a7d80!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu{
-    width:auto!important;
-    min-width:0!important;
-    justify-self:start!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
-    width:auto!important;
-    min-width:132px!important;
-    max-width:100%!important;
-    min-height:44px!important;
-    padding:.58rem .78rem!important;
-    justify-content:center!important;
-    font-size:.82rem!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu-panel{
-    width:min(230px,calc(100vw - 2.5rem))!important;
-    min-width:0!important;
-  }
-}
-@media(max-width:420px){
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
-    grid-template-columns:92px minmax(0,1fr)!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
-    min-width:124px!important;
-  }
-}
-
 /* 1.2.13.6 - móvil: una sola navegación inferior.
    #nav es la navegación desktop heredada que en móvil quedaba fija detrás
    del dock flotante #mobile-nav. Cuando existe el dock móvil, se oculta #nav. */
@@ -1038,158 +849,212 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .control-open-incident .actions{justify-content:flex-start;margin-top:.55rem;gap:.5rem;align-items:center;flex-wrap:wrap}
 @media (max-width:700px){.control-open-incidents{padding:.8rem}.control-open-incident .actions button{width:100%;min-height:44px}.control-open-incident .actions .subtle{display:block;width:100%}}
 
-/* 1.2.13.16 - Incidencias ADMIN móvil: Acciones igual a Solicitudes */
+/* 1.2.14.2 - Sistema visual móvil canónico
+   Única capa final de geometría responsive para ADMIN / CONTROL / PROPIETARIO.
+   Las excepciones anteriores quedan subordinadas a estas reglas. */
 @media(max-width:720px){
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
-    display:grid!important;
-    grid-template-columns:100px minmax(0,1fr)!important;
-    gap:.65rem!important;
-    align-items:center!important;
-    padding:.52rem 0!important;
+  :root{
+    --m-card-radius:16px;
+    --m-control-radius:12px;
+    --m-control-h:46px;
+    --m-button-h:44px;
+    --m-action-w:132px;
+    --m-badge-h:28px;
+    --m-label-w:100px;
+    --m-gap:.7rem;
+    --m-card-shadow:0 5px 18px rgba(15,48,47,.055);
   }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{
-    display:block!important;
-    content:"ACCIONES"!important;
-    font-size:.68rem!important;
-    line-height:1.2!important;
-    text-transform:uppercase!important;
-    font-weight:850!important;
-    color:#6a7d80!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu{
-    width:100%!important;
-    min-width:0!important;
-    justify-self:stretch!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
-    width:100%!important;
-    min-width:0!important;
-    max-width:none!important;
-    min-height:46px!important;
-    padding:.65rem .8rem!important;
-    justify-content:center!important;
-    font-size:.9rem!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu-panel{
-    width:min(230px,calc(100vw - 2.5rem))!important;
-    min-width:0!important;
-    right:0!important;
-    left:auto!important;
-  }
-}
-@media(max-width:420px){
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
-    grid-template-columns:92px minmax(0,1fr)!important;
-  }
-}
 
-/* 1.2.14.0 - Normalizacion responsive movil ADMIN / CONTROL / PROPIETARIO */
-@media(max-width:720px){
-  /* Ritmo y superficies comunes */
+  /* Layout global */
+  body:has(#mobile-nav){padding-bottom:calc(108px + env(safe-area-inset-bottom))!important}
   body:has(#mobile-nav) .wrap{width:calc(100% - 1rem)!important;padding:1rem 0 calc(110px + env(safe-area-inset-bottom))!important}
+  body:has(#mobile-nav) #nav,
+  body:has(#mobile-nav) .section-nav{display:none!important}
+
+  /* Cabeceras y ritmo */
+  body:has(#mobile-nav) .head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:.65rem!important;flex-wrap:wrap!important;margin:1rem 0 .75rem!important}
+  body:has(#mobile-nav) .head h1{font-size:1.55rem!important;line-height:1.12!important;margin:0!important}
+  body:has(#mobile-nav) .head h2{font-size:1.25rem!important;line-height:1.15!important;margin:0!important}
+  body:has(#mobile-nav) .head .actions{margin-left:auto!important}
+
+  /* Superficies */
   body:has(#mobile-nav) .card,
   body:has(#mobile-nav) .tablebox,
   body:has(#mobile-nav) .detail-panel,
-  body:has(#mobile-nav) .summary-card{
-    border-radius:16px!important;
-    box-shadow:0 6px 20px rgba(15,48,47,.06)!important;
+  body:has(#mobile-nav) .summary-card,
+  body:has(#mobile-nav) .owner-list-row,
+  body:has(#mobile-nav) .owner-home-card{
+    border-radius:var(--m-card-radius)!important;
+    box-shadow:var(--m-card-shadow)!important;
   }
   body:has(#mobile-nav) .card{padding:1rem!important}
 
-  /* Tipografia y cabeceras */
-  body:has(#mobile-nav) .head{gap:.65rem!important;align-items:center!important}
-  body:has(#mobile-nav) .head h1{font-size:1.55rem!important;line-height:1.12!important;margin:0!important}
-  body:has(#mobile-nav) .head h2{font-size:1.25rem!important;line-height:1.15!important}
+  /* Campos */
+  body:has(#mobile-nav) .field{gap:.35rem!important}
   body:has(#mobile-nav) .field label,
   body:has(#mobile-nav) .responsive-data-table td:before,
   body:has(#mobile-nav) .admin-record-table td:before{
-    font-size:.7rem!important;line-height:1.2!important;font-weight:850!important;letter-spacing:.02em!important;color:#667b7e!important;
+    font-size:.7rem!important;line-height:1.2!important;font-weight:850!important;
+    letter-spacing:.02em!important;color:#667b7e!important;text-transform:uppercase!important;
   }
-
-  /* Controles y botones estandar */
-  body:has(#mobile-nav) input,
-  body:has(#mobile-nav) select,
-  body:has(#mobile-nav) textarea,
-  body:has(#mobile-nav) .search{font-size:1rem!important;border-radius:12px!important}
   body:has(#mobile-nav) input:not([type="checkbox"]):not([type="radio"]),
   body:has(#mobile-nav) select,
-  body:has(#mobile-nav) .search{min-height:46px!important;padding:.65rem .78rem!important}
-  body:has(#mobile-nav) textarea{min-height:96px!important;padding:.72rem .78rem!important}
+  body:has(#mobile-nav) .search{
+    width:100%!important;min-height:var(--m-control-h)!important;padding:.65rem .78rem!important;
+    border-radius:var(--m-control-radius)!important;font-size:1rem!important;
+  }
+  body:has(#mobile-nav) textarea{
+    width:100%!important;min-height:96px!important;padding:.72rem .78rem!important;
+    border-radius:var(--m-control-radius)!important;font-size:1rem!important;
+  }
+
+  /* Botones estándar: geometría compartida */
   body:has(#mobile-nav) button:not(.mobile-dock-item):not(.mobile-icon-btn):not(.mobile-sheet-backdrop),
   body:has(#mobile-nav) .btn{
-    min-height:44px!important;border-radius:12px!important;padding:.62rem .82rem!important;font-size:.86rem!important;line-height:1.1!important;
+    min-height:var(--m-button-h)!important;border-radius:var(--m-control-radius)!important;
+    padding:.62rem .82rem!important;font-size:.86rem!important;line-height:1.1!important;
   }
-  /* CTAs grandes de Control mantienen jerarquia, pero con acabado comun */
-  body:has(#mobile-nav[data-role="CONTROL"]) .big{min-height:92px!important;border-radius:16px!important;font-size:1rem!important}
+  body:has(#mobile-nav[data-role="CONTROL"]) .big{
+    min-height:92px!important;border-radius:var(--m-card-radius)!important;font-size:1rem!important;
+  }
 
-  /* Estados y chips: misma altura/sombreado visual */
+  /* Chips y estados */
   body:has(#mobile-nav) .status,
+  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table .status,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .status,
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .status,
   body:has(#mobile-nav) .request-chip,
   body:has(#mobile-nav) .vehicle-alert-chip,
   body:has(#mobile-nav) .link-chip,
   body:has(#mobile-nav) .system-pill,
   body:has(#mobile-nav) .perf-badge{
     display:inline-flex!important;align-items:center!important;justify-content:center!important;
-    min-height:28px!important;width:max-content!important;max-width:100%!important;
+    min-height:var(--m-badge-h)!important;width:max-content!important;max-width:100%!important;
     padding:.28rem .58rem!important;border-radius:999px!important;
     font-size:.72rem!important;font-weight:850!important;line-height:1!important;
     white-space:nowrap!important;word-break:keep-all!important;
   }
 
-  /* Tarjetas-tabla compartidas */
+  /* Filtros */
+  body:has(#mobile-nav) .filterbar{
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:.65rem!important;align-items:end!important;border-radius:var(--m-card-radius)!important;
+  }
+  body:has(#mobile-nav) .filterbar .field,
+  body:has(#mobile-nav) .filterbar .filter-search{min-width:0!important;width:100%!important;flex:none!important}
+  body:has(#mobile-nav) .filterbar .filter-search{grid-column:1/-1!important}
+  body:has(#mobile-nav) .filterbar .count{grid-column:1/-1!important;width:100%!important;margin:0!important;padding:.2rem 0!important;font-size:.82rem!important;color:var(--muted)!important}
+
+  /* Todas las tablas de gestión pasan a tarjeta con la misma geometría */
+  body:has(#mobile-nav) .tablebox:has(.responsive-data-table),
+  body:has(#mobile-nav) .admin-record-tablebox,
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like{
+    overflow:visible!important;background:transparent!important;border:0!important;box-shadow:none!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table,
+  body:has(#mobile-nav) .admin-record-table{
+    display:block!important;width:100%!important;min-width:0!important;table-layout:auto!important;background:transparent!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table thead,
+  body:has(#mobile-nav) .admin-record-table thead{display:none!important}
+  body:has(#mobile-nav) .responsive-data-table tbody,
+  body:has(#mobile-nav) .admin-record-table tbody{
+    display:grid!important;grid-template-columns:1fr!important;gap:.75rem!important;width:100%!important;
+  }
   body:has(#mobile-nav) .responsive-data-table tr:not(.table-group-row),
   body:has(#mobile-nav) .admin-record-table tr:not(.table-group-row){
-    border-radius:16px!important;padding:.82rem .88rem!important;
-    box-shadow:0 5px 18px rgba(15,48,47,.05)!important;
+    display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;
+    margin:0!important;padding:.82rem .88rem!important;border:1px solid var(--line)!important;
+    border-radius:var(--m-card-radius)!important;background:#fff!important;box-shadow:var(--m-card-shadow)!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table tr.table-group-row,
+  body:has(#mobile-nav) .admin-record-table tr.table-group-row{
+    display:block!important;width:100%!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table tr.table-group-row td,
+  body:has(#mobile-nav) .admin-record-table tr.table-group-row td{
+    display:block!important;width:100%!important;padding:.6rem .1rem!important;border:0!important;font-size:.82rem!important;
   }
   body:has(#mobile-nav) .responsive-data-table td,
-  body:has(#mobile-nav) .admin-record-table td{
-    grid-template-columns:100px minmax(0,1fr)!important;
-    column-gap:.7rem!important;align-items:center!important;padding:.42rem 0!important;
+  body:has(#mobile-nav) .admin-record-table td,
+  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td:nth-child(n),
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td:nth-child(n),
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td:nth-child(n),
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td:nth-child(n){
+    display:grid!important;width:100%!important;min-width:0!important;max-width:none!important;
+    grid-template-columns:var(--m-label-w) minmax(0,1fr)!important;gap:var(--m-gap)!important;
+    align-items:center!important;padding:.43rem 0!important;border:0!important;border-bottom:1px dashed #edf1f1!important;
+    white-space:normal!important;overflow:visible!important;word-break:normal!important;overflow-wrap:anywhere!important;
   }
+  body:has(#mobile-nav) .responsive-data-table td:last-child,
+  body:has(#mobile-nav) .admin-record-table td:last-child{border-bottom:0!important}
   body:has(#mobile-nav) .responsive-data-table td>* ,
   body:has(#mobile-nav) .admin-record-table td>*{min-width:0!important;max-width:100%!important}
+  body:has(#mobile-nav) .responsive-data-table td[data-label*="Matrícula"] b,
+  body:has(#mobile-nav) .admin-record-table td[data-label*="Matrícula"] b{
+    display:inline-block!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;
+  }
 
-  /* Una sola geometria para Acciones en todas las pantallas */
+  /* Acciones: una sola medida, una sola alineación en todo móvil */
   body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
   body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
   body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"],
+  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td[data-label="Acciones"],
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td[data-label="Acciones"],
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"],
   body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Acciones"]{
-    display:grid!important;grid-template-columns:100px minmax(0,1fr)!important;
-    gap:.7rem!important;align-items:center!important;padding:.58rem 0 .22rem!important;
+    display:grid!important;grid-template-columns:var(--m-label-w) minmax(0,1fr)!important;
+    gap:var(--m-gap)!important;align-items:center!important;padding:.56rem 0 .18rem!important;border-bottom:0!important;
   }
   body:has(#mobile-nav) td[data-label="Acciones"]:before{
-    display:block!important;content:"ACCIONES"!important;
-    font-size:.7rem!important;font-weight:850!important;color:#667b7e!important;
+    display:block!important;content:"ACCIONES"!important;font-size:.7rem!important;font-weight:850!important;color:#667b7e!important;
   }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu{
-    width:auto!important;min-width:0!important;justify-self:start!important;
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like td[data-label="Acciones"] .action-menu{
+    width:var(--m-action-w)!important;min-width:0!important;max-width:100%!important;justify-self:start!important;
   }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{
-    width:136px!important;max-width:100%!important;min-width:0!important;min-height:44px!important;
-    padding:.6rem .72rem!important;justify-content:center!important;font-size:.86rem!important;border-radius:12px!important;
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary,
+  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td[data-label="Acciones"] .action-menu summary,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td[data-label="Acciones"] .action-menu summary,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary,
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like td[data-label="Acciones"] .action-menu summary{
+    box-sizing:border-box!important;width:var(--m-action-w)!important;max-width:100%!important;min-width:0!important;
+    min-height:var(--m-button-h)!important;padding:.6rem .72rem!important;
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    font-size:.86rem!important;border-radius:var(--m-control-radius)!important;
   }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel{
-    min-width:min(210px,calc(100vw - 48px))!important;max-width:calc(100vw - 32px)!important;
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table td[data-label="Acciones"] .action-menu-panel,
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu-panel{
+    width:min(220px,calc(100vw - 32px))!important;min-width:0!important;max-width:calc(100vw - 24px)!important;
+    z-index:1000!important;
   }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel button{min-height:42px!important;width:100%!important}
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel button{
+    width:100%!important;min-height:42px!important;border-radius:10px!important;
+  }
 
-  /* Filtros con mismos ritmos */
-  body:has(#mobile-nav) .filterbar{gap:.65rem!important;border-radius:16px!important}
-  body:has(#mobile-nav) .filterbar .count{font-size:.82rem!important;color:var(--muted)!important;align-self:end!important}
+  /* Listas/tarjetas de propietario que no usan tabla */
+  body:has(#mobile-nav) .owner-list{gap:.75rem!important}
+  body:has(#mobile-nav) .owner-list-row{padding:.9rem!important;gap:.7rem!important}
+  body:has(#mobile-nav) .owner-row-actions{width:100%!important;max-width:none!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.5rem!important}
+  body:has(#mobile-nav) .owner-row-actions button{width:100%!important;min-height:var(--m-button-h)!important;font-size:.82rem!important}
 
-  /* Navegacion movil: un unico dock y auditoria solo desktop */
-  body:has(#mobile-nav) #nav,
-  body:has(#mobile-nav) .section-nav{display:none!important}
+  /* Formularios y acciones */
+  body:has(#mobile-nav) .form{grid-template-columns:1fr!important;gap:.8rem!important}
+  body:has(#mobile-nav) .actions{gap:.5rem!important}
+  body:has(#mobile-nav) .detail-panel .actions button,
+  body:has(#mobile-nav) .incident-form-actions button{min-height:var(--m-button-h)!important}
+
+  /* Navegación por perfil */
   body:has(#mobile-nav[data-role="ADMIN"]) .mobile-more-item[data-view="audit"]{display:none!important}
 }
 @media(max-width:420px){
-  body:has(#mobile-nav) .responsive-data-table td,
-  body:has(#mobile-nav) .admin-record-table td,
-  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
-  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"]{
-    grid-template-columns:92px minmax(0,1fr)!important;
-  }
-  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{width:128px!important}
+  :root{--m-label-w:92px;--m-action-w:128px}
+  body:has(#mobile-nav) .filterbar{grid-template-columns:1fr!important}
+  body:has(#mobile-nav) .filterbar .filter-search,
+  body:has(#mobile-nav) .filterbar .count{grid-column:1!important}
+  body:has(#mobile-nav) .owner-row-actions{grid-template-columns:1fr!important}
 }
