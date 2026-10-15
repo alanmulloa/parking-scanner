@@ -750,3 +750,29 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav[data-role="ADMIN"]) #request-detail .actions,
   body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .actions{grid-template-columns:1fr!important}
 }
+
+
+/* 1.2.12.22 - Incidencias ADMIN móvil: activación real de tarjetas + detalle legible */
+@media(max-width:720px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table thead{display:none!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table tbody{display:grid!important;grid-template-columns:1fr!important;gap:.75rem!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table tr:not(.table-group-row){margin:0!important;overflow:hidden!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td{grid-template-columns:100px minmax(0,1fr)!important;column-gap:.7rem!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Matrícula"] b{display:inline-block!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Tipo"]{line-height:1.3!important;word-break:normal!important;overflow-wrap:break-word!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{display:block!important;padding-top:.65rem!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{display:none!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table .action-menu summary{width:100%!important;min-height:46px!important;font-size:.9rem!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters{grid-template-columns:1fr 1fr!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters .filter-search,body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters .count{grid-column:1/-1!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .detail-panel>.head{display:grid!important;grid-template-columns:1fr!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .detail-panel>.head>button{width:100%!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .details{grid-template-columns:1fr!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .details>div{display:grid!important;grid-template-columns:110px minmax(0,1fr)!important;gap:.55rem!important;align-items:start!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .details>div small{margin:0!important;font-weight:800!important}
+}
+@media(max-width:420px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters{grid-template-columns:1fr!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td{grid-template-columns:88px minmax(0,1fr)!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .details>div{grid-template-columns:92px minmax(0,1fr)!important}
+}
