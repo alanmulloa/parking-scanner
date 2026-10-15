@@ -1037,3 +1037,48 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .control-open-incident:first-of-type{border-top:0;padding-top:0}
 .control-open-incident .actions{justify-content:flex-start;margin-top:.55rem;gap:.5rem;align-items:center;flex-wrap:wrap}
 @media (max-width:700px){.control-open-incidents{padding:.8rem}.control-open-incident .actions button{width:100%;min-height:44px}.control-open-incident .actions .subtle{display:block;width:100%}}
+
+/* 1.2.13.16 - Incidencias ADMIN móvil: Acciones igual a Solicitudes */
+@media(max-width:720px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
+    display:grid!important;
+    grid-template-columns:100px minmax(0,1fr)!important;
+    gap:.65rem!important;
+    align-items:center!important;
+    padding:.52rem 0!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{
+    display:block!important;
+    content:"ACCIONES"!important;
+    font-size:.68rem!important;
+    line-height:1.2!important;
+    text-transform:uppercase!important;
+    font-weight:850!important;
+    color:#6a7d80!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu{
+    width:100%!important;
+    min-width:0!important;
+    justify-self:stretch!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu summary{
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    min-height:46px!important;
+    padding:.65rem .8rem!important;
+    justify-content:center!important;
+    font-size:.9rem!important;
+  }
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"] .action-menu-panel{
+    width:min(230px,calc(100vw - 2.5rem))!important;
+    min-width:0!important;
+    right:0!important;
+    left:auto!important;
+  }
+}
+@media(max-width:420px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
+    grid-template-columns:92px minmax(0,1fr)!important;
+  }
+}
