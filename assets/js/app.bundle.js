@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.10';
+const APP_FRONTEND_VERSION='1.2.12.24';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -555,27 +555,38 @@ async function configurationView(initialTab='identity'){
 
     async function renderSystem(){
       setActive('system');
-      panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
-      const load=async()=>{
-        const refresh=$('#system-refresh');if(refresh)busy(refresh);
+      panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
+      async function loadStatus(){
         try{
           const st=await call('systemStatus');
-          const cards=(st.services||[]).map(x=>`<div class="system-service ${x.ok?'ok':'bad'}"><span class="system-dot" aria-hidden="true"></span><div><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div></div>`).join('');
-          panel.innerHTML=`<section class="card system-info"><div class="system-status-head"><div><h2>Sistema</h2><p class="muted">Información técnica de solo lectura para comprobar la instalación.</p></div><span class="system-pill ${st.ok?'ok':'bad'}">${st.ok?'Disponible':'Revisar'}</span></div>
-            <div class="system-meta-grid">
-              <div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div>
-              <div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div>
-              <div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div>
-              <div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div>
-              <div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div>
-              <div><span>Hojas de datos</span><b>${esc(String(st.sheetCount??'—'))}</b></div>
-            </div></section>
-            <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar</button></div><div class="system-service-grid">${cards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'}</div></section>
-            <section class="card system-note"><h3>Seguridad</h3><p class="muted">Esta pantalla no muestra IDs de Drive/Sheets, tokens, URLs internas ni propiedades sensibles del proyecto.</p></section>`;
-          const r=$('#system-refresh');if(r)r.onclick=load;
-        }catch(x){panel.innerHTML=`<section class="card"><div class="message bad">${esc(x.message||x)}</div><div class="actions"><button type="button" id="system-retry">Reintentar</button></div></section>`;const r=$('#system-retry');if(r)r.onclick=load}
-      };
-      await load();
+          const serviceCards=(st.services||[]).map(x=>`<div class="system-service ${x.ok?'ok':'bad'}"><span class="system-dot"></span><div><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div></div>`).join('');
+          panel.innerHTML=`<section class="card system-info"><div class="system-status-head"><div><h2>Sistema</h2><p class="muted">Información técnica para comprobar la instalación.</p></div><span class="system-pill ${st.ok?'ok':'bad'}">${st.ok?'Disponible':'Revisar'}</span></div>
+            <div class="system-meta-grid"><div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div><div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div><div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div><div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div><div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div><div><span>Hojas</span><b>${Number(st.sheetCount||0)}</b></div></div></section>
+            <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-service-grid">${serviceCards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'} · ${Number(st.performance&&st.performance.totalMs||0)} ms</div></section>
+            <section class="card performance-card"><div class="system-status-head"><div><h2>Rendimiento y diagnóstico</h2><p class="muted">Mide tiempos reales de lectura desde Apps Script, Sheets y Drive sin modificar datos.</p></div></div>
+              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button></div>
+              <div id="diag-result" class="diagnostic-empty"><b>Sin prueba ejecutada</b><span>La prueba rápida comprueba disponibilidad. El diagnóstico completo fuerza lecturas de los principales conjuntos de datos.</span></div>
+              <p class="muted diagnostic-note">Estas comprobaciones no son una prueba de carga ni escriben registros. Para medir concurrencia se necesita una prueba externa controlada.</p>
+            </section>`;
+          $('#system-refresh').onclick=loadStatus;
+          $('#diag-quick').onclick=()=>runDiagnostic('quick');
+          $('#diag-full').onclick=()=>runDiagnostic('full');
+        }catch(e){panel.innerHTML=`<section class="card"><div class="message bad">${esc(e.message||String(e))}</div><button type="button" class="secondary" id="system-retry">Reintentar</button></section>`;$('#system-retry').onclick=loadStatus}
+      }
+      async function runDiagnostic(mode){
+        const box=$('#diag-result'),q=$('#diag-quick'),f=$('#diag-full');
+        if(!box)return;
+        q.disabled=true;f.disabled=true;
+        box.className='diagnostic-running';box.innerHTML=`<div class="spinner"></div><span>${mode==='full'?'Ejecutando diagnóstico completo…':'Ejecutando prueba rápida…'}</span>`;
+        try{
+          const r=await call('systemDiagnostics',{mode});
+          const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
+          box.className='diagnostic-result';
+          box.innerHTML=`<div class="diagnostic-summary"><div><b>${r.mode==='full'?'Diagnóstico completo':'Prueba rápida'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><div class="diagnostic-legend"><span><i class="legend-dot good"></i> ≤ 500 ms</span><span><i class="legend-dot warn"></i> 501–1500 ms</span><span><i class="legend-dot slow"></i> &gt; 1500 ms</span></div>`;
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}
+        finally{q.disabled=false;f.disabled=false}
+      }
+      loadStatus();
     }
 
     tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());
