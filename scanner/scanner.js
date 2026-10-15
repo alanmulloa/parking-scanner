@@ -16,8 +16,8 @@ async function start(){
     scanner=new Html5Qrcode('reader');
     await scanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*.72);return{width:s,height:s}},aspectRatio:1.333},async text=>{
       if(done)return;
-      if(!validParkingUrl(text)){show('El QR leído no contiene un enlace válido de Parking Comunidad.',true);return}
-      done=true;navigator.vibrate?.(100);show('QR detectado. Volviendo a Parking Comunidad…');await stop();window.location.href=text;
+      if(!validParkingUrl(text)){show('El QR leído no contiene un enlace válido.',true);return}
+      done=true;navigator.vibrate?.(100);show('QR detectado. Volviendo…');await stop();window.location.href=text;
     },()=>{});
     show('Apunta al QR y mantenlo dentro del recuadro.');
   }catch(e){

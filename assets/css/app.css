@@ -975,7 +975,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 /* 1.2.13.2 - alta de incidencia en móvil */
 @media(max-width:720px){body.incident-entry-mode{padding-bottom:0!important}body.incident-entry-mode #mobile-nav{display:none!important}.incident-create-form{margin-bottom:1rem!important;padding-bottom:1.25rem!important}.incident-create-form .incident-form-actions{position:sticky;bottom:0;background:#fff;padding-top:.65rem;padding-bottom:calc(.35rem + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}.incident-create-form .incident-form-actions button{min-height:48px}}
 
-/* 1.2.13.5 - Incidencias móvil: Acciones igual al patrón de Vehículos */
+/* 1.2.13.6 - Incidencias móvil: Acciones igual al patrón de Vehículos */
 @media(max-width:720px){
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{
     display:grid!important;
@@ -1021,7 +1021,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   }
 }
 
-/* 1.2.13.5 - móvil: una sola navegación inferior.
+/* 1.2.13.6 - móvil: una sola navegación inferior.
    #nav es la navegación desktop heredada que en móvil quedaba fija detrás
    del dock flotante #mobile-nav. Cuando existe el dock móvil, se oculta #nav. */
 @media(max-width:720px){
@@ -1030,7 +1030,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav){padding-bottom:calc(104px + env(safe-area-inset-bottom))!important}
 }
 
-/* 1.2.13.5 - incidencias abiertas dentro del resultado de Control */
+/* 1.2.13.6 - incidencias abiertas dentro del resultado de Control */
 .control-open-incidents{margin-top:1rem;padding:1rem;border:1px solid var(--border,#d7dfdc);border-radius:14px;background:rgba(255,255,255,.72);text-align:left}
 .control-open-incidents h3{margin:.1rem 0 .75rem}
 .control-open-incident{padding:.8rem 0;border-top:1px solid var(--border,#d7dfdc)}
