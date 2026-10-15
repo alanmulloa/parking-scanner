@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.13.14';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.14.1';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -189,7 +189,7 @@ function renderNav(){
   };
   const items=map[role]||[];
   const nav=$('#nav');if(nav){nav.innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');nav.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view))}
-  const primary=mobilePrimary[role]||[],primaryViews=new Set(primary.map(x=>x[0])),moreItems=items.filter(([v])=>!primaryViews.has(v));
+  const primary=mobilePrimary[role]||[],primaryViews=new Set(primary.map(x=>x[0])),moreItems=items.filter(([v])=>!primaryViews.has(v)&&!(role==='ADMIN'&&v==='audit'));
   const mobileNav=$('#mobile-nav');if(mobileNav){
     const moreActive=moreItems.some(([v])=>v===state.view),showMore=moreItems.length>0;
     mobileNav.dataset.role=role;mobileNav.dataset.count=String(primary.length+(showMore?1:0));

@@ -1082,3 +1082,114 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     grid-template-columns:92px minmax(0,1fr)!important;
   }
 }
+
+/* 1.2.14.0 - Normalizacion responsive movil ADMIN / CONTROL / PROPIETARIO */
+@media(max-width:720px){
+  /* Ritmo y superficies comunes */
+  body:has(#mobile-nav) .wrap{width:calc(100% - 1rem)!important;padding:1rem 0 calc(110px + env(safe-area-inset-bottom))!important}
+  body:has(#mobile-nav) .card,
+  body:has(#mobile-nav) .tablebox,
+  body:has(#mobile-nav) .detail-panel,
+  body:has(#mobile-nav) .summary-card{
+    border-radius:16px!important;
+    box-shadow:0 6px 20px rgba(15,48,47,.06)!important;
+  }
+  body:has(#mobile-nav) .card{padding:1rem!important}
+
+  /* Tipografia y cabeceras */
+  body:has(#mobile-nav) .head{gap:.65rem!important;align-items:center!important}
+  body:has(#mobile-nav) .head h1{font-size:1.55rem!important;line-height:1.12!important;margin:0!important}
+  body:has(#mobile-nav) .head h2{font-size:1.25rem!important;line-height:1.15!important}
+  body:has(#mobile-nav) .field label,
+  body:has(#mobile-nav) .responsive-data-table td:before,
+  body:has(#mobile-nav) .admin-record-table td:before{
+    font-size:.7rem!important;line-height:1.2!important;font-weight:850!important;letter-spacing:.02em!important;color:#667b7e!important;
+  }
+
+  /* Controles y botones estandar */
+  body:has(#mobile-nav) input,
+  body:has(#mobile-nav) select,
+  body:has(#mobile-nav) textarea,
+  body:has(#mobile-nav) .search{font-size:1rem!important;border-radius:12px!important}
+  body:has(#mobile-nav) input:not([type="checkbox"]):not([type="radio"]),
+  body:has(#mobile-nav) select,
+  body:has(#mobile-nav) .search{min-height:46px!important;padding:.65rem .78rem!important}
+  body:has(#mobile-nav) textarea{min-height:96px!important;padding:.72rem .78rem!important}
+  body:has(#mobile-nav) button:not(.mobile-dock-item):not(.mobile-icon-btn):not(.mobile-sheet-backdrop),
+  body:has(#mobile-nav) .btn{
+    min-height:44px!important;border-radius:12px!important;padding:.62rem .82rem!important;font-size:.86rem!important;line-height:1.1!important;
+  }
+  /* CTAs grandes de Control mantienen jerarquia, pero con acabado comun */
+  body:has(#mobile-nav[data-role="CONTROL"]) .big{min-height:92px!important;border-radius:16px!important;font-size:1rem!important}
+
+  /* Estados y chips: misma altura/sombreado visual */
+  body:has(#mobile-nav) .status,
+  body:has(#mobile-nav) .request-chip,
+  body:has(#mobile-nav) .vehicle-alert-chip,
+  body:has(#mobile-nav) .link-chip,
+  body:has(#mobile-nav) .system-pill,
+  body:has(#mobile-nav) .perf-badge{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    min-height:28px!important;width:max-content!important;max-width:100%!important;
+    padding:.28rem .58rem!important;border-radius:999px!important;
+    font-size:.72rem!important;font-weight:850!important;line-height:1!important;
+    white-space:nowrap!important;word-break:keep-all!important;
+  }
+
+  /* Tarjetas-tabla compartidas */
+  body:has(#mobile-nav) .responsive-data-table tr:not(.table-group-row),
+  body:has(#mobile-nav) .admin-record-table tr:not(.table-group-row){
+    border-radius:16px!important;padding:.82rem .88rem!important;
+    box-shadow:0 5px 18px rgba(15,48,47,.05)!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table td,
+  body:has(#mobile-nav) .admin-record-table td{
+    grid-template-columns:100px minmax(0,1fr)!important;
+    column-gap:.7rem!important;align-items:center!important;padding:.42rem 0!important;
+  }
+  body:has(#mobile-nav) .responsive-data-table td>* ,
+  body:has(#mobile-nav) .admin-record-table td>*{min-width:0!important;max-width:100%!important}
+
+  /* Una sola geometria para Acciones en todas las pantallas */
+  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
+  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
+  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"],
+  body:has(#mobile-nav[data-role="PROPIETARIO"]) .owner-admin-like .responsive-data-table td[data-label="Acciones"]{
+    display:grid!important;grid-template-columns:100px minmax(0,1fr)!important;
+    gap:.7rem!important;align-items:center!important;padding:.58rem 0 .22rem!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"]:before{
+    display:block!important;content:"ACCIONES"!important;
+    font-size:.7rem!important;font-weight:850!important;color:#667b7e!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu{
+    width:auto!important;min-width:0!important;justify-self:start!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{
+    width:136px!important;max-width:100%!important;min-width:0!important;min-height:44px!important;
+    padding:.6rem .72rem!important;justify-content:center!important;font-size:.86rem!important;border-radius:12px!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel{
+    min-width:min(210px,calc(100vw - 48px))!important;max-width:calc(100vw - 32px)!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu-panel button{min-height:42px!important;width:100%!important}
+
+  /* Filtros con mismos ritmos */
+  body:has(#mobile-nav) .filterbar{gap:.65rem!important;border-radius:16px!important}
+  body:has(#mobile-nav) .filterbar .count{font-size:.82rem!important;color:var(--muted)!important;align-self:end!important}
+
+  /* Navegacion movil: un unico dock y auditoria solo desktop */
+  body:has(#mobile-nav) #nav,
+  body:has(#mobile-nav) .section-nav{display:none!important}
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-more-item[data-view="audit"]{display:none!important}
+}
+@media(max-width:420px){
+  body:has(#mobile-nav) .responsive-data-table td,
+  body:has(#mobile-nav) .admin-record-table td,
+  body:has(#mobile-nav) .responsive-data-table td[data-label="Acciones"],
+  body:has(#mobile-nav) .admin-record-table td[data-label="Acciones"],
+  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"]{
+    grid-template-columns:92px minmax(0,1fr)!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu summary{width:128px!important}
+}
