@@ -224,7 +224,7 @@ html,body{max-width:100%;overflow-x:hidden}
   .login-description{font-size:.98rem}
 }
 
-/* 1.2.12.9 - navegación desktop en segunda barra, estilo de secciones */
+/* 1.2.12.10 - navegación desktop en segunda barra, estilo de secciones */
 .section-nav{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(19,48,49,.035)}
 @media(min-width:721px){
   .top{min-height:78px;padding:12px 22px!important;gap:.75rem!important;flex-wrap:nowrap!important}
