@@ -269,3 +269,53 @@ html,body{max-width:100%;overflow-x:hidden}
 }
 
 .settings-color-suggest{width:100%;margin-top:.35rem}.settings-color-hint{font-size:.72rem;line-height:1.35;margin-top:.45rem;text-align:center}
+.settings-logo-actions{display:flex;align-items:center;gap:.65rem;margin-top:.85rem;flex-wrap:wrap}.button-like{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800;padding:.62rem .82rem;border-radius:10px;text-decoration:none}.danger-link{background:transparent!important;color:#a52a22!important;padding:.5rem .35rem!important;border:0!important;box-shadow:none!important}.settings-logo-hint{font-size:.76rem;margin-top:.45rem}
+
+
+/* 1.2.12.14 - Vehiculos: estados y columnas operativas legibles */
+@media (min-width:721px){
+  .vehicles-admin-table{table-layout:fixed!important;min-width:1180px!important;font-size:.82rem}
+  .vehicles-admin-table th,.vehicles-admin-table td{overflow-wrap:normal!important;word-break:normal!important;hyphens:none;line-height:1.2}
+  .vehicles-admin-table th:nth-child(1),.vehicles-admin-table td:nth-child(1){width:32px}
+  .vehicles-admin-table th:nth-child(2),.vehicles-admin-table td:nth-child(2){width:9%}
+  .vehicles-admin-table th:nth-child(3),.vehicles-admin-table td:nth-child(3){width:8%}
+  .vehicles-admin-table th:nth-child(4),.vehicles-admin-table td:nth-child(4){width:13%}
+  .vehicles-admin-table th:nth-child(5),.vehicles-admin-table td:nth-child(5){width:11%}
+  .vehicles-admin-table th:nth-child(6),.vehicles-admin-table td:nth-child(6){width:6%}
+  .vehicles-admin-table th:nth-child(7),.vehicles-admin-table td:nth-child(7){width:7%}
+  .vehicles-admin-table th:nth-child(8),.vehicles-admin-table td:nth-child(8){width:8%}
+  .vehicles-admin-table th:nth-child(9),.vehicles-admin-table td:nth-child(9){width:7%}
+  .vehicles-admin-table th:nth-child(10),.vehicles-admin-table td:nth-child(10){width:10%}
+  .vehicles-admin-table th:nth-child(11),.vehicles-admin-table td:nth-child(11){width:9%}
+  .vehicles-admin-table th:nth-child(12),.vehicles-admin-table td:nth-child(12){width:92px}
+  .owner-vehicles-table{min-width:1120px!important}
+  .owner-vehicles-table th:nth-child(1),.owner-vehicles-table td:nth-child(1){width:10%}
+  .owner-vehicles-table th:nth-child(2),.owner-vehicles-table td:nth-child(2){width:9%}
+  .owner-vehicles-table th:nth-child(3),.owner-vehicles-table td:nth-child(3){width:14%}
+  .owner-vehicles-table th:nth-child(4),.owner-vehicles-table td:nth-child(4){width:12%}
+  .owner-vehicles-table th:nth-child(5),.owner-vehicles-table td:nth-child(5){width:7%}
+  .owner-vehicles-table th:nth-child(6),.owner-vehicles-table td:nth-child(6){width:7%}
+  .owner-vehicles-table th:nth-child(7),.owner-vehicles-table td:nth-child(7){width:8%}
+  .owner-vehicles-table th:nth-child(8),.owner-vehicles-table td:nth-child(8){width:7%}
+  .owner-vehicles-table th:nth-child(9),.owner-vehicles-table td:nth-child(9){width:10%}
+  .owner-vehicles-table th:nth-child(10),.owner-vehicles-table td:nth-child(10){width:9%}
+  .owner-vehicles-table th:nth-child(11),.owner-vehicles-table td:nth-child(11){width:92px}
+}
+.vehicle-status-cell{white-space:nowrap!important}
+.vehicle-status{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;min-width:66px;justify-content:center;text-align:center}
+.vehicle-period-cell{white-space:nowrap!important}
+.vehicle-period{display:inline-flex;align-items:center;gap:.32rem;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink)}
+.vehicle-period-arrow{color:var(--muted);font-weight:800}
+.vehicle-empty{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:999px;background:#f2f5f5;color:var(--muted);font-weight:700}
+.vehicle-alert-cell{text-align:left;vertical-align:middle}
+.vehicle-alert-chip{display:inline-flex;align-items:center;gap:.36rem;max-width:100%;padding:.26rem .48rem;border:0;border-radius:999px;background:#fff3cd;color:#765b00;font-size:.72rem;font-weight:800;line-height:1.05;text-align:left;white-space:nowrap;cursor:default}
+button.vehicle-alert-chip{cursor:pointer}
+button.vehicle-alert-chip:hover{filter:brightness(.97)}
+.vehicle-alert-chip.incident{background:#fff0df;color:#8a4b08}
+.vehicle-alert-count{display:inline-grid;place-items:center;flex:0 0 auto;min-width:19px;height:19px;padding:0 .25rem;border-radius:999px;background:rgba(118,91,0,.12);font-size:.68rem}
+.vehicle-alert-chip.incident .vehicle-alert-count{background:rgba(138,75,8,.12)}
+@media (max-width:720px){
+  .vehicle-period{white-space:normal;flex-wrap:wrap;justify-content:flex-end}
+  .vehicle-status{min-width:0}
+  .vehicle-alert-chip{white-space:normal;justify-content:flex-end}
+}
