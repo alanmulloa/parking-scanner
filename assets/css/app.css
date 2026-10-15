@@ -951,7 +951,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 @media(max-width:520px){.health-grid{grid-template-columns:1fr}.performance-actions #diag-sheets{width:100%}.perf-health,.perf-history{padding:.8rem}.perf-history-row>div{align-items:flex-start;flex-wrap:wrap}}
 
 
-/* 1.2.12.28 - round-trip, concurrencia y llamadas de sesión */
+/* 1.2.12.29 - round-trip, concurrencia y llamadas de sesión */
 #diag-network,#diag-calls{margin-top:.75rem}
 .call-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:.65rem}
 .call-stat{border:1px solid #dde7e5;border-radius:10px;background:#fff;padding:.65rem .75rem;display:flex;flex-direction:column;gap:.2rem;min-width:0}

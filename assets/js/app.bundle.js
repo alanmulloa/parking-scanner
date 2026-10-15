@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.28';
+const APP_FRONTEND_VERSION='1.2.12.29';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -591,9 +591,17 @@ async function configurationView(initialTab='identity'){
           $('#diag-sheets').onclick=()=>runSheetsBenchmark();
           $('#diag-roundtrip').onclick=()=>runRoundTrip();
           $('#diag-concurrency').onclick=()=>runConcurrency();
+          restoreDiagnosticBlocks();
           renderSessionCalls();
           refreshPerfOverview();
         }catch(e){panel.innerHTML=`<section class="card"><div class="message bad">${esc(e.message||String(e))}</div><button type="button" class="secondary" id="system-retry">Reintentar</button></section>`;$('#system-retry').onclick=loadStatus}
+      }
+      const DIAG_UI_STATE_KEY='parking_diag_results_'+APP_FRONTEND_VERSION;
+      function saveDiagnosticBlock(id){
+        try{const el=document.getElementById(id);if(!el)return;const all=JSON.parse(sessionStorage.getItem(DIAG_UI_STATE_KEY)||'{}');all[id]={className:el.className,html:el.innerHTML};sessionStorage.setItem(DIAG_UI_STATE_KEY,JSON.stringify(all))}catch(e){}
+      }
+      function restoreDiagnosticBlocks(){
+        try{const all=JSON.parse(sessionStorage.getItem(DIAG_UI_STATE_KEY)||'{}');['diag-result','diag-special','diag-benchmark','diag-network'].forEach(id=>{const el=document.getElementById(id),x=all[id];if(el&&x&&x.html){el.className=x.className||'diagnostic-result';el.innerHTML=x.html}})}catch(e){}
       }
       function renderPerfOverview(perf){
         const el=$('#perf-overview');if(!el)return;
@@ -614,15 +622,17 @@ async function configurationView(initialTab='identity'){
         try{const samples=[];for(let i=0;i<3;i++){const t=performance.now(),r=await call('systemRoundTripPing',{seq:i+1}),total=Math.round(performance.now()-t),serverMs=Number(r.serverMs||0);samples.push({total,serverMs,overhead:Math.max(0,total-serverMs)})}
           const avg=k=>Math.round(samples.reduce((a,x)=>a+x[k],0)/samples.length),totalAvg=avg('total'),serverAvg=avg('serverMs'),overAvg=avg('overhead');
           box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Round-trip navegador ↔ backend</b><span>Promedio de 3 muestras</span></div><span class="perf-badge ${systemPerfClientLevel(totalAvg)}">${totalAvg} ms</span></div><div class="diagnostic-grid"><div class="diagnostic-row"><div><b>Respuesta total</b><small>Tiempo percibido por el navegador</small></div><span>${totalAvg} ms</span></div><div class="diagnostic-row"><div><b>Ejecución servidor</b><small>Trabajo medido dentro de Apps Script</small></div><span>${serverAvg} ms</span></div><div class="diagnostic-row"><div><b>Transporte / espera</b><small>Diferencia aproximada entre navegador y servidor</small></div><span>${overAvg} ms</span></div></div>`;
+          saveDiagnosticBlock('diag-network');
           await call('systemRecordClientPerformance',{type:'roundtrip',totalMs:totalAvg,metrics:[{label:'Servidor',ms:serverAvg,ok:true},{label:'Transporte / espera',ms:overAvg,ok:true}]});
-        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-network')}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
       }
       async function runConcurrency(){
         const box=$('#diag-network'),b=$('#diag-concurrency');if(!box||!b)return;if(!confirm('La prueba lanzará lotes de 5, 10 y 20 lecturas simultáneas de solo lectura desde este navegador. No modifica datos. ¿Continuar?'))return;b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando concurrencia controlada…</span>';
         try{const batches=[];for(const n of [5,10,20]){const started=performance.now();const jobs=Array.from({length:n},(_,i)=>{const t=performance.now();return call('systemRoundTripPing',{seq:i+1}).then(r=>({ok:true,ms:Math.round(performance.now()-t),serverMs:Number(r.serverMs||0)})).catch(()=>({ok:false,ms:Math.round(performance.now()-t),serverMs:0}))});const r=await Promise.all(jobs),batchMs=Math.round(performance.now()-started),ok=r.filter(x=>x.ok),fails=n-ok.length;batches.push({n,batchMs,avg:ok.length?Math.round(ok.reduce((a,x)=>a+x.ms,0)/ok.length):0,max:ok.length?Math.max(...ok.map(x=>x.ms)):0,fails})}
           const worst=Math.max(...batches.map(x=>x.batchMs)),allOk=batches.every(x=>!x.fails);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Concurrencia controlada</b><span>Simulación desde un único navegador</span></div><span class="system-pill ${allOk?'ok':'bad'}">${allOk?'Correcto':'Revisar'}</span></div><div class="diagnostic-grid">${batches.map(x=>`<div class="diagnostic-row"><div><b>${x.n} simultáneas</b><small>Media ${x.avg} ms · máximo ${x.max} ms${x.fails?' · '+x.fails+' fallos':''}</small></div><span class="perf-badge ${systemPerfClientLevel(x.batchMs)}">${x.batchMs} ms lote</span></div>`).join('')}</div><p class="muted diagnostic-note">Prueba útil para detectar saturación del navegador/Apps Script, pero no sustituye una prueba multiusuario externa.</p>`;
+          saveDiagnosticBlock('diag-network');
           await call('systemRecordClientPerformance',{type:'concurrency',ok:allOk,totalMs:worst,metrics:batches.map(x=>({label:x.n+' simultáneas',ms:x.batchMs,ok:x.fails===0}))});
-        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-network')}finally{b.disabled=false;renderSessionCalls();refreshPerfOverview()}
       }
       async function runSheetsBenchmark(){
         const box=$('#diag-benchmark'),b=$('#diag-sheets');if(!box||!b)return;
@@ -632,8 +642,9 @@ async function configurationView(initialTab='identity'){
           const r=await call('systemSheetsRealBenchmark',{});
           const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
           box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Benchmark real de Sheets</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
+          saveDiagnosticBlock('diag-benchmark');
           refreshPerfOverview();
-        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false}
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-benchmark')}finally{b.disabled=false}
       }
       async function runSpecialDiagnostic(kind){
         const box=$('#diag-special'),c=$('#diag-control'),v=$('#diag-volume');
@@ -644,7 +655,8 @@ async function configurationView(initialTab='identity'){
           const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
           box.className='diagnostic-result';
           box.innerHTML=`<div class="diagnostic-summary"><div><b>${kind==='control'?'Rendimiento de Control':'Prueba de volumen'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
-        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}
+          saveDiagnosticBlock('diag-special');
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-special')}
         finally{c.disabled=false;v.disabled=false;refreshPerfOverview()}
       }
       async function runDiagnostic(mode){
@@ -657,7 +669,8 @@ async function configurationView(initialTab='identity'){
           const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
           box.className='diagnostic-result';
           box.innerHTML=`<div class="diagnostic-summary"><div><b>${r.mode==='full'?'Diagnóstico completo':'Prueba rápida'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><div class="diagnostic-legend"><span><i class="legend-dot good"></i> ≤ 500 ms</span><span><i class="legend-dot warn"></i> 501–1500 ms</span><span><i class="legend-dot slow"></i> &gt; 1500 ms</span></div>`;
-        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}
+          saveDiagnosticBlock('diag-result');
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-result')}
         finally{q.disabled=false;f.disabled=false;refreshPerfOverview()}
       }
       loadStatus();
