@@ -930,3 +930,8 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 #diag-special{margin-top:.75rem}
 .performance-actions{flex-wrap:wrap}
 @media(max-width:720px){.performance-actions>button{flex:1 1 calc(50% - .5rem);min-height:44px}.diagnostic-grid{grid-template-columns:1fr}}
+
+/* 1.2.12.26 - diagnosticos avanzados siempre visibles */
+.performance-actions{align-items:center}
+#diag-special{margin-top:.1rem}
+@media(max-width:720px){.performance-actions{grid-template-columns:1fr 1fr!important}.performance-actions button{width:100%!important}.performance-actions button:first-child,.performance-actions button:nth-child(2){min-height:44px}}
