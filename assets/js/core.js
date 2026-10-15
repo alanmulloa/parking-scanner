@@ -39,6 +39,31 @@ const ensureScanner=()=>loadExternal('scanner',['https://unpkg.com/html5-qrcode@
 function qrTarget(token){const base=WEB_APP_URL||location.href.split('?')[0];return base+'?q='+encodeURIComponent(token)}
 function qrSize(){return Math.max(220,Math.min(280,window.innerWidth-80))}
 
+
+const ensureXlsx=()=>loadExternal('xlsx',[
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+],'XLSX');
+function excelValue(v){
+  if(v===null||v===undefined)return '';
+  if(v instanceof Date)return v;
+  const s=String(v);
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)){const d=new Date(s);if(!Number.isNaN(d.getTime()))return d}
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)){const [y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d))}
+  return v;
+}
+async function downloadXlsx(filename,rows,columns,sheetName='Datos'){
+  const data=rows||[];if(!data.length){toast('No hay registros para exportar.',true);return}
+  const XLSX=await ensureXlsx();
+  const cols=columns&&columns.length?columns:[...new Set(data.flatMap(r=>Object.keys(r||{})))];
+  const normalized=data.map(r=>Object.fromEntries(cols.map(c=>[c,excelValue(r?.[c])])));
+  const ws=XLSX.utils.json_to_sheet(normalized,{header:cols,cellDates:true});
+  ws['!autofilter']={ref:`A1:${XLSX.utils.encode_col(Math.max(0,cols.length-1))}${data.length+1}`};
+  ws['!cols']=cols.map(c=>({wch:Math.min(42,Math.max(12,String(c).length+2,...data.slice(0,200).map(r=>String(r?.[c]??'').length+2)))}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,String(sheetName||'Datos').slice(0,31));
+  XLSX.writeFile(wb,filename,{cellDates:true,compression:true});
+}
+function exportButtonsHtml(prefix='export-current'){return `<div class="export-actions"><button class="secondary" id="${prefix}-xlsx">Exportar Excel</button><button class="secondary compact" id="${prefix}-csv">CSV</button></div>`}
 function downloadCsv(filename,rows,columns){
   const cols=columns&&columns.length?columns:[...new Set((rows||[]).flatMap(r=>Object.keys(r||{})))];
   const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
@@ -57,9 +82,32 @@ function clearUiState(){try{sessionStorage.removeItem(UI_STATE_KEY)}catch(e){}}
 function defaultViewForRole(role){return role==='ADMIN'?'dashboard':role==='CONTROL'?'control':'ownerHome'}
 
 
-// 1.2.11.3 - utilidades UX compartidas
+// 1.2.12 - utilidades UX compartidas + exportación Excel
 function actionMenuHtml(inner,label='Acciones'){return `<details class="action-menu"><summary>${esc(label)}</summary><div class="action-menu-panel">${inner}</div></details>`}
 function clientDateOnly(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[1]}-${m[2]}-${m[3]}`:''}
 function periodMatches(value,period,from='',to=''){if(!period)return true;const d=clientDateOnly(value);if(!d)return false;const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;const dateAgo=n=>{const x=new Date(now.getFullYear(),now.getMonth(),now.getDate()-n);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`};if(period==='today')return d===today;if(period==='7')return d>=dateAgo(6)&&d<=today;if(period==='30')return d>=dateAgo(29)&&d<=today;if(period==='month'){const p=today.slice(0,7);return d.slice(0,7)===p}if(period==='prevmonth'){const x=new Date(now.getFullYear(),now.getMonth()-1,1),p=`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`;return d.slice(0,7)===p}if(period==='custom')return (!from||d>=from)&&(!to||d<=to);return true}
 function periodFilterFields(prefix){return `<div class="field"><label>Período</label><select id="${prefix}-period"><option value="">Todo</option><option value="today">Hoy</option><option value="7">7 días</option><option value="30">30 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="custom">Personalizado</option></select></div><div class="field period-custom hide" id="${prefix}-from-wrap"><label>Desde</label><input type="date" id="${prefix}-from"></div><div class="field period-custom hide" id="${prefix}-to-wrap"><label>Hasta</label><input type="date" id="${prefix}-to"></div>`}
 function bindPeriodVisibility(prefix){const p=$(`#${prefix}-period`),a=$(`#${prefix}-from-wrap`),b=$(`#${prefix}-to-wrap`);const refresh=()=>{const show=p&&p.value==='custom';a&&a.classList.toggle('hide',!show);b&&b.classList.toggle('hide',!show)};if(p)p.addEventListener('change',refresh);refresh()}
+
+
+// 1.2.12 - menús de acciones flotantes y agrupaciones estables
+(function installFloatingActionMenus(){
+  if(window.__parkingFloatingMenusInstalled)return;window.__parkingFloatingMenusInstalled=true;
+  const position=details=>{
+    if(!details||!details.open||window.matchMedia('(max-width:720px)').matches)return;
+    const panel=details.querySelector('.action-menu-panel'),summary=details.querySelector('summary');if(!panel||!summary)return;
+    panel.style.position='fixed';panel.style.zIndex='1000';panel.style.top='0';panel.style.left='0';panel.style.right='auto';
+    const r=summary.getBoundingClientRect(),pw=Math.max(190,panel.offsetWidth||190),ph=panel.offsetHeight||220,gap=6;
+    let left=Math.min(window.innerWidth-pw-8,Math.max(8,r.right-pw));
+    let top=r.bottom+gap;if(top+ph>window.innerHeight-8&&r.top-ph-gap>8)top=r.top-ph-gap;
+    panel.style.left=`${left}px`;panel.style.top=`${Math.max(8,top)}px`;
+  };
+  document.addEventListener('toggle',e=>{const d=e.target;if(!(d instanceof HTMLDetailsElement)||!d.classList.contains('action-menu'))return;if(d.open){document.querySelectorAll('details.action-menu[open]').forEach(x=>{if(x!==d)x.open=false});requestAnimationFrame(()=>position(d))}else{const p=d.querySelector('.action-menu-panel');if(p){p.style.position='';p.style.left='';p.style.top='';p.style.right=''}}},true);
+  window.addEventListener('resize',()=>document.querySelectorAll('details.action-menu[open]').forEach(position));
+  window.addEventListener('scroll',()=>document.querySelectorAll('details.action-menu[open]').forEach(position),true);
+})();
+function groupedRowsStable(rows,groupKey,sortFn,groupOrderFn){
+  const sorted=[...(rows||[])].sort(sortFn),groups=new Map();
+  sorted.forEach(r=>{const k=groupKey(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r)});
+  let entries=[...groups.entries()];if(groupOrderFn)entries.sort(groupOrderFn);return entries;
+}

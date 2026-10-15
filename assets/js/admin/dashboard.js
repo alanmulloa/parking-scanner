@@ -31,7 +31,7 @@ async function dashboard(){
   }catch(e){err(e)}
 }
 function openSummaryAction(action){
-  if(action==='requests'){go('requests');return}if(action==='incidents'){go('incidents');return}if(action==='housing'){state.cache.tablePreset={kind:'housing',filters:{Estado:'Activa'}};go('housing');return}
+  if(action==='requests'){state.cache.requestPreset={status:'Pendiente'};go('requests');return}if(action==='incidents'){state.cache.incidentPreset={status:'Abierta'};go('incidents');return}if(action==='housing'){state.cache.tablePreset={kind:'housing',filters:{Estado:'Activa'}};go('housing');return}
   if(action==='vehicles-active-slot'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Vehículo con slot'}};go('vehicles');return}
   if(action==='vehicles-motorcycles'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Suspendido'}};go('vehicles');return}

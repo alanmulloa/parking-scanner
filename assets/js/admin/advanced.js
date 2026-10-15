@@ -32,7 +32,7 @@ async function runBulkVehicleAction(action){
   }catch(e){err(e)}
 }
 
-function exportRowsFromCurrent(kind,rows){const filtered=state.cache.currentFilteredRows||rows||[];downloadCsv(`parking_${kind}_${new Date().toISOString().slice(0,10)}.csv`,filtered)}
+function exportRowsFromCurrent(kind,rows,format='xlsx'){const filtered=state.cache.currentFilteredRows||rows||[],date=new Date().toISOString().slice(0,10);if(format==='csv')downloadCsv(`parking_${kind}_${date}.csv`,filtered);else return downloadXlsx(`parking_${kind}_${date}.xlsx`,filtered,null,kind).catch(err)}
 
 
 async function consistencyReviewView(){
@@ -65,3 +65,19 @@ async function vehicleDetailView(id,backFn=null){
   }catch(e){err(e)}
 }
 async function quickVehicleState(v,newState,backFn){const impact=[newState==='Suspendido'?'El vehículo quedará suspendido.':'El vehículo será dado de baja.',v.Tipo==='Moto'?'No ocupa slot.':v.Slot?`Se liberará el Slot ${v.Slot}.`:'',v.Tipo==='Moto'?'':'El QR quedará revocado.',v.PeriodoTemporalActual?`Se anulará el temporal ${v.PeriodoTemporalActual.MatriculaTemporal}.`:''].filter(Boolean).join('\n');if(!confirm(`${impact}\n\n¿Confirmar?`))return;try{await call('saveVehicle',Object.assign({},v,{Estado:newState}));invalidateClientParkingData();toast(`Vehículo ${newState.toLowerCase()}.`);vehicleDetailView(v.ID_Vehiculo,backFn)}catch(e){err(e)}}
+
+
+// 1.2.12 - ficha operativa de vivienda
+async function housingDetailView(id){
+  renderLoading('housing');try{const d=await call('housingDetail',{id}),h=d.housing,o=d.owner||{},vs=d.vehicles||[],incs=d.incidents||[],reqs=d.requests||[];
+  const openInc=incs.filter(x=>(x.Estado||'Abierta')!=='Cerrada'),pendingReq=reqs.filter(x=>x.Estado==='Pendiente'),tmp=vs.filter(v=>v.PeriodoTemporalActual),slotVehicle=n=>vs.find(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&String(v.Slot)===String(n));
+  const slotCard=n=>{const v=slotVehicle(n);return `<article class="summary-card clickable hd-slot" data-plate="${esc(v?.MatriculaHabitual||'')}"><b>${v?esc(v.MatriculaHabitual):'Libre'}</b><span>Slot ${n}</span><small>${v?esc(v.Estado):'Disponible'}</small></article>`};
+  $('#main').innerHTML=`<div class="head"><div><h1>${esc(housingShort(h))}</h1><div class="muted">Ficha operativa de vivienda</div></div><div class="actions"><button class="secondary" id="hd-back">← Viviendas</button><button id="hd-add">＋ Vehículo</button></div></div>
+  <div class="summary-grid">${slotCard(1)}${slotCard(2)}<button class="summary-card clickable" id="hd-inc"><b>${openInc.length}</b><span>Incidencias abiertas</span><small>Ver incidencias</small></button><button class="summary-card clickable" id="hd-req"><b>${pendingReq.length}</b><span>Solicitudes pendientes</span><small>Ver solicitudes</small></button><article class="summary-card"><b>${tmp.length}</b><span>Temporales vigentes</span></article></div>
+  <section class="card" style="margin-top:1rem"><h2>Vivienda y propietario</h2><div class="details"><div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Estado</small>${esc(h.Estado||'—')}</div><div><small>Responsable</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div></div></section>
+  <section class="card" style="margin-top:1rem"><div class="head"><h2>Vehículos registrados</h2><button class="secondary" id="hd-open-vehicles">Abrir en Vehículos</button></div><div class="tablebox compact-table"><table class="table responsive-data-table"><thead><tr><th>Habitual</th><th>Temporal</th><th>Vigencia</th><th>Clase</th><th>Estado</th><th>Slot</th><th>QR</th></tr></thead><tbody>${vs.map(v=>`<tr><td data-label="Habitual"><b>${esc(v.MatriculaHabitual||'—')}</b></td><td data-label="Temporal">${esc(v.PeriodoTemporalActual?.MatriculaTemporal||'—')}</td><td data-label="Vigencia">${v.PeriodoTemporalActual?`${esc(dateEs(v.PeriodoTemporalActual.Desde))} → ${esc(dateEs(v.PeriodoTemporalActual.Hasta))}`:'—'}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado">${esc(v.Estado||'—')}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Sin slot')}</td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':v.QR_Estado||'—')}</td></tr>`).join('')}</tbody></table></div></section>`;
+  $('#hd-back').onclick=()=>go('housing');$('#hd-add').onclick=()=>{state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda}};go('vehicles')};$('#hd-open-vehicles').onclick=$('#hd-add').onclick;
+  $('#hd-inc').onclick=()=>{state.cache.incidentPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('incidents')};$('#hd-req').onclick=()=>{state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Pendiente'};go('requests')};
+  document.querySelectorAll('.hd-slot').forEach(x=>x.onclick=()=>{if(!x.dataset.plate)return;state.cache.tablePreset={kind:'vehicles',search:x.dataset.plate};go('vehicles')});
+  }catch(e){err(e)}
+}

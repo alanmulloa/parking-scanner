@@ -12,7 +12,7 @@ function auditPresetRange(preset){
 async function audit(){
   try{
     const rows=(await call('listAudit')).reverse(),entities=[...new Set(rows.map(r=>r.Entidad).filter(Boolean))].sort(),actions=[...new Set(rows.map(r=>r.Accion).filter(Boolean))].sort(),users=[...new Map(rows.filter(r=>r.Usuario).map(r=>[r.Usuario,{email:r.Usuario,name:r.UsuarioNombre||r.Usuario}])).values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
-    $('#main').innerHTML=`<div class="head"><h1>Auditoría</h1><button class="secondary" id="audit-export">Exportar filtrado CSV</button></div>
+    $('#main').innerHTML=`<div class="head"><h1>Auditoría</h1>${exportButtonsHtml('audit-export')}</div>
       <div class="filterbar">
         <div class="field"><label>Período</label><select id="audit-period"><option value="30" selected>Últimos 30 días</option><option value="today">Hoy</option><option value="7">Últimos 7 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="all">Todo</option><option value="custom">Personalizado</option></select></div>
         <div class="field"><label>Desde</label><input id="audit-from" type="date"></div>
@@ -30,7 +30,7 @@ async function audit(){
     const render=()=>{const filtered=filteredRows();$('#audit-count').textContent=`Mostrando ${filtered.length} de ${rows.length}`;$('#audit-body').innerHTML=filtered.map(r=>`<tr><td>${esc(shortDateTime(r.FechaHora))}</td><td><b>${esc(r.UsuarioNombre||r.Usuario)}</b>${r.UsuarioNombre&&r.Usuario?`<span class="subtle">${esc(r.Usuario)}</span>`:''}</td><td>${esc(r.Accion)}</td><td>${esc(r.Entidad)} · ${esc(r.ID_Entidad)}</td><td>${esc(r.Campo)}</td><td>${auditValue(r.ValorAnterior,r.ValorAnteriorNombre)}</td><td>${auditValue(r.ValorNuevo,r.ValorNuevoNombre)}</td></tr>`).join('');$('#audit-empty').classList.toggle('hide',!!filtered.length)};
     period.onchange=applyPreset;from.onchange=()=>{period.value='custom';render()};to.onchange=()=>{period.value='custom';render()};['#audit-search','#audit-user','#audit-entity','#audit-action'].forEach(id=>{const el=$(id);el[el.tagName==='INPUT'?'oninput':'onchange']=render});
     $('#audit-clear').onclick=()=>{$('#audit-search').value='';$('#audit-user').value='';$('#audit-entity').value='';$('#audit-action').value='';period.value='30';applyPreset()};
-    $('#audit-export').onclick=()=>{const filtered=filteredRows();if(!filtered.length){toast('No hay registros para exportar.',true);return}const suffix=[from.value||'inicio',to.value||'hoy'].join('_');downloadCsv(`auditoria_${suffix}.csv`,filtered,['FechaHora','UsuarioNombre','Usuario','Accion','Entidad','ID_Entidad','Campo','ValorAnterior','ValorNuevo','Observaciones'])};
+    $('#audit-export-xlsx').onclick=()=>{const filtered=filteredRows();if(!filtered.length){toast('No hay registros para exportar.',true);return}const suffix=[from.value||'inicio',to.value||'hoy'].join('_'),cols=['FechaHora','UsuarioNombre','Usuario','Accion','Entidad','ID_Entidad','Campo','ValorAnterior','ValorNuevo','Observaciones'];downloadXlsx(`auditoria_${suffix}.xlsx`,filtered,cols,'Auditoria').catch(err)};$('#audit-export-csv').onclick=()=>{const filtered=filteredRows();if(!filtered.length){toast('No hay registros para exportar.',true);return}const suffix=[from.value||'inicio',to.value||'hoy'].join('_');downloadCsv(`auditoria_${suffix}.csv`,filtered,['FechaHora','UsuarioNombre','Usuario','Accion','Entidad','ID_Entidad','Campo','ValorAnterior','ValorNuevo','Observaciones'])};
     applyPreset();
   }catch(e){err(e)}
 }

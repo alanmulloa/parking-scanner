@@ -56,5 +56,22 @@
 
 /* 1.2.11.3 - tablas ADMIN/PROPIETARIO, acciones compactas y responsive */
 .wrap{width:min(1380px,calc(100% - 2rem))}
-.action-menu{position:relative;display:inline-block}.action-menu summary{list-style:none;cursor:pointer;border-radius:9px;background:#e1f2ef;color:#086b5b;padding:.5rem .7rem;font-size:.78rem;font-weight:800;white-space:nowrap}.action-menu summary::-webkit-details-marker{display:none}.action-menu summary:after{content:' ▾'}.action-menu[open] summary:after{content:' ▴'}.action-menu-panel{position:absolute;right:0;top:calc(100% + .35rem);z-index:80;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:.45rem;box-shadow:0 12px 30px rgba(19,48,49,.18);display:grid;gap:.3rem}.action-menu-panel button,.action-menu-panel .btn{width:100%;justify-content:flex-start;padding:.58rem .65rem;font-size:.8rem}.table-group-row td{background:#eef7f5!important;color:#315a55;font-size:.8rem;padding:.55rem .8rem!important}.owner-admin-like{margin-top:.25rem}.owner-admin-like .owner-resolution{min-width:260px;margin:0}.period-custom{flex-basis:150px!important}
+.action-menu{position:relative;display:inline-block}.action-menu summary{list-style:none;cursor:pointer;border-radius:9px;background:#e1f2ef;color:#086b5b;padding:.5rem .7rem;font-size:.78rem;font-weight:800;white-space:nowrap}.action-menu summary::-webkit-details-marker{display:none}.action-menu summary:after{content:' ▾'}.action-menu[open] summary:after{content:' ▴'}.action-menu-panel{position:absolute;right:0;top:calc(100% + .35rem);z-index:1000;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:.45rem;box-shadow:0 12px 30px rgba(19,48,49,.18);display:grid;gap:.3rem}.action-menu-panel button,.action-menu-panel .btn{width:100%;justify-content:flex-start;padding:.58rem .65rem;font-size:.8rem}.table-group-row td{background:#eef7f5!important;color:#315a55;font-size:.8rem;padding:.55rem .8rem!important}.owner-admin-like{margin-top:.25rem}.owner-admin-like .owner-resolution{min-width:260px;margin:0}.period-custom{flex-basis:150px!important}
 @media(max-width:720px){.wrap{width:calc(100% - 1rem)}.responsive-data-table thead{display:none}.responsive-data-table,.responsive-data-table tbody,.responsive-data-table tr,.responsive-data-table td{display:block;width:100%}.responsive-data-table tr{border-bottom:1px solid var(--line);padding:.55rem .7rem}.responsive-data-table tr.table-group-row{padding:0}.responsive-data-table tr.table-group-row td{padding:.6rem!important}.responsive-data-table td{border:0!important;white-space:normal!important;padding:.32rem 0!important;display:grid;grid-template-columns:minmax(105px,38%) 1fr;gap:.5rem;align-items:start}.responsive-data-table td:before{content:attr(data-label);font-size:.72rem;text-transform:uppercase;font-weight:800;color:#6a7d80}.responsive-data-table td[colspan]:before{display:none}.action-menu{width:100%}.action-menu summary{min-height:44px;display:flex;align-items:center;justify-content:center}.action-menu-panel{position:static;margin-top:.35rem;box-shadow:none;min-width:0}.owner-admin-like .owner-resolution{min-width:0}.period-custom{flex-basis:100%!important}}
+
+/* 1.2.11.4 - exportación Excel principal + CSV secundario */
+.export-actions{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
+.export-actions .compact{padding:.55rem .75rem;min-width:auto}
+@media (max-width:700px){.export-actions{width:100%}.export-actions button{flex:1 1 auto}}
+
+/* 1.2.12 UX */
+.control-result-title{text-align:center;margin:.2rem 0 .65rem;font-size:clamp(1.25rem,3vw,2rem)}
+.control-current-label{text-align:center;font-size:.82rem;text-transform:uppercase;font-weight:850;color:var(--muted);letter-spacing:.04em;margin-top:.8rem}
+.control-valid-plate{border-color:var(--brand)}
+.control-secondary-info{margin-top:1rem}
+.link-chip{border:0;background:#fff3cd;color:#765b00;cursor:pointer;padding:.25rem .55rem;border-radius:99px;font-size:.74rem;font-weight:800}
+.link-chip:hover{text-decoration:underline}
+.resolution-cell{min-width:280px;white-space:normal!important}
+.detail-text{white-space:normal;max-width:420px}
+.admin-data-view{overflow:visible}.admin-data-view .table{min-width:100%}.tablebox:has(.action-menu[open]){overflow:visible}
+@media(max-width:720px){.resolution-cell{min-width:0}.detail-text{max-width:none}.tablebox:has(.action-menu[open]){overflow:visible}.action-menu-panel{z-index:1000}}
