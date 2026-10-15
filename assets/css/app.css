@@ -202,3 +202,49 @@ html,body{max-width:100%;overflow-x:hidden}
     flex:0 0 auto;
   }
 }
+
+/* 1.2.12.8 - login reforzado + identidad realmente anclada a izquierda */
+.login .card{width:min(460px,calc(100% - 2rem));padding:2.7rem 2.5rem 2.4rem}
+.login-brand{min-height:108px;margin-bottom:.85rem}
+.login-logo{max-width:190px;max-height:122px;object-fit:contain}
+.login-description{margin:.35rem 0 1rem;font-size:1.05rem;font-weight:650;line-height:1.4;color:#52686b}
+.login .card h1{margin:.35rem 0 .55rem;line-height:1.08}
+.login .card>p.muted:not(.login-description){margin-top:.2rem}
+@media(min-width:901px){
+  .top{padding-left:18px!important;padding-right:18px!important;max-width:none!important;margin:0!important;width:100%!important}
+  .brand{margin-left:0!important;padding-left:0!important;max-width:330px}
+  .brand-identity{justify-content:flex-start!important}
+  .brand-name{text-align:left}
+  .nav{justify-content:flex-start!important;margin-left:.35rem}
+}
+@media(max-width:720px){
+  .login .card{padding:2rem 1.35rem 1.8rem}
+  .login-brand{min-height:92px}
+  .login-logo{max-width:155px;max-height:105px}
+  .login-description{font-size:.98rem}
+}
+
+/* 1.2.12.9 - navegación desktop en segunda barra, estilo de secciones */
+.section-nav{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(19,48,49,.035)}
+@media(min-width:721px){
+  .top{min-height:78px;padding:12px 22px!important;gap:.75rem!important;flex-wrap:nowrap!important}
+  .top .brand{margin-right:auto!important;max-width:min(420px,38vw)!important}
+  .top .brand-logo{width:40px;height:40px;border-radius:9px}
+  .top .brand-name{font-size:1.06rem}
+  .top .global-search-trigger{margin-left:auto!important}
+  .section-nav{display:block;padding:.5rem 22px}
+  .section-nav .nav{display:flex;align-items:center;justify-content:flex-start!important;gap:.25rem;margin:0!important;overflow:visible;max-width:none;width:100%}
+  .section-nav .nav>button,
+  .section-nav .nav-more>summary{color:#50625f!important;background:transparent!important;padding:.58rem .78rem!important;border-radius:10px;font-size:.82rem!important;font-weight:760}
+  .section-nav .nav>button:hover,
+  .section-nav .nav-more>summary:hover{background:#f2f6f5!important;color:var(--dark)!important}
+  .section-nav .nav>button.active,
+  .section-nav .nav-more.active>summary,
+  .section-nav .nav-more[open]>summary{background:var(--accent)!important;color:var(--dark)!important}
+  .section-nav .nav-more-panel{top:calc(100% + .45rem);left:0;right:auto}
+  .wrap{padding-top:1.65rem}
+}
+@media(max-width:720px){
+  .section-nav{border:0;box-shadow:none;padding:0;background:transparent}
+  .section-nav .nav{position:fixed}
+}

@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.7';
+const APP_FRONTEND_VERSION='1.2.12.9';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -141,7 +141,7 @@ function login(message=''){
 function shell(){
   const roles=userRoles(),active=activeUiRole();
   const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
-  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><main class="wrap" id="main"></main>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav></div><main class="wrap" id="main"></main>`;
   const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
   const searchBtn=$('#global-search-trigger');if(searchBtn)searchBtn.addEventListener('click',()=>openGlobalSearchOverlay());
   const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
