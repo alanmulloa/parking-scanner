@@ -75,3 +75,17 @@
 .detail-text{white-space:normal;max-width:420px}
 .admin-data-view{overflow:visible}.admin-data-view .table{min-width:100%}.tablebox:has(.action-menu[open]){overflow:visible}
 @media(max-width:720px){.resolution-cell{min-width:0}.detail-text{max-width:none}.tablebox:has(.action-menu[open]){overflow:visible}.action-menu-panel{z-index:1000}}
+
+/* 1.2.12.1 - menús de acciones fuera del flujo de las tablas */
+.action-menu-panel[data-floating="1"]{position:fixed!important;right:auto!important;z-index:5000!important;max-height:min(420px,calc(100vh - 16px));overflow:auto}.tablebox,.admin-data-view{overflow-x:auto}.tablebox.action-menu-open,.admin-data-view.action-menu-open{overflow:visible!important}
+
+
+/* 1.2.12.2 - alineación UX de Inicio, Viviendas y Vehículos */
+.vehicles-admin-view{overflow-x:auto}
+.vehicles-admin-table{width:100%;table-layout:auto}
+.vehicles-admin-table th,.vehicles-admin-table td{padding:.7rem .62rem;vertical-align:middle}
+.vehicles-admin-table th:nth-child(1),.vehicles-admin-table td:nth-child(1){width:34px}
+.vehicles-admin-table th:nth-child(5),.vehicles-admin-table td:nth-child(5){min-width:125px;max-width:180px;white-space:normal}
+.vehicles-admin-table th:nth-child(12),.vehicles-admin-table td:nth-child(12){width:105px}
+.housing-detail-card{margin-top:1rem}
+@media(min-width:721px){.vehicles-admin-table{font-size:.9rem}.vehicles-admin-table .action-menu{white-space:nowrap}}

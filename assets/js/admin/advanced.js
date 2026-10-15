@@ -81,3 +81,44 @@ async function housingDetailView(id){
   document.querySelectorAll('.hd-slot').forEach(x=>x.onclick=()=>{if(!x.dataset.plate)return;state.cache.tablePreset={kind:'vehicles',search:x.dataset.plate};go('vehicles')});
   }catch(e){err(e)}
 }
+
+
+// 1.2.12.2 - ficha de vivienda unificada; Vehículos reutiliza la pantalla principal filtrada
+async function housingDetailView(id){
+  renderLoading('housing');
+  try{
+    const d=await call('housingDetail',{id}),h=d.housing,o=d.owner||{},vs=d.vehicles||[],incs=d.incidents||[],reqs=d.requests||[];
+    const openInc=incs.filter(x=>(x.Estado||'Abierta')!=='Cerrada');
+    const pendingReq=reqs.filter(x=>x.Estado==='Pendiente');
+    const tmp=vs.filter(v=>v.PeriodoTemporalActual);
+    const activeSlots=vs.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')));
+    const motos=vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto');
+    const slot=n=>activeSlots.find(v=>String(v.Slot)===String(n));
+    const card=(value,label,detail='',action='',alert=false)=>`<article class="summary-card ${action?'clickable':''} ${alert?'alert':''}" ${action?`data-hd-action="${action}"`:''}><b>${esc(value)}</b><span>${esc(label)}</span>${detail?`<small>${esc(detail)}</small>`:''}</article>`;
+    $('#main').innerHTML=`<div class="head"><div><h1>${esc(housingShort(h))}</h1><div class="muted">Ficha operativa de vivienda</div></div><div class="actions"><button class="secondary" id="hd-back">← Viviendas</button><button id="hd-add">＋ Vehículo</button></div></div>
+      <section class="summary-section"><div class="head"><h2>Estado general</h2></div><div class="summary-grid">
+        ${card(slot(1)?.MatriculaHabitual||'Libre','Slot 1',slot(1)?.Estado||'Disponible','slot1')}
+        ${card(slot(2)?.MatriculaHabitual||'Libre','Slot 2',slot(2)?.Estado||'Disponible','slot2')}
+        ${card(vs.length,'Vehículos registrados',`${activeSlots.length}/2 slots ocupados · ${motos.length} moto${motos.length===1?'':'s'}`,'vehicles')}
+        ${card(tmp.length,'Temporales vigentes','Ver vehículos','vehicles')}
+      </div></section>
+      <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
+        ${card(openInc.length,'Incidencias abiertas','Pendientes de resolución','incidents',openInc.length>0)}
+        ${card(pendingReq.length,'Solicitudes pendientes','Requieren revisión','requests',pendingReq.length>0)}
+      </div></section>
+      <section class="card housing-detail-card"><div class="head"><h2>Vivienda y propietario</h2></div><div class="details">
+        <div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Estado</small>${esc(h.Estado||'—')}</div><div><small>Responsable</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div>
+      </div><div class="actions" style="margin-top:1rem"><button class="secondary" id="hd-open-vehicles">Abrir vehículos de esta vivienda</button></div></section>`;
+    const openVehicles=()=>{state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda}};go('vehicles')};
+    $('#hd-back').onclick=()=>go('housing');
+    $('#hd-add').onclick=openVehicles;
+    $('#hd-open-vehicles').onclick=openVehicles;
+    document.querySelectorAll('[data-hd-action]').forEach(el=>el.onclick=()=>{
+      const a=el.dataset.hdAction;
+      if(a==='vehicles'){openVehicles();return}
+      if(a==='incidents'){state.cache.incidentPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('incidents');return}
+      if(a==='requests'){state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Pendiente'};go('requests');return}
+      if(a==='slot1'||a==='slot2'){const v=slot(a==='slot1'?1:2);if(v){state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda},search:v.MatriculaHabitual||''};go('vehicles')}}
+    });
+  }catch(e){err(e)}
+}
