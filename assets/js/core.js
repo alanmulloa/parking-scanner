@@ -1,4 +1,8 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{},scanResult:null,scanner:null,libs:{},navSeq:0};
+const APP_FRONTEND_VERSION='1.2.12.4';
+function appSettings(){return state.cache?.bootstrap?.settings||{}}
+function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
+function applyParkingSettings(settings){settings=settings||{};const root=document.documentElement;if(settings.ColorPrincipal)root.style.setProperty('--brand',settings.ColorPrincipal);if(settings.ColorSecundario)root.style.setProperty('--dark',settings.ColorSecundario);if(settings.ColorAcento)root.style.setProperty('--accent',settings.ColorAcento);document.title=settings.NombreOficial||'Parking Comunidad'}
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SERVER_TIMEOUT_MS=18000;
 const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listAudit','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
@@ -72,7 +76,7 @@ function downloadCsv(filename,rows,columns){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-const UI_STATE_KEY='parking_ui_state_v2';
+const UI_STATE_KEY='parking_ui_state_v3_'+APP_FRONTEND_VERSION;
 function loadUiState(){try{return JSON.parse(sessionStorage.getItem(UI_STATE_KEY)||'{}')||{}}catch(e){return {}}}
 function saveUiState(patch){try{const next=Object.assign({},loadUiState(),patch||{});sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(next));return next}catch(e){return {}}}
 function viewUiState(view=state.view){const all=loadUiState();return (all.views&&all.views[view])||{}}

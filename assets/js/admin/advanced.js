@@ -122,3 +122,45 @@ async function housingDetailView(id){
     });
   }catch(e){err(e)}
 }
+
+// 1.2.12.4 - búsqueda global desde cabecera + configuración ADMIN
+function closeGlobalSearchOverlay(){document.querySelector('#global-search-overlay')?.remove()}
+async function openGlobalSearchOverlay(initial=''){
+  closeGlobalSearchOverlay();
+  const overlay=document.createElement('div');overlay.id='global-search-overlay';overlay.className='global-search-overlay';
+  overlay.innerHTML=`<section class="global-search-dialog" role="dialog" aria-modal="true" aria-label="Búsqueda global"><div class="global-search-head"><div><h2>Buscar</h2><p class="muted">Matrículas, viviendas, propietarios, incidencias y solicitudes.</p></div><button type="button" class="secondary compact" id="global-search-close">Cerrar</button></div><form id="global-search-modal-form" class="global-search-form"><input id="global-search-modal-input" class="search" autocomplete="off" placeholder="Matrícula, vivienda, propietario, incidencia…" value="${esc(initial)}" minlength="2" required><button>Buscar</button></form><div id="global-search-modal-results" class="global-search-modal-results"><div class="empty">Escribe al menos 2 caracteres.</div></div></section>`;
+  document.body.appendChild(overlay);
+  const input=overlay.querySelector('#global-search-modal-input'),results=overlay.querySelector('#global-search-modal-results');
+  const run=async()=>{const q=input.value.trim();if(q.length<2){results.innerHTML='<div class="empty">Escribe al menos 2 caracteres.</div>';return}results.innerHTML='<div class="spinner"></div>';try{const rows=await call('globalSearch',{q});results.innerHTML=rows.length?rows.map((r,i)=>`<button type="button" class="global-search-row" data-i="${i}"><span class="status">${esc(r.type)}</span><span class="global-search-row-main"><b>${esc(r.title)}</b><small>${esc(r.detail||'')}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<div class="empty">No se encontraron resultados.</div>';results.querySelectorAll('.global-search-row').forEach(b=>b.onclick=()=>{const r=rows[Number(b.dataset.i)];closeGlobalSearchOverlay();openGlobalResult(r)})}catch(e){results.innerHTML=`<div class="message bad">${esc(e.message||e)}</div>`}};
+  overlay.querySelector('#global-search-close').onclick=closeGlobalSearchOverlay;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)closeGlobalSearchOverlay()});
+  overlay.querySelector('#global-search-modal-form').onsubmit=e=>{e.preventDefault();run()};
+  document.addEventListener('keydown',function escClose(e){if(e.key==='Escape'){closeGlobalSearchOverlay();document.removeEventListener('keydown',escClose)}});
+  requestAnimationFrame(()=>input.focus());if(initial)run();
+}
+
+async function configurationView(){
+  renderLoading('config');
+  try{
+    const s=await call('getSettings');
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de Parking Comunidad.</div></div></div>
+    <form id="configuration-form" class="settings-layout">
+      <section class="card settings-main"><h2>Datos principales</h2><p class="muted">Información visible dentro de la aplicación.</p><div class="form">
+        <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
+        <div class="field"><label>Nombre corto</label><input name="NombreCorto" value="${esc(s.NombreCorto||'Parking')}"></div>
+        <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
+        <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
+        <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="https://..."></div>
+      </div></section>
+      <aside class="settings-side">
+        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Vista previa de la identidad.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div></section>
+        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Se aplican a la interfaz al guardar.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}</section>
+      </aside>
+      <div class="settings-save"><button type="submit">Guardar configuración</button></div>
+    </form>`;
+    const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
+    logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
+    document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
+    form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
+  }catch(e){err(e)}
+}

@@ -1,4 +1,8 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{},scanResult:null,scanner:null,libs:{},navSeq:0};
+const APP_FRONTEND_VERSION='1.2.12.4';
+function appSettings(){return state.cache?.bootstrap?.settings||{}}
+function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
+function applyParkingSettings(settings){settings=settings||{};const root=document.documentElement;if(settings.ColorPrincipal)root.style.setProperty('--brand',settings.ColorPrincipal);if(settings.ColorSecundario)root.style.setProperty('--dark',settings.ColorSecundario);if(settings.ColorAcento)root.style.setProperty('--accent',settings.ColorAcento);document.title=settings.NombreOficial||'Parking Comunidad'}
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SERVER_TIMEOUT_MS=18000;
 const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listAudit','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
@@ -72,7 +76,7 @@ function downloadCsv(filename,rows,columns){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-const UI_STATE_KEY='parking_ui_state_v2';
+const UI_STATE_KEY='parking_ui_state_v3_'+APP_FRONTEND_VERSION;
 function loadUiState(){try{return JSON.parse(sessionStorage.getItem(UI_STATE_KEY)||'{}')||{}}catch(e){return {}}}
 function saveUiState(patch){try{const next=Object.assign({},loadUiState(),patch||{});sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(next));return next}catch(e){return {}}}
 function viewUiState(view=state.view){const all=loadUiState();return (all.views&&all.views[view])||{}}
@@ -120,18 +124,40 @@ function hasAssignedRole(role){return userRoles().includes(role)}
 function hasUiRole(role){return activeUiRole()===role}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return roles[0]||'PROPIETARIO'}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
-function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const allowed={ADMIN:['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'],CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(restoredStartView())}catch(e){login(e.message)}}
+function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const allowed={ADMIN:['dashboard','search','config','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'],CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
+async function init(){if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(restoredStartView())}catch(e){login(e.message)}}
 function login(message=''){
   $('#app').innerHTML=`<main class="login"><section class="card"><div class="mark">P</div><h1>Parking Comunidad</h1><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
-  $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);const roles=userRoles();saveUiState({activeRole:roles[0]||'PROPIETARIO'});state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}}
+  $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}const roles=userRoles();saveUiState({activeRole:roles[0]||'PROPIETARIO'});state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}}
 }
-function shell(){const roles=userRoles(),active=activeUiRole(),roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;$('#app').innerHTML=`<header class="top"><div class="brand">Parking Comunidad</div><nav class="nav" id="nav"></nav><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><main class="wrap" id="main"></main>`;const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));$('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};renderNav()}
-function renderNav(){const map={ADMIN:[['dashboard','Resumen'],['search','Buscar'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control']],CONTROL:[['control','Control'],['search','Buscar'],['incidents','Incidencias']],PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]};const items=map[activeUiRole()]||[];$('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.view))}
+function shell(){
+  const roles=userRoles(),active=activeUiRole();
+  const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${esc(appDisplayName())}</div><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><main class="wrap" id="main"></main>`;
+  const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
+  const searchBtn=$('#global-search-trigger');if(searchBtn)searchBtn.addEventListener('click',()=>openGlobalSearchOverlay());
+  const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
+  $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
+  renderNav();
+}
+function renderNav(){
+  const role=activeUiRole();
+  const map={
+    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes']],
+    CONTROL:[['control','Control'],['incidents','Incidencias']],
+    PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
+  };
+  const secondary=role==='ADMIN'?[['audit','Auditoría'],['control','Control'],['config','Configuración']]:[];
+  const items=map[role]||[];
+  const direct=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
+  const more=secondary.length?`<details class="nav-more ${secondary.some(([v])=>state.view===v)?'active':''}"><summary>Más</summary><div class="nav-more-panel">${secondary.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('')}</div></details>`:'';
+  $('#nav').innerHTML=direct+more;
+  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const d=b.closest('.nav-more');if(d)d.removeAttribute('open');go(b.dataset.view)});
+}
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
-function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
+function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
 function renderLoading(view){const main=$('#main');if(!main)return;main.innerHTML=`<section class="card loading-state"><div class="spinner"></div><h2>${esc(viewLabel(view))}</h2><p class="muted">Cargando datos…</p></section>`}
-function go(view){stopScanner();state.view=view;rememberCurrentView(view);state.navSeq++;renderNav();renderLoading(view);const fn=({dashboard,search:globalSearchView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).catch(err)}
+function go(view){stopScanner();state.view=view;rememberCurrentView(view);state.navSeq++;renderNav();renderLoading(view);const fn=({dashboard,search:globalSearchView,config:configurationView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).catch(err)}
 function err(e){const message=(e&&e.message)||String(e)||'No se pudo cargar la información.';toast(message,true);const main=$('#main');if(!main)return;const stillLoading=!!main.querySelector('.loading-state,.spinner')||!main.textContent.trim();if(stillLoading){const view=state.view;main.innerHTML=`<section class="card retry-state"><h2>No se pudo cargar ${esc(viewLabel(view).toLowerCase())}</h2><p class="muted">${esc(message)}</p><div class="actions"><button id="retry-view">Reintentar</button><button class="secondary" id="retry-home">Ir al inicio</button></div></section>`;$('#retry-view').onclick=()=>go(view);$('#retry-home').onclick=()=>go(defaultViewForRole(activeUiRole()))}}
 async function dashboard(){
   try{
@@ -382,6 +408,48 @@ async function housingDetailView(id){
       if(a==='requests'){state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Pendiente'};go('requests');return}
       if(a==='slot1'||a==='slot2'){const v=slot(a==='slot1'?1:2);if(v){state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda},search:v.MatriculaHabitual||''};go('vehicles')}}
     });
+  }catch(e){err(e)}
+}
+
+// 1.2.12.4 - búsqueda global desde cabecera + configuración ADMIN
+function closeGlobalSearchOverlay(){document.querySelector('#global-search-overlay')?.remove()}
+async function openGlobalSearchOverlay(initial=''){
+  closeGlobalSearchOverlay();
+  const overlay=document.createElement('div');overlay.id='global-search-overlay';overlay.className='global-search-overlay';
+  overlay.innerHTML=`<section class="global-search-dialog" role="dialog" aria-modal="true" aria-label="Búsqueda global"><div class="global-search-head"><div><h2>Buscar</h2><p class="muted">Matrículas, viviendas, propietarios, incidencias y solicitudes.</p></div><button type="button" class="secondary compact" id="global-search-close">Cerrar</button></div><form id="global-search-modal-form" class="global-search-form"><input id="global-search-modal-input" class="search" autocomplete="off" placeholder="Matrícula, vivienda, propietario, incidencia…" value="${esc(initial)}" minlength="2" required><button>Buscar</button></form><div id="global-search-modal-results" class="global-search-modal-results"><div class="empty">Escribe al menos 2 caracteres.</div></div></section>`;
+  document.body.appendChild(overlay);
+  const input=overlay.querySelector('#global-search-modal-input'),results=overlay.querySelector('#global-search-modal-results');
+  const run=async()=>{const q=input.value.trim();if(q.length<2){results.innerHTML='<div class="empty">Escribe al menos 2 caracteres.</div>';return}results.innerHTML='<div class="spinner"></div>';try{const rows=await call('globalSearch',{q});results.innerHTML=rows.length?rows.map((r,i)=>`<button type="button" class="global-search-row" data-i="${i}"><span class="status">${esc(r.type)}</span><span class="global-search-row-main"><b>${esc(r.title)}</b><small>${esc(r.detail||'')}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<div class="empty">No se encontraron resultados.</div>';results.querySelectorAll('.global-search-row').forEach(b=>b.onclick=()=>{const r=rows[Number(b.dataset.i)];closeGlobalSearchOverlay();openGlobalResult(r)})}catch(e){results.innerHTML=`<div class="message bad">${esc(e.message||e)}</div>`}};
+  overlay.querySelector('#global-search-close').onclick=closeGlobalSearchOverlay;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)closeGlobalSearchOverlay()});
+  overlay.querySelector('#global-search-modal-form').onsubmit=e=>{e.preventDefault();run()};
+  document.addEventListener('keydown',function escClose(e){if(e.key==='Escape'){closeGlobalSearchOverlay();document.removeEventListener('keydown',escClose)}});
+  requestAnimationFrame(()=>input.focus());if(initial)run();
+}
+
+async function configurationView(){
+  renderLoading('config');
+  try{
+    const s=await call('getSettings');
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de Parking Comunidad.</div></div></div>
+    <form id="configuration-form" class="settings-layout">
+      <section class="card settings-main"><h2>Datos principales</h2><p class="muted">Información visible dentro de la aplicación.</p><div class="form">
+        <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
+        <div class="field"><label>Nombre corto</label><input name="NombreCorto" value="${esc(s.NombreCorto||'Parking')}"></div>
+        <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
+        <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
+        <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="https://..."></div>
+      </div></section>
+      <aside class="settings-side">
+        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Vista previa de la identidad.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div></section>
+        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Se aplican a la interfaz al guardar.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}</section>
+      </aside>
+      <div class="settings-save"><button type="submit">Guardar configuración</button></div>
+    </form>`;
+    const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
+    logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
+    document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
+    form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
   }catch(e){err(e)}
 }
 async function control(token=''){
