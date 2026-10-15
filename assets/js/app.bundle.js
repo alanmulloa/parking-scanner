@@ -512,33 +512,74 @@ async function logoFileData(file){
     return fileData(file);
   }
 }
-async function configurationView(){
+async function configurationView(initialTab='identity'){
   renderLoading('config');
   try{
     const s=await call('getSettings');
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de la comunidad. Los cambios se aplican al login y a la cabecera.</div></div></div>
-    <form id="configuration-form" class="settings-layout">
-      <section class="card settings-main"><h2>Datos principales</h2><p class="muted">Información visible dentro de la aplicación.</p><div class="form">
-        <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
-        <div class="field"><label>Descripción</label><input name="Descripcion" value="${esc(s.Descripcion||s.NombreCorto||'Gestión de acceso y parking de la comunidad')}" placeholder="Gestión de acceso y parking de la comunidad"></div>
-        <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
-        <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
-        <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="Puedes pegar una URL o subir un archivo desde el panel de Logo"></div>
-      </div></section>
-      <aside class="settings-side">
-        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Puedes subir una imagen desde tu equipo o utilizar una URL. Se usa en el login y en la cabecera.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div><div class="settings-logo-actions"><label class="button-like secondary" for="settings-logo-file">Elegir logo</label><input id="settings-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button type="button" class="danger-link" id="settings-logo-remove">Quitar</button></div><div class="muted settings-logo-hint" id="settings-logo-hint">PNG, JPG, WEBP o GIF. Máximo 6 MB.</div></section>
-        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Puedes elegirlos manualmente o sugerirlos automáticamente a partir del logo.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}<button type="button" class="secondary settings-color-suggest" id="settings-colors-suggest">Sugerir desde logo</button><div class="muted settings-color-hint" id="settings-color-hint">La sugerencia no se guarda hasta pulsar “Guardar configuración”.</div></section>
-      </aside>
-      <div class="settings-save"><button type="submit">Guardar configuración</button></div>
-    </form>`;
-    const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
-    logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
-    const logoFile=$('#settings-logo-file'),logoRemove=$('#settings-logo-remove'),logoHint=$('#settings-logo-hint');
-    if(logoFile)logoFile.onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const choose=document.querySelector('label[for="settings-logo-file"]');busy(choose);try{if(logoHint)logoHint.textContent='Optimizando y subiendo logo…';const dataUrl=await logoFileData(file);preview.innerHTML=`<img src="${dataUrl}" alt="Vista previa del logo">`;const out=await call('uploadLogo',{dataUrl});logo.value=out.url||'';preview.innerHTML=`<img src="${esc(out.url||'')}" alt="Logo de la comunidad">`;if(logoHint)logoHint.textContent='Logo subido. Pulsa “Guardar configuración” para aplicarlo.';toast('Logo subido correctamente.');}catch(x){toast(x.message||x,true);if(logoHint)logoHint.textContent='No se pudo subir el logo.';}finally{busy(choose,false);logoFile.value=''}};
-    if(logoRemove)logoRemove.onclick=()=>{logo.value='';preview.innerHTML='<span>Sin logo</span>';if(logoHint)logoHint.textContent='El logo se quitará al guardar la configuración.'};
-    document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
-    const suggest=$('#settings-colors-suggest');if(suggest)suggest.onclick=async()=>{busy(suggest);try{const colors=await suggestColorsFromLogo(logo.value.trim());Object.entries(colors).forEach(([n,v])=>{const c=document.querySelector(`[data-color-name="${n}"]`),t=document.querySelector(`[data-color-text="${n}"]`);if(c)c.value=v;if(t)t.value=v});const hint=$('#settings-color-hint');if(hint)hint.textContent='Colores sugeridos desde el logo. Revísalos y guarda para aplicarlos.';toast('Colores sugeridos desde el logo.');busy(suggest,false)}catch(x){toast(x.message||x,true);busy(suggest,false)}};
-    form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">Identidad de la comunidad y estado técnico del sistema.</div></div></div>
+      <div class="config-tabs" role="tablist" aria-label="Configuración">
+        <button type="button" class="config-tab active" data-config-tab="identity">Identidad</button>
+        <button type="button" class="config-tab" data-config-tab="system">Sistema</button>
+      </div>
+      <div id="config-panel"></div>`;
+
+    const panel=$('#config-panel');
+    const tabs=[...document.querySelectorAll('[data-config-tab]')];
+    const setActive=tab=>tabs.forEach(b=>b.classList.toggle('active',b.dataset.configTab===tab));
+
+    async function renderIdentity(){
+      setActive('identity');
+      panel.innerHTML=`<form id="configuration-form" class="settings-layout">
+        <section class="card settings-main"><h2>Identidad de la comunidad</h2><p class="muted">Datos generales e identidad visual. Los cambios se aplican al login y a la cabecera.</p><div class="form">
+          <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
+          <div class="field"><label>Descripción</label><input name="Descripcion" value="${esc(s.Descripcion||s.NombreCorto||'Gestión de acceso y parking de la comunidad')}" placeholder="Gestión de acceso y parking de la comunidad"></div>
+          <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
+          <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
+          <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="Puedes pegar una URL o subir un archivo desde el panel de Logo"></div>
+        </div></section>
+        <aside class="settings-side">
+          <section class="card settings-logo"><h2>Logo</h2><p class="muted">Puedes subir una imagen desde tu equipo o utilizar una URL. Se usa en el login y en la cabecera.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div><div class="settings-logo-actions"><label class="button-like secondary" for="settings-logo-file">Elegir logo</label><input id="settings-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button type="button" class="danger-link" id="settings-logo-remove">Quitar</button></div><div class="muted settings-logo-hint" id="settings-logo-hint">PNG, JPG, WEBP o GIF. Máximo 6 MB.</div></section>
+          <section class="card settings-colors"><h2>Colores</h2><p class="muted">Puedes elegirlos manualmente o sugerirlos automáticamente a partir del logo.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}<button type="button" class="secondary settings-color-suggest" id="settings-colors-suggest">Sugerir desde logo</button><div class="muted settings-color-hint" id="settings-color-hint">La sugerencia no se guarda hasta pulsar “Guardar configuración”.</div></section>
+        </aside>
+        <div class="settings-save"><button type="submit">Guardar configuración</button></div>
+      </form>`;
+      const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
+      logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
+      const logoFile=$('#settings-logo-file'),logoRemove=$('#settings-logo-remove'),logoHint=$('#settings-logo-hint');
+      if(logoFile)logoFile.onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const choose=document.querySelector('label[for="settings-logo-file"]');busy(choose);try{if(logoHint)logoHint.textContent='Optimizando y subiendo logo…';const dataUrl=await logoFileData(file);preview.innerHTML=`<img src="${dataUrl}" alt="Vista previa del logo">`;const out=await call('uploadLogo',{dataUrl});logo.value=out.url||'';preview.innerHTML=`<img src="${esc(out.url||'')}" alt="Logo de la comunidad">`;if(logoHint)logoHint.textContent='Logo subido. Pulsa “Guardar configuración” para aplicarlo.';toast('Logo subido correctamente.');}catch(x){toast(x.message||x,true);if(logoHint)logoHint.textContent='No se pudo subir el logo.';}finally{busy(choose,false);logoFile.value=''}};
+      if(logoRemove)logoRemove.onclick=()=>{logo.value='';preview.innerHTML='<span>Sin logo</span>';if(logoHint)logoHint.textContent='El logo se quitará al guardar la configuración.'};
+      document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
+      const suggest=$('#settings-colors-suggest');if(suggest)suggest.onclick=async()=>{busy(suggest);try{const colors=await suggestColorsFromLogo(logo.value.trim());Object.entries(colors).forEach(([n,v])=>{const c=document.querySelector(`[data-color-name="${n}"]`),t=document.querySelector(`[data-color-text="${n}"]`);if(c)c.value=v;if(t)t.value=v});const hint=$('#settings-color-hint');if(hint)hint.textContent='Colores sugeridos desde el logo. Revísalos y guarda para aplicarlos.';toast('Colores sugeridos desde el logo.');busy(suggest,false)}catch(x){toast(x.message||x,true);busy(suggest,false)}};
+      form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);Object.assign(s,out||{});state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
+    }
+
+    async function renderSystem(){
+      setActive('system');
+      panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
+      const load=async()=>{
+        const refresh=$('#system-refresh');if(refresh)busy(refresh);
+        try{
+          const st=await call('systemStatus');
+          const cards=(st.services||[]).map(x=>`<div class="system-service ${x.ok?'ok':'bad'}"><span class="system-dot" aria-hidden="true"></span><div><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div></div>`).join('');
+          panel.innerHTML=`<section class="card system-info"><div class="system-status-head"><div><h2>Sistema</h2><p class="muted">Información técnica de solo lectura para comprobar la instalación.</p></div><span class="system-pill ${st.ok?'ok':'bad'}">${st.ok?'Disponible':'Revisar'}</span></div>
+            <div class="system-meta-grid">
+              <div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div>
+              <div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div>
+              <div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div>
+              <div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div>
+              <div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div>
+              <div><span>Hojas de datos</span><b>${esc(String(st.sheetCount??'—'))}</b></div>
+            </div></section>
+            <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar</button></div><div class="system-service-grid">${cards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'}</div></section>
+            <section class="card system-note"><h3>Seguridad</h3><p class="muted">Esta pantalla no muestra IDs de Drive/Sheets, tokens, URLs internas ni propiedades sensibles del proyecto.</p></section>`;
+          const r=$('#system-refresh');if(r)r.onclick=load;
+        }catch(x){panel.innerHTML=`<section class="card"><div class="message bad">${esc(x.message||x)}</div><div class="actions"><button type="button" id="system-retry">Reintentar</button></div></section>`;const r=$('#system-retry');if(r)r.onclick=load}
+      };
+      await load();
+    }
+
+    tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());
+    if(initialTab==='system')await renderSystem();else await renderIdentity();
   }catch(e){err(e)}
 }
 async function control(token=''){
