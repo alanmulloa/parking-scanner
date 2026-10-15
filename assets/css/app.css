@@ -387,3 +387,45 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 @media(max-width:380px){
   .top .brand-name{font-size:.9rem}.top .brand-logo,.top .brand-fallback{width:38px;height:38px;flex-basis:38px}.mobile-icon-btn{width:38px;height:38px}.mobile-dock{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom))}.mobile-dock-item{font-size:.63rem!important}
 }
+
+/* 1.2.12.17 - navegacion movil por perfil y menu hamburguesa unificado */
+@media(max-width:720px){
+  .mobile-menu-search{gap:.7rem!important;font-weight:800!important}
+  .mobile-menu-search>span:first-child{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#e7f4f1;color:var(--brand);font-size:1rem}
+  .mobile-dock[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr));left:max(34px,env(safe-area-inset-left));right:max(34px,env(safe-area-inset-right))}
+  .mobile-dock[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mobile-dock[data-count="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+  /* CONTROL: uso rapido con una mano */
+  #control-body.grid{display:grid!important;grid-template-columns:1fr!important;gap:.75rem!important}
+  #control-body.grid .big{width:100%;min-height:78px!important;justify-content:flex-start!important;text-align:left!important;padding:1rem 1.1rem!important;border-radius:16px!important;font-size:1rem!important}
+  #control-body.grid .big:first-child{min-height:92px!important;font-size:1.08rem!important}
+  #control-body .card.wide{padding:1rem!important}
+  #control-body .head{margin-top:0!important}
+  #control-body #search-form{display:grid!important;grid-template-columns:1fr!important;width:100%}
+  #control-body #search-form .search{min-height:52px;font-size:1.05rem;text-transform:uppercase}
+  #control-body #search-form button{min-height:50px;width:100%}
+  #control-body .result{padding:1rem!important;border-top-width:8px!important}
+  #control-body .control-result-title{font-size:1.35rem!important;margin:.2rem 0 .6rem!important}
+  #control-body .plate{font-size:clamp(2rem,12vw,3.2rem)!important;margin:.7rem 0!important;padding:.3em .2em!important}
+  #control-body .details{grid-template-columns:1fr 1fr!important;gap:.55rem!important}
+  #control-body .details>div{padding:.65rem!important;min-width:0;overflow-wrap:anywhere}
+  #control-body .result>.actions{display:grid!important;grid-template-columns:1fr!important;gap:.55rem!important}
+  #control-body .result>.actions button{width:100%;min-height:48px}
+
+  /* PROPIETARIO: controles y tarjetas pensados para movil */
+  .owner-list-row{padding:.9rem!important;gap:.7rem!important}
+  .owner-list-title{align-items:flex-start!important}
+  .owner-plate{font-size:1.18rem!important}
+  .owner-row-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:.45rem!important}
+  .owner-row-actions button{width:100%!important;min-height:44px!important;padding:.55rem .5rem!important}
+  .owner-section>.head{align-items:flex-start!important}
+  .owner-section>.head>button{width:100%!important}
+  .owner-home-link{width:100%!important}
+  .owner-admin-like .responsive-data-table td{grid-template-columns:minmax(94px,34%) 1fr!important}
+  .owner-admin-like .owner-resolution{margin:.25rem 0 0!important;padding:.65rem!important}
+}
+@media(max-width:420px){
+  #control-body .details{grid-template-columns:1fr!important}
+  .owner-row-actions{grid-template-columns:1fr!important}
+}
