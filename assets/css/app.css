@@ -272,7 +272,7 @@ html,body{max-width:100%;overflow-x:hidden}
 .settings-logo-actions{display:flex;align-items:center;gap:.65rem;margin-top:.85rem;flex-wrap:wrap}.button-like{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800;padding:.62rem .82rem;border-radius:10px;text-decoration:none}.danger-link{background:transparent!important;color:#a52a22!important;padding:.5rem .35rem!important;border:0!important;box-shadow:none!important}.settings-logo-hint{font-size:.76rem;margin-top:.45rem}
 
 
-/* 1.2.12.14 - Vehiculos: estados y columnas operativas legibles */
+/* 1.2.12.15 - Vehiculos: estados y columnas operativas legibles */
 @media (min-width:721px){
   .vehicles-admin-table{table-layout:fixed!important;min-width:1180px!important;font-size:.82rem}
   .vehicles-admin-table th,.vehicles-admin-table td{overflow-wrap:normal!important;word-break:normal!important;hyphens:none;line-height:1.2}
@@ -318,4 +318,19 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   .vehicle-period{white-space:normal;flex-wrap:wrap;justify-content:flex-end}
   .vehicle-status{min-width:0}
   .vehicle-alert-chip{white-space:normal;justify-content:flex-end}
+}
+
+/* 1.2.12.15 - vehiculos: prioridad legibilidad sobre compresion */
+@media (min-width:721px){
+  .vehicles-admin-view .tablebox,.vehicles-owner-view.tablebox{overflow-x:auto!important}
+  .vehicles-admin-table{table-layout:auto!important;min-width:1320px!important}
+  .vehicles-admin-table td[data-label="Vigencia temporal"]{min-width:145px!important;white-space:nowrap!important}
+  .vehicles-admin-table td[data-label="Estado"]{min-width:100px!important;white-space:nowrap!important}
+  .vehicles-admin-table td[data-label="Estado"] .status{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;width:auto!important;min-width:max-content!important}
+  .vehicles-admin-table td[data-label="Solicitudes"]{min-width:135px!important;white-space:nowrap!important}
+  .vehicles-admin-table td[data-label="Incidencias"]{min-width:120px!important;white-space:nowrap!important}
+  .vehicles-admin-table td[data-label="Solicitudes"] .request-chip,
+  .vehicles-admin-table td[data-label="Incidencias"] .request-chip,
+  .vehicles-admin-table td[data-label="Solicitudes"] .vehicle-alert-chip,
+  .vehicles-admin-table td[data-label="Incidencias"] .vehicle-alert-chip{white-space:nowrap!important;max-width:none!important}
 }
