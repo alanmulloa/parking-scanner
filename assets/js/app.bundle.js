@@ -1,5 +1,5 @@
-const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.5';
+const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
+const APP_FRONTEND_VERSION='1.2.12.6';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -128,7 +128,7 @@ function hasUiRole(role){return activeUiRole()===role}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return roles[0]||'PROPIETARIO'}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const allowed={ADMIN:['dashboard','search','config','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'],CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(restoredStartView())}catch(e){login(e.message)}}
+async function init(){applyParkingSettings(appSettings());if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(restoredStartView())}catch(e){login(e.message)}}
 function login(message=''){
   const renderLogin=()=>{
     const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
@@ -136,7 +136,7 @@ function login(message=''){
     $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}const roles=userRoles();saveUiState({activeRole:roles[0]||'PROPIETARIO'});state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
-  if(!state.cache?.bootstrap?.settings){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(()=>{})}
+  if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
 }
 function shell(){
   const roles=userRoles(),active=activeUiRole();
