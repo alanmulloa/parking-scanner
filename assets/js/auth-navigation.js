@@ -1,7 +1,7 @@
 function userRoles(){const allowed=['ADMIN','CONTROL','PROPIETARIO'];const raw=String(state.user?.Rol||'').toUpperCase().split(/[,;|·]+/).map(x=>x.trim()).filter(Boolean);return [...new Set(raw.filter(x=>allowed.includes(x)))]}
 function hasAssignedRole(role){return userRoles().includes(role)}
 function hasUiRole(role){return activeUiRole()===role}
-function canConfigure(){return !!state.user?.CanConfigure}
+function canConfigure(){return !!state.user?.CanConfigure&&activeUiRole()==='ADMIN'}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return roles[0]||'PROPIETARIO'}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'];if(canConfigure())adminViews.push('config');const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
