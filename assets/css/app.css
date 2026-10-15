@@ -57,7 +57,7 @@
 /* 1.2.11.3 - tablas ADMIN/PROPIETARIO, acciones compactas y responsive */
 .wrap{width:min(1380px,calc(100% - 2rem))}
 .action-menu{position:relative;display:inline-block}.action-menu summary{list-style:none;cursor:pointer;border-radius:9px;background:#e1f2ef;color:#086b5b;padding:.5rem .7rem;font-size:.78rem;font-weight:800;white-space:nowrap}.action-menu summary::-webkit-details-marker{display:none}.action-menu summary:after{content:' ▾'}.action-menu[open] summary:after{content:' ▴'}.action-menu-panel{position:absolute;right:0;top:calc(100% + .35rem);z-index:1000;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:.45rem;box-shadow:0 12px 30px rgba(19,48,49,.18);display:grid;gap:.3rem}.action-menu-panel button,.action-menu-panel .btn{width:100%;justify-content:flex-start;padding:.58rem .65rem;font-size:.8rem}.table-group-row td{background:#eef7f5!important;color:#315a55;font-size:.8rem;padding:.55rem .8rem!important}.owner-admin-like{margin-top:.25rem}.owner-admin-like .owner-resolution{min-width:260px;margin:0}.period-custom{flex-basis:150px!important}
-@media(max-width:720px){.wrap{width:calc(100% - 1rem)}.responsive-data-table thead{display:none}.responsive-data-table,.responsive-data-table tbody,.responsive-data-table tr,.responsive-data-table td{display:block;width:100%}.responsive-data-table tr{border-bottom:1px solid var(--line);padding:.55rem .7rem}.responsive-data-table tr.table-group-row{padding:0}.responsive-data-table tr.table-group-row td{padding:.6rem!important}.responsive-data-table td{border:0!important;white-space:normal!important;padding:.32rem 0!important;display:grid;grid-template-columns:minmax(105px,38%) 1fr;gap:.5rem;align-items:start}.responsive-data-table td:before{content:attr(data-label);font-size:.72rem;text-transform:uppercase;font-weight:800;color:#6a7d80}.responsive-data-table td[colspan]:before{display:none}.action-menu{width:100%}.action-menu summary{min-height:44px;display:flex;align-items:center;justify-content:center}.action-menu-panel{position:static;margin-top:.35rem;box-shadow:none;min-width:0}.owner-admin-like .owner-resolution{min-width:0}.period-custom{flex-basis:100%!important}}
+@media(max-width:720px){.wrap{width:calc(100% - 1rem)}.responsive-data-table thead{display:none}.responsive-data-table,.responsive-data-table tbody,.responsive-data-table tr,.responsive-data-table td{display:block;width:100%}.responsive-data-table tr{border-bottom:1px solid var(--line);padding:.55rem .7rem}.responsive-data-table tr.table-group-row{padding:0}.responsive-data-table tr.table-group-row td{padding:.6rem!important}.responsive-data-table td{border:0!important;white-space:normal!important;padding:.32rem 0!important;display:grid;grid-template-columns:minmax(105px,38%) 1fr;gap:.5rem;align-items:start}.responsive-data-table td:before{content:attr(data-label);font-size:.72rem;text-transform:uppercase;font-weight:800;color:#6a7d80}.responsive-data-table td[colspan]:before{display:none}.action-menu{width:auto}.action-menu summary{min-height:44px;display:flex;align-items:center;justify-content:center}.action-menu-panel{min-width:0}.owner-admin-like .owner-resolution{min-width:0}.period-custom{flex-basis:100%!important}}
 
 /* 1.2.11.4 - exportación Excel principal + CSV secundario */
 .export-actions{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
@@ -494,7 +494,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td .status,
   body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td .request-chip,
   body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table td .vehicle-alert-chip{white-space:normal!important;max-width:100%!important;width:max-content!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table .action-menu summary{width:100%!important;min-height:44px!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table .action-menu-panel{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;padding:.45rem 0!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .responsive-data-table .action-menu-panel button{width:100%!important;min-height:42px!important}
 
@@ -537,8 +536,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Vigencia temporal"] .vehicle-period{justify-content:flex-start!important;white-space:normal!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Solicitudes"] .vehicle-alert-chip,
   body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Incidencias"] .vehicle-alert-chip{justify-content:flex-start!important;width:auto!important;max-width:100%!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Acciones"]{grid-template-columns:1fr!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .vehicles-admin-table td[data-label="Acciones"]:before{display:none!important}
 
   /* PROPIETARIO Mis vehiculos: tarjeta a ancho completo, sin reglas heredadas de filas/tablas */
   .owner-section .owner-list{display:grid!important;gap:.8rem!important;width:100%!important}
@@ -665,20 +662,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     max-width:100%!important;
     white-space:normal!important;
   }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .action-menu,
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .action-menu summary{
-    width:100%!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .action-menu summary{
-    min-height:44px!important;
-  }
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .action-menu-panel{
-    position:static!important;
-    min-width:0!important;
-    width:100%!important;
-    margin-top:.4rem!important;
-    box-shadow:none!important;
-  }
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-record-table .action-menu-panel button{
     width:100%!important;
     min-height:42px!important;
@@ -760,9 +743,6 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td{grid-template-columns:100px minmax(0,1fr)!important;column-gap:.7rem!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Matrícula"] b{display:inline-block!important;white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Tipo"]{line-height:1.3!important;word-break:normal!important;overflow-wrap:break-word!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]{display:block!important;padding-top:.65rem!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table td[data-label="Acciones"]:before{display:none!important}
-  body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-table .action-menu summary{width:100%!important;min-height:46px!important;font-size:.9rem!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters{grid-template-columns:1fr 1fr!important}
   body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters .filter-search,body:has(#mobile-nav[data-role="ADMIN"]) .admin-incident-filters .count{grid-column:1/-1!important}
   body:has(#mobile-nav[data-role="ADMIN"]) #incident-detail .detail-panel>.head{display:grid!important;grid-template-columns:1fr!important}
@@ -1057,4 +1037,32 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   body:has(#mobile-nav) .filterbar .filter-search,
   body:has(#mobile-nav) .filterbar .count{grid-column:1!important}
   body:has(#mobile-nav) .owner-row-actions{grid-template-columns:1fr!important}
+}
+
+
+/* 1.2.14.3 - cierre responsive movil: elimina geometria heredada de acciones */
+@media(max-width:720px){
+  body:has(#mobile-nav) td[data-label="Acciones"]{
+    display:grid!important;
+    grid-template-columns:var(--m-label-w,100px) minmax(0,1fr)!important;
+    align-items:center!important;
+    gap:var(--m-gap,.7rem)!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"]:before{display:block!important;content:"ACCIONES"!important}
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu{
+    width:var(--m-action-w,132px)!important;
+    justify-self:start!important;
+  }
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu>summary{
+    width:var(--m-action-w,132px)!important;
+    min-height:var(--m-button-h,44px)!important;
+  }
+  body:has(#mobile-nav) .admin-incident-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav) .admin-request-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav) .vehicles-admin-table td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav) .owner-vehicles-table td[data-label="Acciones"] .action-menu{width:var(--m-action-w,132px)!important}
+}
+@media(max-width:420px){
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu,
+  body:has(#mobile-nav) td[data-label="Acciones"] .action-menu>summary{width:128px!important}
 }
