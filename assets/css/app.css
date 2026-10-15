@@ -957,3 +957,17 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .call-stat{border:1px solid #dde7e5;border-radius:10px;background:#fff;padding:.65rem .75rem;display:flex;flex-direction:column;gap:.2rem;min-width:0}
 .call-stat b{font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.call-stat span{font-size:.76rem;color:#657774;line-height:1.3}
 @media(max-width:720px){.call-stats-grid{grid-template-columns:1fr}.performance-actions #diag-roundtrip,.performance-actions #diag-concurrency{width:100%!important}}
+
+/* 1.2.13.0 - incidencias con seguimiento y prioridad automática */
+.incident-priority{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border-radius:999px;font-weight:700;font-size:.82rem;background:#eef2f2;color:#244}
+.incident-priority.atención,.incident-priority.atencion{background:#fff1c7;color:#745400}
+.incident-priority.alta{background:#ffe1c9;color:#8a3b00}
+.incident-priority.crítica,.incident-priority.critica{background:#ffd9df;color:#9f1630}
+.incident-timeline{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line,#dfe7e5)}
+.incident-timeline h4{margin:0 0 .75rem}
+.incident-followup{position:relative;margin:.65rem 0;padding:.75rem .9rem .75rem 1rem;border-left:3px solid var(--brand,#087f6b);background:#f7faf9;border-radius:0 10px 10px 0}
+.incident-followup>div:first-child{margin-bottom:.25rem}
+.incident-followup a{display:inline-block;margin-top:.4rem}
+.incident-create-form .message{align-self:end}
+.incident-thresholds{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.incident-thresholds{grid-template-columns:1fr}.incident-create-form .field{min-width:0}.incident-timeline{margin-top:.75rem}}
