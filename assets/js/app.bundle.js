@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.12.26';
+const APP_FRONTEND_VERSION='1.2.12.27';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -564,17 +564,41 @@ async function configurationView(initialTab='identity'){
             <div class="system-meta-grid"><div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div><div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div><div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div><div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div><div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div><div><span>Hojas</span><b>${Number(st.sheetCount||0)}</b></div></div></section>
             <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-service-grid">${serviceCards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'} · ${Number(st.performance&&st.performance.totalMs||0)} ms</div></section>
             <section class="card performance-card"><div class="system-status-head"><div><h2>Rendimiento y diagnóstico</h2><p class="muted">Mide tiempos reales de lectura desde Apps Script, Sheets y Drive sin modificar datos.</p></div></div>
-              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-control">Medir Control</button><button type="button" class="secondary" id="diag-volume">Prueba de volumen</button></div>
+              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-control">Medir Control</button><button type="button" class="secondary" id="diag-volume">Prueba de volumen</button><button type="button" class="secondary" id="diag-sheets">Benchmark Sheets</button></div>
               <div id="diag-result" class="diagnostic-empty"><b>Sin prueba ejecutada</b><span>La prueba rápida comprueba disponibilidad. El diagnóstico completo fuerza lecturas de los principales conjuntos de datos.</span></div>
               <div id="diag-special" class="diagnostic-empty"><b>Pruebas avanzadas</b><span>Control mide matrícula/QR sin registrar accesos. Volumen simula 1.000, 5.000 y 20.000 registros en memoria sin modificar datos.</span></div>
-              <p class="muted diagnostic-note">Estas comprobaciones no sustituyen una prueba externa de concurrencia. La prueba de volumen no crea filas: simula procesamiento con distintos tamaños.</p>
+              <div id="diag-benchmark" class="diagnostic-empty"><b>Benchmark real de Sheets</b><span>Crea un Spreadsheet temporal con 20.000 filas, mide lecturas reales y lo envía a la papelera al finalizar. No modifica la BBDD operativa.</span></div>
+              <div id="perf-overview"><div class="diagnostic-running"><div class="spinner"></div><span>Cargando resumen de salud…</span></div></div>
+              <p class="muted diagnostic-note">Estas comprobaciones no sustituyen una prueba externa de concurrencia. El histórico técnico no almacena datos personales.</p>
             </section>`;
           $('#system-refresh').onclick=loadStatus;
           $('#diag-quick').onclick=()=>runDiagnostic('quick');
           $('#diag-full').onclick=()=>runDiagnostic('full');
           $('#diag-control').onclick=()=>runSpecialDiagnostic('control');
           $('#diag-volume').onclick=()=>runSpecialDiagnostic('volume');
+          $('#diag-sheets').onclick=()=>runSheetsBenchmark();
+          refreshPerfOverview();
         }catch(e){panel.innerHTML=`<section class="card"><div class="message bad">${esc(e.message||String(e))}</div><button type="button" class="secondary" id="system-retry">Reintentar</button></section>`;$('#system-retry').onclick=loadStatus}
+      }
+      function renderPerfOverview(perf){
+        const el=$('#perf-overview');if(!el)return;
+        const health=(perf.health||[]).map(x=>`<div class="health-card ${esc(x.tone||'neutral')}"><span>${esc(x.label||'')}</span><b>${esc(x.value||'—')}</b><small>${esc(x.detail||'')}</small></div>`).join('');
+        const typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real'};
+        const history=(perf.history||[]).slice(0,8).map(x=>{const slow=(x.metrics||[]).slice().sort((a,b)=>Number(b.ms||0)-Number(a.ms||0))[0];return `<div class="perf-history-row"><div><b>${esc(typeLabel[x.type]||x.type||'Prueba')}</b><span>${esc(x.checkedAt||'')}</span></div><div><span>${slow?esc(slow.label)+' · '+Number(slow.ms||0)+' ms':''}</span><strong class="perf-badge ${x.ok===false?'bad':systemPerfClientLevel(Number(x.totalMs||0))}">${Number(x.totalMs||0)} ms</strong></div></div>`}).join('');
+        el.innerHTML=`<section class="perf-health"><h3>Resumen de salud</h3><div class="health-grid">${health}</div></section><section class="perf-history"><div class="system-status-head"><div><h3>Histórico de diagnósticos</h3><p class="muted">Últimas comprobaciones técnicas guardadas sin datos personales.</p></div></div>${history||'<div class="diagnostic-empty"><span>Todavía no hay histórico suficiente.</span></div>'}</section>`;
+      }
+      function systemPerfClientLevel(ms){return ms<=500?'good':ms<=1500?'warn':'slow'}
+      async function refreshPerfOverview(){try{renderPerfOverview(await call('systemPerformanceHistory'))}catch(e){const el=$('#perf-overview');if(el)el.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}}
+      async function runSheetsBenchmark(){
+        const box=$('#diag-benchmark'),b=$('#diag-sheets');if(!box||!b)return;
+        if(!confirm('El benchmark creará temporalmente un Spreadsheet con 20.000 filas para medir lectura real. No modificará la base operativa y el archivo se enviará a la papelera al finalizar. ¿Continuar?'))return;
+        b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando benchmark real de Google Sheets… Puede tardar unos segundos.</span>';
+        try{
+          const r=await call('systemSheetsRealBenchmark',{});
+          const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
+          box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Benchmark real de Sheets</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
+          refreshPerfOverview();
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{b.disabled=false}
       }
       async function runSpecialDiagnostic(kind){
         const box=$('#diag-special'),c=$('#diag-control'),v=$('#diag-volume');
@@ -586,7 +610,7 @@ async function configurationView(initialTab='identity'){
           box.className='diagnostic-result';
           box.innerHTML=`<div class="diagnostic-summary"><div><b>${kind==='control'?'Rendimiento de Control':'Prueba de volumen'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
         }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}
-        finally{c.disabled=false;v.disabled=false}
+        finally{c.disabled=false;v.disabled=false;refreshPerfOverview()}
       }
       async function runDiagnostic(mode){
         const box=$('#diag-result'),q=$('#diag-quick'),f=$('#diag-full');
@@ -599,7 +623,7 @@ async function configurationView(initialTab='identity'){
           box.className='diagnostic-result';
           box.innerHTML=`<div class="diagnostic-summary"><div><b>${r.mode==='full'?'Diagnóstico completo':'Prueba rápida'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><div class="diagnostic-legend"><span><i class="legend-dot good"></i> ≤ 500 ms</span><span><i class="legend-dot warn"></i> 501–1500 ms</span><span><i class="legend-dot slow"></i> &gt; 1500 ms</span></div>`;
         }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}
-        finally{q.disabled=false;f.disabled=false}
+        finally{q.disabled=false;f.disabled=false;refreshPerfOverview()}
       }
       loadStatus();
     }

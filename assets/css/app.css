@@ -935,3 +935,17 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .performance-actions{align-items:center}
 #diag-special{margin-top:.1rem}
 @media(max-width:720px){.performance-actions{grid-template-columns:1fr 1fr!important}.performance-actions button{width:100%!important}.performance-actions button:first-child,.performance-actions button:nth-child(2){min-height:44px}}
+
+/* 1.2.12.27 - resumen de salud e histórico técnico */
+#perf-overview{display:grid;gap:1rem;margin-top:1rem}
+.perf-health,.perf-history{border:1px solid #d9e4e2;border-radius:16px;padding:1rem;background:#fbfdfc}
+.perf-health h3,.perf-history h3{margin:0 0 .75rem}
+.health-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.65rem}
+.health-card{border:1px solid #dbe5e3;border-radius:12px;padding:.8rem;background:#fff;display:flex;flex-direction:column;gap:.25rem;min-width:0}
+.health-card>span{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#607370;font-weight:800}
+.health-card>b{font-size:1rem}.health-card small{color:#667976;line-height:1.25}
+.health-card.good{border-left:4px solid #1c9a69}.health-card.warn{border-left:4px solid #d9a11e}.health-card.bad{border-left:4px solid #c83b31}.health-card.neutral{border-left:4px solid #95a6a3}
+.perf-history-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;padding:.7rem 0;border-top:1px dashed #dfe7e5;align-items:center}
+.perf-history-row:first-of-type{border-top:0}.perf-history-row>div{display:flex;gap:.5rem;align-items:center;min-width:0}.perf-history-row>div:last-child{justify-content:flex-end}.perf-history-row span{color:#607370;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:900px){.health-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.perf-history-row{grid-template-columns:1fr}.perf-history-row>div:last-child{justify-content:space-between}}
+@media(max-width:520px){.health-grid{grid-template-columns:1fr}.performance-actions #diag-sheets{width:100%}.perf-health,.perf-history{padding:.8rem}.perf-history-row>div{align-items:flex-start;flex-wrap:wrap}}
