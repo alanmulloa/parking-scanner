@@ -1433,3 +1433,56 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   #app>.section-nav>.nav>button,
   #app>.section-nav>.nav .nav-more>summary{padding:.48rem .52rem!important;font-size:.73rem!important}
 }
+
+/* 1.2.17.1 - Auditoria escritorio: mas ancho util y columnas equilibradas.
+   Cambio visual aislado: no altera otras tablas ni el responsive movil. */
+@media (min-width:721px){
+  body:has(#audit-body) .wrap{
+    width:min(1600px,calc(100% - 28px))!important;
+  }
+
+  .tablebox:has(#audit-body){
+    overflow-x:auto!important;
+  }
+
+  .table:has(#audit-body){
+    width:100%!important;
+    min-width:1180px;
+    table-layout:fixed;
+  }
+
+  .table:has(#audit-body) th,
+  .table:has(#audit-body) td{
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+    word-break:normal;
+    vertical-align:top!important;
+  }
+
+  /* Fecha | Usuario | Accion | Entidad | Campo | Antes | Despues */
+  .table:has(#audit-body) th:nth-child(1),
+  .table:has(#audit-body) td:nth-child(1){width:12%;white-space:nowrap!important}
+  .table:has(#audit-body) th:nth-child(2),
+  .table:has(#audit-body) td:nth-child(2){width:18%}
+  .table:has(#audit-body) th:nth-child(3),
+  .table:has(#audit-body) td:nth-child(3){width:12%}
+  .table:has(#audit-body) th:nth-child(4),
+  .table:has(#audit-body) td:nth-child(4){width:18%}
+  .table:has(#audit-body) th:nth-child(5),
+  .table:has(#audit-body) td:nth-child(5){width:12%}
+  .table:has(#audit-body) th:nth-child(6),
+  .table:has(#audit-body) td:nth-child(6),
+  .table:has(#audit-body) th:nth-child(7),
+  .table:has(#audit-body) td:nth-child(7){width:14%}
+
+  #audit-body td:nth-child(6),
+  #audit-body td:nth-child(7){
+    line-height:1.38!important;
+  }
+
+  #audit-body td:nth-child(6) .subtle,
+  #audit-body td:nth-child(7) .subtle{
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+  }
+}
