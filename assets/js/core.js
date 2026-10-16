@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.2';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.3';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -172,6 +172,7 @@ function loadUiState(){try{return JSON.parse(sessionStorage.getItem(UI_STATE_KEY
 function saveUiState(patch){try{const next=Object.assign({},loadUiState(),patch||{});sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(next));return next}catch(e){return {}}}
 function viewUiState(view=state.view){const all=loadUiState();return (all.views&&all.views[view])||{}}
 function saveViewUiState(view,patch){try{const all=loadUiState(),views=Object.assign({},all.views||{});views[view]=Object.assign({},views[view]||{},patch||{});all.views=views;sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(all));return views[view]}catch(e){return {}}}
+function replaceViewUiState(view,value={}){try{const all=loadUiState(),views=Object.assign({},all.views||{});views[view]=Object.assign({},value||{});all.views=views;sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(all));return views[view]}catch(e){return {}}}
 function rememberCurrentView(view){if(view)saveUiState({view})}
 function clearUiState(){try{sessionStorage.removeItem(UI_STATE_KEY)}catch(e){}}
 function defaultViewForRole(role){return role==='ADMIN'?'dashboard':role==='CONTROL'?'control':'ownerHome'}

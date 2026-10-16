@@ -1487,7 +1487,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
   }
 }
 
-/* 1.2.17.2 - Patron unificado de acciones en modal.
+/* 1.2.17.3 - Patron unificado de acciones en modal.
    Los listados permanecen visibles debajo y conservan filtros/paginacion. */
 #editor:not(:empty),
 #owner-editor:not(:empty),
@@ -1597,3 +1597,7 @@ body:has(#incident-close-editor:not(:empty)) .mobile-more-sheet{display:none!imp
   .request-detail-actions{width:100%;justify-content:stretch!important}
   .request-detail-actions button{flex:1 1 140px}
 }
+
+/* 1.2.17.3 - paginacion del bloque Requiere atencion */
+#summary-attention-pager{margin-top:.75rem}
+#summary-attention-pager .pager{margin-top:0}
