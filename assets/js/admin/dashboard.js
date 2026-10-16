@@ -12,7 +12,7 @@ async function dashboard(){
         <article class="summary-card"><b>${esc(d.occupiedSlots)}</b><span>Slots ocupados</span><small>${esc(d.availableSlots)} libres de ${esc(d.slotCapacity)}</small><div class="slot-meter"><span style="width:${Math.max(0,Math.min(100,pct))}%"></span></div></article>
       </div></section>
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
-        ${card(d.pendingRequests,'Solicitudes pendientes','Requieren revisión','requests-pending',d.pendingRequests>0)}
+        ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests-pending',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents-open',d.openIncidents>0)}
         ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
         ${card(d.activeWithoutQr,'Activos sin QR válido','No incluye motos','vehicles-active-revoked',d.activeWithoutQr>0)}
@@ -33,7 +33,7 @@ async function dashboard(){
 }
 function resetSummaryDestination(view){replaceViewUiState(view,{})}
 function openSummaryAction(action){
-  if(action==='requests-pending'){resetSummaryDestination('requests');state.cache.requestPreset={search:'',status:'Pendiente',type:'',period:'',from:'',to:'',group:'none'};go('requests');return}
+  if(action==='requests-pending'){resetSummaryDestination('requests');state.cache.requestPreset={search:'',status:'Abierta',type:'',period:'',from:'',to:'',group:'none'};go('requests');return}
   if(action==='requests-30'){resetSummaryDestination('requests');state.cache.requestPreset={search:'',status:'',type:'',period:'30',from:'',to:'',group:'none'};go('requests');return}
   if(action==='incidents-open'){resetSummaryDestination('incidents');state.cache.incidentPreset={search:'',status:'Abierta',type:'',origin:'',period:'',from:'',to:'',group:'none'};go('incidents');return}
   if(action==='incidents-30'){resetSummaryDestination('incidents');state.cache.incidentPreset={search:'',status:'',type:'',origin:'',period:'30',from:'',to:'',group:'none'};go('incidents');return}
@@ -42,7 +42,7 @@ function openSummaryAction(action){
   if(action==='vehicles-motorcycles'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Suspendido'}};go('vehicles');return}
   if(action==='vehicles-low'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Baja'}};go('vehicles');return}
-  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{QR_Estado:'Revocado',__Clase:'Vehículo'}};go('vehicles');return}
+  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{QR_Estado:'Revocado'}};go('vehicles');return}
   if(action==='vehicles-active-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',QR_Estado:'Revocado',__Clase:'Vehículo'}};go('vehicles');return}
   if(action==='vehicles-temporary'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vigente'}};go('vehicles');return}
   if(action==='vehicles-temporary-expiring'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vence en 7 días'}};go('vehicles');return}

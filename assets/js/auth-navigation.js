@@ -25,6 +25,7 @@ function shell(){
   $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
   renderNav();
 }
+function resetDirectNavigationState(view){if(['users','housing','vehicles','incidents','requests'].includes(view)){replaceViewUiState(view,{});if(view==='vehicles')delete state.cache.tablePreset;if(view==='incidents'){delete state.cache.incidentPreset;delete state.cache.incidentFocus}if(view==='requests'){delete state.cache.requestPreset;delete state.cache.requestFocus}}}
 function renderNav(){
   const role=activeUiRole();
   const map={
@@ -34,7 +35,7 @@ function renderNav(){
   };
   const items=map[role]||[];
   $('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
-  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
+  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const view=b.dataset.view;resetDirectNavigationState(view);go(view)});
 }
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
