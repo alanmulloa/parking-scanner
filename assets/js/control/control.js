@@ -1,6 +1,8 @@
 async function control(token=''){
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
+    const initial=state.cache?.initialControlResult;
+    if(initial&&initial.token===token){delete state.cache.initialControlResult;resultCard(initial.data);return}
     await lookupQr(token);
     return;
   }

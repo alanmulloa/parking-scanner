@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.16.1';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.0';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -60,6 +60,19 @@ function clientReadCacheKey(action,payload){
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
 function invalidateClientReadCache(){CLIENT_RESPONSE_CACHE.clear()}
+function seedClientRead(action,payload,value){
+  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
+  CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),{value,expires:Date.now()+ttl});
+}
+function applyInitialContext(context){
+  context=context||{};state.user=context.user||state.user;
+  state.cache=state.cache||{};state.cache.bootstrap={user:state.user,settings:context.settings||appSettings(),serverDate:context.serverDate||'',timeZone:context.timeZone||'Europe/Madrid',version:context.version||APP_FRONTEND_VERSION};
+  applyParkingSettings(state.cache.bootstrap.settings);
+  if(context.resource?.kind==='read')seedClientRead(context.resource.action,context.resource.payload||{},context.resource.data);
+  if(context.resource?.kind==='controlScan')state.cache.initialControlResult={token:context.resource.token,data:context.resource.data};
+  state.cache.initialViewReady=context.initialView||'';
+  return context;
+}
 function recordClientCall(action,ms,ok=true,source='network'){
   if(/^systemPerformanceHistory$/.test(action))return;
   CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,source:String(source||'network'),at:Date.now()});

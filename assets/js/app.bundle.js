@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.16.1';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.0';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -60,6 +60,19 @@ function clientReadCacheKey(action,payload){
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
 function invalidateClientReadCache(){CLIENT_RESPONSE_CACHE.clear()}
+function seedClientRead(action,payload,value){
+  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
+  CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),{value,expires:Date.now()+ttl});
+}
+function applyInitialContext(context){
+  context=context||{};state.user=context.user||state.user;
+  state.cache=state.cache||{};state.cache.bootstrap={user:state.user,settings:context.settings||appSettings(),serverDate:context.serverDate||'',timeZone:context.timeZone||'Europe/Madrid',version:context.version||APP_FRONTEND_VERSION};
+  applyParkingSettings(state.cache.bootstrap.settings);
+  if(context.resource?.kind==='read')seedClientRead(context.resource.action,context.resource.payload||{},context.resource.data);
+  if(context.resource?.kind==='controlScan')state.cache.initialControlResult={token:context.resource.token,data:context.resource.data};
+  state.cache.initialViewReady=context.initialView||'';
+  return context;
+}
 function recordClientCall(action,ms,ok=true,source='network'){
   if(/^systemPerformanceHistory$/.test(action))return;
   CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,source:String(source||'network'),at:Date.now()});
@@ -203,12 +216,12 @@ function canConfigure(){return !!state.user?.CanConfigure&&activeUiRole()==='ADM
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return roles[0]||'PROPIETARIO'}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'];if(canConfigure())adminViews.push('config');const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){applyParkingSettings(appSettings());if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(restoredStartView())}catch(e){login(e.message)}}
+async function init(){applyParkingSettings(appSettings());if(!state.token)return login();try{const ui=loadUiState(),data=applyInitialContext(await call('initialContext',{role:ui.activeRole||'',initialToken:INITIAL_TOKEN||''}));state.activeRole=data.role||activeUiRole();saveUiState({activeRole:state.activeRole});shell();go(data.initialView||defaultViewForRole(state.activeRole))}catch(e){login(e.message)}}
 function login(message=''){
   const renderLogin=()=>{
     const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
     $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
-    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}const roles=userRoles();saveUiState({activeRole:roles[0]||'PROPIETARIO'});state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const ui=loadUiState(),fallbackSettings=appSettings(),out=await server('loginWithPassword',$('#email').value,$('#password').value,{role:ui.activeRole||'',initialToken:INITIAL_TOKEN||''});state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);const context=applyInitialContext(out.context||{user:out.user,settings:fallbackSettings});state.activeRole=context.role||activeUiRole();saveUiState({activeRole:state.activeRole});shell();go(context.initialView||defaultViewForRole(state.activeRole))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
   if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
@@ -265,7 +278,7 @@ function renderNav(){
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
 function renderLoading(view){const main=$('#main');if(!main)return;main.innerHTML=`<section class="card loading-state"><div class="spinner"></div><h2>${esc(viewLabel(view))}</h2><p class="muted">Cargando datos…</p></section>`}
-function go(view){if(view==='config'&&!canConfigure()){view=defaultViewForRole(activeUiRole());toast('No tienes permisos para acceder a Configuración.',true)}stopScanner();state.view=view;rememberCurrentView(view);const navId=++state.navSeq,started=performance.now(),callStart=CLIENT_CALL_METRICS.length;renderNav();renderLoading(view);const fn=({dashboard,search:globalSearchView,config:configurationView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).then(()=>{if(navId===state.navSeq)recordClientView(view,performance.now()-started,callStart)}).catch(err)}
+function go(view){if(view==='config'&&!canConfigure()){view=defaultViewForRole(activeUiRole());toast('No tienes permisos para acceder a Configuración.',true)}stopScanner();state.view=view;rememberCurrentView(view);const navId=++state.navSeq,started=performance.now(),callStart=CLIENT_CALL_METRICS.length,ready=state.cache?.initialViewReady===view;if(ready)delete state.cache.initialViewReady;renderNav();if(!ready)renderLoading(view);const fn=({dashboard,search:globalSearchView,config:configurationView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).then(()=>{if(navId===state.navSeq)recordClientView(view,performance.now()-started,callStart)}).catch(err)}
 function err(e){const message=(e&&e.message)||String(e)||'No se pudo cargar la información.';toast(message,true);const main=$('#main');if(!main)return;const stillLoading=!!main.querySelector('.loading-state,.spinner')||!main.textContent.trim();if(stillLoading){const view=state.view;main.innerHTML=`<section class="card retry-state"><h2>No se pudo cargar ${esc(viewLabel(view).toLowerCase())}</h2><p class="muted">${esc(message)}</p><div class="actions"><button id="retry-view">Reintentar</button><button class="secondary" id="retry-home">Ir al inicio</button></div></section>`;$('#retry-view').onclick=()=>go(view);$('#retry-home').onclick=()=>go(defaultViewForRole(activeUiRole()))}}
 async function dashboard(){
   try{
@@ -754,6 +767,8 @@ async function configurationView(initialTab='identity'){
 async function control(token=''){
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
+    const initial=state.cache?.initialControlResult;
+    if(initial&&initial.token===token){delete state.cache.initialControlResult;resultCard(initial.data);return}
     await lookupQr(token);
     return;
   }
