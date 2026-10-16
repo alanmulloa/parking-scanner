@@ -1486,3 +1486,114 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     overflow-wrap:anywhere;
   }
 }
+
+/* 1.2.17.2 - Patron unificado de acciones en modal.
+   Los listados permanecen visibles debajo y conservan filtros/paginacion. */
+#editor:not(:empty),
+#owner-editor:not(:empty),
+#incident-editor:not(:empty),
+#incident-detail:not(:empty),
+#request-detail:not(:empty),
+#tmp-editor:not(:empty),
+#incident-close-editor:not(:empty){
+  position:fixed!important;
+  inset:0!important;
+  z-index:360!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  overflow:auto!important;
+  box-sizing:border-box!important;
+  padding:clamp(18px,4vh,48px) 18px!important;
+  background:rgba(11,32,33,.52)!important;
+  backdrop-filter:blur(2px);
+}
+#incident-close-editor:not(:empty){z-index:430!important;background:rgba(11,32,33,.64)!important}
+#editor:not(:empty)>.card,
+#editor:not(:empty)>form,
+#owner-editor:not(:empty)>.card,
+#owner-editor:not(:empty)>form,
+#incident-editor:not(:empty)>.card,
+#incident-editor:not(:empty)>form,
+#incident-detail:not(:empty)>.card,
+#request-detail:not(:empty)>.card,
+#tmp-editor:not(:empty)>.card,
+#tmp-editor:not(:empty)>form,
+#incident-close-editor:not(:empty)>form{
+  width:min(920px,calc(100vw - 36px))!important;
+  max-height:calc(100vh - 72px)!important;
+  overflow:auto!important;
+  margin:auto!important;
+  background:#fff!important;
+  border:1px solid var(--line)!important;
+  border-radius:18px!important;
+  box-shadow:0 24px 70px rgba(8,34,35,.28)!important;
+  box-sizing:border-box!important;
+}
+#incident-detail:not(:empty)>.card,
+#request-detail:not(:empty)>.card{width:min(1120px,calc(100vw - 36px))!important}
+#incident-close-editor:not(:empty)>form{width:min(650px,calc(100vw - 36px))!important;padding:1.1rem!important}
+body:has(#editor:not(:empty)),
+body:has(#owner-editor:not(:empty)),
+body:has(#incident-editor:not(:empty)),
+body:has(#incident-detail:not(:empty)),
+body:has(#request-detail:not(:empty)),
+body:has(#tmp-editor:not(:empty)),
+body:has(#incident-close-editor:not(:empty)){overflow:hidden!important}
+body:has(#editor:not(:empty)) .mobile-dock,
+body:has(#owner-editor:not(:empty)) .mobile-dock,
+body:has(#incident-editor:not(:empty)) .mobile-dock,
+body:has(#incident-detail:not(:empty)) .mobile-dock,
+body:has(#request-detail:not(:empty)) .mobile-dock,
+body:has(#tmp-editor:not(:empty)) .mobile-dock,
+body:has(#incident-close-editor:not(:empty)) .mobile-dock,
+body:has(#editor:not(:empty)) .mobile-more-sheet,
+body:has(#owner-editor:not(:empty)) .mobile-more-sheet,
+body:has(#incident-editor:not(:empty)) .mobile-more-sheet,
+body:has(#incident-detail:not(:empty)) .mobile-more-sheet,
+body:has(#request-detail:not(:empty)) .mobile-more-sheet,
+body:has(#tmp-editor:not(:empty)) .mobile-more-sheet,
+body:has(#incident-close-editor:not(:empty)) .mobile-more-sheet{display:none!important}
+.incident-detail-head{position:sticky;top:-1px;z-index:3;background:#fff;padding-bottom:.65rem;border-bottom:1px solid var(--line);margin-bottom:.85rem}
+.incident-detail-actions{justify-content:flex-end;flex-wrap:wrap}
+.incident-initial-evidence{margin:1rem 0;padding:.9rem 1rem;border:1px solid #dce8e7;border-radius:12px;background:#f8fbfa}
+.incident-initial-evidence h4{margin:0 0 .55rem}
+.incident-initial-note{white-space:pre-wrap;line-height:1.45;margin-bottom:.65rem}
+.incident-resolution{margin-top:1rem}
+#audit-pager{margin-top:.75rem}
+.audit-page-size{max-width:90px}
+
+@media (max-width:720px){
+  #editor:not(:empty),
+  #owner-editor:not(:empty),
+  #incident-editor:not(:empty),
+  #incident-detail:not(:empty),
+  #request-detail:not(:empty),
+  #tmp-editor:not(:empty),
+  #incident-close-editor:not(:empty){padding:10px!important;align-items:flex-end!important}
+  #editor:not(:empty)>.card,
+  #editor:not(:empty)>form,
+  #owner-editor:not(:empty)>.card,
+  #owner-editor:not(:empty)>form,
+  #incident-editor:not(:empty)>.card,
+  #incident-editor:not(:empty)>form,
+  #incident-detail:not(:empty)>.card,
+  #request-detail:not(:empty)>.card,
+  #tmp-editor:not(:empty)>.card,
+  #tmp-editor:not(:empty)>form,
+  #incident-close-editor:not(:empty)>form{
+    width:100%!important;
+    max-height:calc(100dvh - 20px)!important;
+    border-radius:18px 18px 12px 12px!important;
+  }
+  .incident-detail-head{align-items:flex-start!important}
+  .incident-detail-actions{width:100%;justify-content:stretch!important}
+  .incident-detail-actions button{flex:1 1 140px}
+}
+.request-detail-head{position:sticky;top:-1px;z-index:3;background:#fff;padding-bottom:.65rem;border-bottom:1px solid var(--line);margin-bottom:.85rem}
+.request-detail-actions{justify-content:flex-end;flex-wrap:wrap}
+@media (max-width:720px){
+  .request-detail-head{align-items:flex-start!important}
+  .request-detail-actions{width:100%;justify-content:stretch!important}
+  .request-detail-actions button{flex:1 1 140px}
+}
