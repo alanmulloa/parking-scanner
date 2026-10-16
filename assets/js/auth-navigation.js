@@ -13,6 +13,7 @@ function login(message=''){
     $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}const roles=userRoles();saveUiState({activeRole:roles[0]||'PROPIETARIO'});state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&(hasAssignedRole('ADMIN')||hasAssignedRole('CONTROL'))){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
+  if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
 }
 function shell(){
   const roles=userRoles(),active=activeUiRole();
