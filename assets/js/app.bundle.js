@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.4';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.5';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -588,33 +588,168 @@ async function logoFileData(file){
     return fileData(file);
   }
 }
-async function configurationView(){
+async function configurationView(initialTab='identity'){
   renderLoading('config');
   try{
     const s=await call('getSettings');
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Identidad de la comunidad</h1><div class="muted">Datos generales e identidad visual de la comunidad. Los cambios se aplican al login y a la cabecera.</div></div></div>
-    <form id="configuration-form" class="settings-layout">
-      <section class="card settings-main"><h2>Datos principales</h2><p class="muted">Información visible dentro de la aplicación.</p><div class="form">
-        <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
-        <div class="field"><label>Descripción</label><input name="Descripcion" value="${esc(s.Descripcion||s.NombreCorto||'Gestión de acceso y parking de la comunidad')}" placeholder="Gestión de acceso y parking de la comunidad"></div>
-        <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
-        <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
-        <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="Puedes pegar una URL o subir un archivo desde el panel de Logo"></div>
-      </div><hr><h3>Incidencias</h3><p class="muted">La prioridad sube automáticamente según la cantidad de intentos diarios registrados. El intento inicial cuenta como 1.</p><div class="form incident-thresholds"><div class="field"><label>Atención desde</label><input type="number" min="2" name="IncidenciaAtencionDesde" value="${esc(s.IncidenciaAtencionDesde||3)}"></div><div class="field"><label>Alta desde</label><input type="number" min="3" name="IncidenciaAltaDesde" value="${esc(s.IncidenciaAltaDesde||5)}"></div><div class="field"><label>Crítica desde</label><input type="number" min="4" name="IncidenciaCriticaDesde" value="${esc(s.IncidenciaCriticaDesde||7)}"></div></div></section>
-      <aside class="settings-side">
-        <section class="card settings-logo"><h2>Logo</h2><p class="muted">Puedes subir una imagen desde tu equipo o utilizar una URL. Se usa en el login y en la cabecera.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div><div class="settings-logo-actions"><label class="button-like secondary" for="settings-logo-file">Elegir logo</label><input id="settings-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button type="button" class="danger-link" id="settings-logo-remove">Quitar</button></div><div class="muted settings-logo-hint" id="settings-logo-hint">PNG, JPG, WEBP o GIF. Máximo 6 MB.</div></section>
-        <section class="card settings-colors"><h2>Colores</h2><p class="muted">Puedes elegirlos manualmente o sugerirlos automáticamente a partir del logo.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}<button type="button" class="secondary settings-color-suggest" id="settings-colors-suggest">Sugerir desde logo</button><div class="muted settings-color-hint" id="settings-color-hint">La sugerencia no se guarda hasta pulsar “Guardar configuración”.</div></section>
-      </aside>
-      <div class="settings-save"><button type="submit">Guardar configuración</button></div>
-    </form>`;
-    const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
-    logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
-    const logoFile=$('#settings-logo-file'),logoRemove=$('#settings-logo-remove'),logoHint=$('#settings-logo-hint');
-    if(logoFile)logoFile.onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const choose=document.querySelector('label[for="settings-logo-file"]');busy(choose);try{if(logoHint)logoHint.textContent='Optimizando y subiendo logo…';const dataUrl=await logoFileData(file);preview.innerHTML=`<img src="${dataUrl}" alt="Vista previa del logo">`;const out=await call('uploadLogo',{dataUrl});logo.value=out.url||'';preview.innerHTML=`<img src="${esc(out.url||'')}" alt="Logo de la comunidad">`;if(logoHint)logoHint.textContent='Logo subido. Pulsa “Guardar configuración” para aplicarlo.';toast('Logo subido correctamente.');}catch(x){toast(x.message||x,true);if(logoHint)logoHint.textContent='No se pudo subir el logo.';}finally{busy(choose,false);logoFile.value=''}};
-    if(logoRemove)logoRemove.onclick=()=>{logo.value='';preview.innerHTML='<span>Sin logo</span>';if(logoHint)logoHint.textContent='El logo se quitará al guardar la configuración.'};
-    document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
-    const suggest=$('#settings-colors-suggest');if(suggest)suggest.onclick=async()=>{busy(suggest);try{const colors=await suggestColorsFromLogo(logo.value.trim());Object.entries(colors).forEach(([n,v])=>{const c=document.querySelector(`[data-color-name="${n}"]`),t=document.querySelector(`[data-color-text="${n}"]`);if(c)c.value=v;if(t)t.value=v});const hint=$('#settings-color-hint');if(hint)hint.textContent='Colores sugeridos desde el logo. Revísalos y guarda para aplicarlos.';toast('Colores sugeridos desde el logo.');busy(suggest,false)}catch(x){toast(x.message||x,true);busy(suggest,false)}};
-    form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">Identidad de la comunidad y estado técnico del sistema.</div></div></div>
+      <div class="config-tabs" role="tablist" aria-label="Configuración">
+        <button type="button" class="config-tab active" data-config-tab="identity">Identidad</button>
+        <button type="button" class="config-tab" data-config-tab="system">Sistema</button>
+      </div>
+      <div id="config-panel"></div>`;
+
+    const panel=$('#config-panel');
+    const tabs=[...document.querySelectorAll('[data-config-tab]')];
+    const setActive=tab=>tabs.forEach(b=>b.classList.toggle('active',b.dataset.configTab===tab));
+
+    async function renderIdentity(){
+      setActive('identity');
+      panel.innerHTML=`<form id="configuration-form" class="settings-layout">
+        <section class="card settings-main"><h2>Identidad de la comunidad</h2><p class="muted">Datos generales e identidad visual. Los cambios se aplican al login y a la cabecera.</p><div class="form">
+          <div class="field"><label>Nombre oficial</label><input name="NombreOficial" value="${esc(s.NombreOficial||'Parking Comunidad')}" required></div>
+          <div class="field"><label>Descripción</label><input name="Descripcion" value="${esc(s.Descripcion||s.NombreCorto||'Gestión de acceso y parking de la comunidad')}" placeholder="Gestión de acceso y parking de la comunidad"></div>
+          <div class="field"><label>Correo de contacto</label><input type="email" name="EmailContacto" value="${esc(s.EmailContacto||'')}"></div>
+          <div class="field"><label>Dirección</label><input name="Direccion" value="${esc(s.Direccion||'')}"></div>
+          <div class="field wide"><label>URL del logo <span class="muted">(opcional)</span></label><input name="LogoUrl" id="settings-logo-url" type="url" value="${esc(s.LogoUrl||'')}" placeholder="Puedes pegar una URL o subir un archivo desde el panel de Logo"></div>
+        </div><hr><h3>Incidencias</h3><p class="muted">La prioridad sube automáticamente según la cantidad de intentos diarios registrados. El intento inicial cuenta como 1.</p><div class="form incident-thresholds"><div class="field"><label>Atención desde</label><input type="number" min="2" name="IncidenciaAtencionDesde" value="${esc(s.IncidenciaAtencionDesde||3)}"></div><div class="field"><label>Alta desde</label><input type="number" min="3" name="IncidenciaAltaDesde" value="${esc(s.IncidenciaAltaDesde||5)}"></div><div class="field"><label>Crítica desde</label><input type="number" min="4" name="IncidenciaCriticaDesde" value="${esc(s.IncidenciaCriticaDesde||7)}"></div></div></section>
+        <aside class="settings-side">
+          <section class="card settings-logo"><h2>Logo</h2><p class="muted">Puedes subir una imagen desde tu equipo o utilizar una URL. Se usa en el login y en la cabecera.</p><div class="settings-logo-preview" id="settings-logo-preview">${s.LogoUrl?`<img src="${esc(s.LogoUrl)}" alt="Logo de la comunidad">`:'<span>Sin logo</span>'}</div><div class="settings-logo-actions"><label class="button-like secondary" for="settings-logo-file">Elegir logo</label><input id="settings-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><button type="button" class="danger-link" id="settings-logo-remove">Quitar</button></div><div class="muted settings-logo-hint" id="settings-logo-hint">PNG, JPG, WEBP o GIF. Máximo 6 MB.</div></section>
+          <section class="card settings-colors"><h2>Colores</h2><p class="muted">Puedes elegirlos manualmente o sugerirlos automáticamente a partir del logo.</p>${[['ColorPrincipal','Principal',s.ColorPrincipal||'#087f6b'],['ColorSecundario','Secundario',s.ColorSecundario||'#0d302f'],['ColorAcento','Acento',s.ColorAcento||'#e1f2ef']].map(([n,l,v])=>`<div class="color-setting"><label>${l}</label><div><input type="color" data-color-name="${n}" value="${esc(v)}"><input name="${n}" data-color-text="${n}" value="${esc(v)}" maxlength="7" pattern="#[0-9A-Fa-f]{6}"></div></div>`).join('')}<button type="button" class="secondary settings-color-suggest" id="settings-colors-suggest">Sugerir desde logo</button><div class="muted settings-color-hint" id="settings-color-hint">La sugerencia no se guarda hasta pulsar “Guardar configuración”.</div></section>
+        </aside>
+        <div class="settings-save"><button type="submit">Guardar configuración</button></div>
+      </form>`;
+      const form=$('#configuration-form'),logo=$('#settings-logo-url'),preview=$('#settings-logo-preview');
+      logo.addEventListener('input',()=>{const u=logo.value.trim();preview.innerHTML=u?`<img src="${esc(u)}" alt="Logo de la comunidad" onerror="this.parentElement.innerHTML='<span>Logo no disponible</span>'">`:'<span>Sin logo</span>'});
+      const logoFile=$('#settings-logo-file'),logoRemove=$('#settings-logo-remove'),logoHint=$('#settings-logo-hint');
+      if(logoFile)logoFile.onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const choose=document.querySelector('label[for="settings-logo-file"]');busy(choose);try{if(logoHint)logoHint.textContent='Optimizando y subiendo logo…';const dataUrl=await logoFileData(file);preview.innerHTML=`<img src="${dataUrl}" alt="Vista previa del logo">`;const out=await call('uploadLogo',{dataUrl});logo.value=out.url||'';preview.innerHTML=`<img src="${esc(out.url||'')}" alt="Logo de la comunidad">`;if(logoHint)logoHint.textContent='Logo subido. Pulsa “Guardar configuración” para aplicarlo.';toast('Logo subido correctamente.');}catch(x){toast(x.message||x,true);if(logoHint)logoHint.textContent='No se pudo subir el logo.';}finally{busy(choose,false);logoFile.value=''}};
+      if(logoRemove)logoRemove.onclick=()=>{logo.value='';preview.innerHTML='<span>Sin logo</span>';if(logoHint)logoHint.textContent='El logo se quitará al guardar la configuración.'};
+      document.querySelectorAll('[data-color-name]').forEach(c=>{const n=c.dataset.colorName,t=document.querySelector(`[data-color-text="${n}"]`);c.oninput=()=>{t.value=c.value};t.oninput=()=>{if(/^#[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value}});
+      const suggest=$('#settings-colors-suggest');if(suggest)suggest.onclick=async()=>{busy(suggest);try{const colors=await suggestColorsFromLogo(logo.value.trim());Object.entries(colors).forEach(([n,v])=>{const c=document.querySelector(`[data-color-name="${n}"]`),t=document.querySelector(`[data-color-text="${n}"]`);if(c)c.value=v;if(t)t.value=v});const hint=$('#settings-color-hint');if(hint)hint.textContent='Colores sugeridos desde el logo. Revísalos y guarda para aplicarlos.';toast('Colores sugeridos desde el logo.');busy(suggest,false)}catch(x){toast(x.message||x,true);busy(suggest,false)}};
+      form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);Object.assign(s,out||{});state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
+    }
+
+    async function renderSystem(){
+      setActive('system');
+      panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
+      async function loadStatus(){
+        try{
+          const st=await call('systemStatus');
+          const serviceCards=(st.services||[]).map(x=>`<div class="system-service ${x.ok?'ok':'bad'}"><span class="system-dot"></span><div><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div></div>`).join('');
+          panel.innerHTML=`<section class="card system-info"><div class="system-status-head"><div><h2>Sistema</h2><p class="muted">Información técnica para comprobar la instalación.</p></div><span class="system-pill ${st.ok?'ok':'bad'}">${st.ok?'Disponible':'Revisar'}</span></div>
+            <div class="system-meta-grid"><div><span>Frontend</span><b>${esc(st.frontendVersion||'—')}</b></div><div><span>Backend</span><b>${esc(st.backendVersion||'—')}</b></div><div><span>Entorno</span><b>${esc(st.environment||'—')}</b></div><div><span>Zona horaria</span><b>${esc(st.timeZone||'—')}</b></div><div><span>Última comprobación</span><b>${esc(st.checkedAt||'—')}</b></div><div><span>Hojas</span><b>${Number(st.sheetCount||0)}</b></div></div></section>
+            <section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Backend, autenticación y almacenamiento.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-service-grid">${serviceCards}</div><div class="system-summary ${st.ok?'ok':'bad'}">${st.ok?'Sistema disponible.':'Hay elementos que requieren revisión.'} · ${Number(st.performance&&st.performance.totalMs||0)} ms</div></section>
+            <section class="card performance-card"><div class="system-status-head"><div><h2>Rendimiento y diagnóstico</h2><p class="muted">Mide tiempos reales de lectura desde Apps Script, Sheets y Drive sin modificar datos.</p></div></div>
+              <div class="performance-actions"><button type="button" id="diag-quick">Ejecutar prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-control">Medir Control</button><button type="button" class="secondary" id="diag-volume">Prueba de volumen</button><button type="button" class="secondary" id="diag-sheets">Benchmark Sheets</button><button type="button" class="secondary" id="diag-roundtrip">Round-trip</button><button type="button" class="secondary" id="diag-concurrency">Concurrencia</button></div>
+              <div id="diag-result" class="diagnostic-empty"><b>Sin prueba ejecutada</b><span>La prueba rápida comprueba disponibilidad. El diagnóstico completo fuerza lecturas de los principales conjuntos de datos.</span></div>
+              <div id="diag-special" class="diagnostic-empty"><b>Pruebas avanzadas</b><span>Control mide matrícula/QR sin registrar accesos. Volumen simula 1.000, 5.000 y 20.000 registros en memoria sin modificar datos.</span></div>
+              <div id="diag-benchmark" class="diagnostic-empty"><b>Benchmark real de Sheets</b><span>Crea un Spreadsheet temporal con 20.000 filas, mide lecturas reales y lo envía a la papelera al finalizar. No modifica la BBDD operativa.</span></div>
+              <div id="diag-network" class="diagnostic-empty"><b>Latencia y concurrencia</b><span>Round-trip separa ejecución servidor de espera/transporte. Concurrencia lanza lotes de 5, 10 y 20 lecturas desde este navegador.</span></div>
+              <div id="diag-calls" class="diagnostic-empty"><b>Llamadas de esta sesión</b><span>Se mostrarán las acciones más costosas y cuántas respuestas se resolvieron desde caché del navegador.</span></div>
+              <div id="diag-views" class="diagnostic-empty"><b>Carga de pantallas</b><span>Registra tiempo percibido y cantidad de viajes reales al backend por pantalla.</span></div>
+              <div id="perf-overview"><div class="diagnostic-running"><div class="spinner"></div><span>Cargando resumen de salud…</span></div></div>
+              <p class="muted diagnostic-note">Estas comprobaciones no sustituyen una prueba externa de concurrencia. El histórico técnico no almacena datos personales.</p>
+            </section>`;
+          $('#system-refresh').onclick=loadStatus;
+          $('#diag-quick').onclick=()=>runDiagnostic('quick');
+          $('#diag-full').onclick=()=>runDiagnostic('full');
+          $('#diag-control').onclick=()=>runSpecialDiagnostic('control');
+          $('#diag-volume').onclick=()=>runSpecialDiagnostic('volume');
+          $('#diag-sheets').onclick=()=>runSheetsBenchmark();
+          $('#diag-roundtrip').onclick=()=>runRoundTrip();
+          $('#diag-concurrency').onclick=()=>runConcurrency();
+          restoreDiagnosticBlocks();
+          renderSessionCalls();renderSessionViews();
+          refreshPerfOverview();
+        }catch(e){panel.innerHTML=`<section class="card"><div class="message bad">${esc(e.message||String(e))}</div><button type="button" class="secondary" id="system-retry">Reintentar</button></section>`;$('#system-retry').onclick=loadStatus}
+      }
+      const DIAG_UI_STATE_KEY='parking_diag_results_'+APP_FRONTEND_VERSION;
+      function saveDiagnosticBlock(id){
+        try{const el=document.getElementById(id);if(!el)return;const all=JSON.parse(sessionStorage.getItem(DIAG_UI_STATE_KEY)||'{}');all[id]={className:el.className,html:el.innerHTML};sessionStorage.setItem(DIAG_UI_STATE_KEY,JSON.stringify(all))}catch(e){}
+      }
+      function restoreDiagnosticBlocks(){
+        try{const all=JSON.parse(sessionStorage.getItem(DIAG_UI_STATE_KEY)||'{}');['diag-result','diag-special','diag-benchmark','diag-network'].forEach(id=>{const el=document.getElementById(id),x=all[id];if(el&&x&&x.html){el.className=x.className||'diagnostic-result';el.innerHTML=x.html}})}catch(e){}
+      }
+      function renderPerfOverview(perf){
+        const el=$('#perf-overview');if(!el)return;
+        const health=(perf.health||[]).map(x=>`<div class="health-card ${esc(x.tone||'neutral')}"><span>${esc(x.label||'')}</span><b>${esc(x.value||'—')}</b><small>${esc(x.detail||'')}</small></div>`).join('');
+        const typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real',roundtrip:'Round-trip',concurrency:'Concurrencia'};
+        const history=(perf.history||[]).slice(0,8).map(x=>{const slow=(x.metrics||[]).slice().sort((a,b)=>Number(b.ms||0)-Number(a.ms||0))[0];return `<div class="perf-history-row"><div><b>${esc(typeLabel[x.type]||x.type||'Prueba')}</b><span>${esc(x.checkedAt||'')}</span></div><div><span>${slow?esc(slow.label)+' · '+Number(slow.ms||0)+' ms':''}</span><strong class="perf-badge ${x.ok===false?'bad':systemPerfClientLevel(Number(x.totalMs||0))}">${Number(x.totalMs||0)} ms</strong></div></div>`}).join('');
+        el.innerHTML=`<section class="perf-health"><h3>Resumen de salud</h3><div class="health-grid">${health}</div></section><section class="perf-history"><div class="system-status-head"><div><h3>Histórico de diagnósticos</h3><p class="muted">Últimas comprobaciones técnicas guardadas sin datos personales.</p></div></div>${history||'<div class="diagnostic-empty"><span>Todavía no hay histórico suficiente.</span></div>'}</section>`;
+      }
+      function systemPerfClientLevel(ms){return ms<=500?'good':ms<=1500?'warn':'slow'}
+      async function refreshPerfOverview(){try{renderPerfOverview(await call('systemPerformanceHistory'))}catch(e){const el=$('#perf-overview');if(el)el.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}}
+      function renderSessionCalls(){
+        const box=$('#diag-calls');if(!box)return;const rows=clientCallSummary().slice(0,10);
+        if(!rows.length){box.className='diagnostic-empty';box.innerHTML='<b>Llamadas de esta sesión</b><span>Todavía no hay suficientes llamadas registradas.</span>';return}
+        box.className='diagnostic-result';box.innerHTML='<div class="diagnostic-summary"><div><b>Llamadas de esta sesión</b><span>Viajes reales vs. respuestas reutilizadas</span></div></div><div class="call-stats-grid">'+rows.map(x=>`<div class="call-stat"><b>${esc(x.action)}</b><span>${x.network} backend · media ${x.avg} ms · máx. ${x.max} ms${x.cacheHits?' · '+x.cacheHits+' caché':''}${x.coalesced?' · '+x.coalesced+' unificada(s)':''}${x.errors?' · '+x.errors+' error(es)':''}</span></div>`).join('')+'</div>';
+      }
+      function renderSessionViews(){
+        const box=$('#diag-views');if(!box)return;const rows=clientViewSummary().slice(0,10);
+        if(!rows.length){box.className='diagnostic-empty';box.innerHTML='<b>Carga de pantallas</b><span>Navega por la aplicación y vuelve a Sistema para comparar tiempos y viajes al backend.</span>';return}
+        box.className='diagnostic-result';box.innerHTML='<div class="diagnostic-summary"><div><b>Carga de pantallas</b><span>Tiempo percibido y viajes reales por apertura</span></div></div><div class="call-stats-grid">'+rows.map(x=>`<div class="call-stat"><b>${esc(viewLabel(x.view))}</b><span>${x.count} apertura${x.count===1?'':'s'} · media ${x.avg} ms · máx. ${x.max} ms · ${x.avgNetwork} backend/apertura${x.cacheHits?' · '+x.cacheHits+' caché':''}${x.coalesced?' · '+x.coalesced+' unificada(s)':''}</span></div>`).join('')+'</div>';
+      }
+      async function runRoundTrip(){
+        const box=$('#diag-network'),b=$('#diag-roundtrip');if(!box||!b)return;b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Midiendo latencia navegador ↔ Apps Script…</span>';
+        try{const samples=[];for(let i=0;i<3;i++){const t=performance.now(),r=await call('systemRoundTripPing',{seq:i+1}),total=Math.round(performance.now()-t),serverMs=Number(r.serverMs||0);samples.push({total,serverMs,overhead:Math.max(0,total-serverMs)})}
+          const avg=k=>Math.round(samples.reduce((a,x)=>a+x[k],0)/samples.length),totalAvg=avg('total'),serverAvg=avg('serverMs'),overAvg=avg('overhead');
+          box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Round-trip navegador ↔ backend</b><span>Promedio de 3 muestras</span></div><span class="perf-badge ${systemPerfClientLevel(totalAvg)}">${totalAvg} ms</span></div><div class="diagnostic-grid"><div class="diagnostic-row"><div><b>Respuesta total</b><small>Tiempo percibido por el navegador</small></div><span>${totalAvg} ms</span></div><div class="diagnostic-row"><div><b>Ejecución servidor</b><small>Trabajo medido dentro de Apps Script</small></div><span>${serverAvg} ms</span></div><div class="diagnostic-row"><div><b>Transporte / espera</b><small>Diferencia aproximada entre navegador y servidor</small></div><span>${overAvg} ms</span></div></div>`;
+          saveDiagnosticBlock('diag-network');
+          await call('systemRecordClientPerformance',{type:'roundtrip',totalMs:totalAvg,metrics:[{label:'Servidor',ms:serverAvg,ok:true},{label:'Transporte / espera',ms:overAvg,ok:true}]});
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-network')}finally{b.disabled=false;renderSessionCalls();renderSessionViews();refreshPerfOverview()}
+      }
+      async function runConcurrency(){
+        const box=$('#diag-network'),b=$('#diag-concurrency');if(!box||!b)return;if(!confirm('La prueba lanzará lotes de 5, 10 y 20 lecturas simultáneas de solo lectura desde este navegador. No modifica datos. ¿Continuar?'))return;b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando concurrencia controlada…</span>';
+        try{const batches=[];for(const n of [5,10,20]){const started=performance.now();const jobs=Array.from({length:n},(_,i)=>{const t=performance.now();return call('systemRoundTripPing',{seq:i+1}).then(r=>({ok:true,ms:Math.round(performance.now()-t),serverMs:Number(r.serverMs||0)})).catch(()=>({ok:false,ms:Math.round(performance.now()-t),serverMs:0}))});const r=await Promise.all(jobs),batchMs=Math.round(performance.now()-started),ok=r.filter(x=>x.ok),fails=n-ok.length;batches.push({n,batchMs,avg:ok.length?Math.round(ok.reduce((a,x)=>a+x.ms,0)/ok.length):0,max:ok.length?Math.max(...ok.map(x=>x.ms)):0,fails})}
+          const worst=Math.max(...batches.map(x=>x.batchMs)),allOk=batches.every(x=>!x.fails);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Concurrencia controlada</b><span>Simulación desde un único navegador</span></div><span class="system-pill ${allOk?'ok':'bad'}">${allOk?'Correcto':'Revisar'}</span></div><div class="diagnostic-grid">${batches.map(x=>`<div class="diagnostic-row"><div><b>${x.n} simultáneas</b><small>Media ${x.avg} ms · máximo ${x.max} ms${x.fails?' · '+x.fails+' fallos':''}</small></div><span class="perf-badge ${systemPerfClientLevel(x.batchMs)}">${x.batchMs} ms lote</span></div>`).join('')}</div><p class="muted diagnostic-note">Prueba útil para detectar saturación del navegador/Apps Script, pero no sustituye una prueba multiusuario externa.</p>`;
+          saveDiagnosticBlock('diag-network');
+          await call('systemRecordClientPerformance',{type:'concurrency',ok:allOk,totalMs:worst,metrics:batches.map(x=>({label:x.n+' simultáneas',ms:x.batchMs,ok:x.fails===0}))});
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-network')}finally{b.disabled=false;renderSessionCalls();renderSessionViews();refreshPerfOverview()}
+      }
+      async function runSheetsBenchmark(){
+        const box=$('#diag-benchmark'),b=$('#diag-sheets');if(!box||!b)return;
+        if(!confirm('El benchmark creará temporalmente un Spreadsheet con 20.000 filas para medir lectura real. No modificará la base operativa y el archivo se enviará a la papelera al finalizar. ¿Continuar?'))return;
+        b.disabled=true;box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando benchmark real de Google Sheets… Puede tardar unos segundos.</span>';
+        try{
+          const r=await call('systemSheetsRealBenchmark',{});
+          const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
+          box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Benchmark real de Sheets</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
+          saveDiagnosticBlock('diag-benchmark');
+          refreshPerfOverview();
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-benchmark')}finally{b.disabled=false}
+      }
+      async function runSpecialDiagnostic(kind){
+        const box=$('#diag-special'),c=$('#diag-control'),v=$('#diag-volume');
+        if(!box)return;c.disabled=true;v.disabled=true;
+        box.className='diagnostic-running';box.innerHTML=`<div class="spinner"></div><span>${kind==='control'?'Midiendo Control por matrícula y QR…':'Ejecutando simulación de volumen…'}</span>`;
+        try{
+          const r=await call(kind==='control'?'systemControlDiagnostics':'systemVolumeDiagnostics',{});
+          const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
+          box.className='diagnostic-result';
+          box.innerHTML=`<div class="diagnostic-summary"><div><b>${kind==='control'?'Rendimiento de Control':'Prueba de volumen'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><p class="muted diagnostic-note">${esc(r.note||'')}</p>`;
+          saveDiagnosticBlock('diag-special');
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-special')}
+        finally{c.disabled=false;v.disabled=false;refreshPerfOverview()}
+      }
+      async function runDiagnostic(mode){
+        const box=$('#diag-result'),q=$('#diag-quick'),f=$('#diag-full');
+        if(!box)return;
+        q.disabled=true;f.disabled=true;
+        box.className='diagnostic-running';box.innerHTML=`<div class="spinner"></div><span>${mode==='full'?'Ejecutando diagnóstico completo…':'Ejecutando prueba rápida…'}</span>`;
+        try{
+          const r=await call('systemDiagnostics',{mode});
+          const rows=(r.tests||[]).map(x=>`<div class="diagnostic-row"><div><span class="system-dot"></span><b>${esc(x.label)}</b><small>${esc(x.detail||'')}</small></div><span class="perf-badge ${esc(x.level||'good')}">${Number(x.ms||0)} ms</span></div>`).join('');
+          box.className='diagnostic-result';
+          box.innerHTML=`<div class="diagnostic-summary"><div><b>${r.mode==='full'?'Diagnóstico completo':'Prueba rápida'}</b><span>${esc(r.checkedAt||'')}</span></div><div><span class="perf-badge ${esc(r.level||'good')}">${Number(r.totalMs||0)} ms total</span><span class="system-pill ${r.ok?'ok':'bad'}">${r.ok?'Correcto':'Revisar'}</span></div></div><div class="diagnostic-grid">${rows}</div><div class="diagnostic-legend"><span><i class="legend-dot good"></i> ≤ 500 ms</span><span><i class="legend-dot warn"></i> 501–1500 ms</span><span><i class="legend-dot slow"></i> &gt; 1500 ms</span></div>`;
+          saveDiagnosticBlock('diag-result');
+        }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`;saveDiagnosticBlock('diag-result')}
+        finally{q.disabled=false;f.disabled=false;refreshPerfOverview()}
+      }
+      loadStatus();
+    }
+
+    tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());
+    if(initialTab==='system')await renderSystem();else await renderIdentity();
   }catch(e){err(e)}
 }
 async function control(token=''){
@@ -893,7 +1028,7 @@ async function ownerIncidents(){try{const {hs,incs}=await ownerData(),hm=Object.
 async function ownerRequests(){try{const {reqs}=await ownerData(),ui=viewUiState('ownerRequestsTable'),preset=state.cache.ownerNavPreset?.view==='ownerRequests'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;let sortKey=ui.sortKey||'FechaHora',sortDir=ui.sortDir||'desc';$('#main').innerHTML=`<div class="head"><h1>Mis solicitudes</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="or-search" class="search" placeholder="Matrícula, vivienda o tipo..."></div>${periodFilterFields('or')}<div class="field"><label>Estado</label><select id="or-state"><option value="Pendiente">Pendientes</option><option value="">Todas</option><option>Aprobada</option><option>Rechazada</option></select></div><div class="field"><label>Tipo</label><select id="or-type"><option value="">Todos</option><option value="REACTIVACION_VEHICULO">Reactivación</option><option value="RENOVACION_QR">Renovación QR</option><option value="PERMANENCIA_PROLONGADA">Permanencia prolongada</option></select></div><div class="field"><label>Agrupar por</label><select id="or-group"><option value="none">Sin agrupar</option><option value="plate">Matrícula</option><option value="housing">Vivienda</option><option value="type">Tipo</option></select></div><span class="count" id="or-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="plate">Matrícula</th><th class="sortable-th" data-sort="housing">Vivienda</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>Resolución</th></tr></thead><tbody id="or-body"></tbody></table></div>`;$('#or-search').value=preset?String(preset.plate||''):(ui.q||'');$('#or-state').value=preset?(preset.filter==='pending'?'Pendiente':preset.filter==='approved'?'Aprobada':String(preset.state||'')):(ui.st===undefined?'Pendiente':ui.st);$('#or-type').value=preset?String(preset.type||''):(ui.tp||'');$('#or-period').value=preset?String(preset.period||''):(ui.period||'');$('#or-from').value=preset?String(preset.from||''):(ui.from||'');$('#or-to').value=preset?String(preset.to||''):(ui.to||'');$('#or-group').value=preset?String(preset.group||'none'):(ui.group||'none');bindPeriodVisibility('or');const plate=r=>r.MatriculaHabitual||r.MatriculaOrigen||'SIN MATRÍCULA',house=r=>`Bloque ${r.Bloque}, ${r.Planta} ${r.Apartamento}`,val=(r,k)=>k==='plate'?plate(r):k==='housing'?house(r):k==='Tipo'?requestTypeLabel(r.Tipo):r[k]||'',cmp=(a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true});return sortDir==='asc'?c:-c},rowHtml=r=>`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Matrícula"><b>${esc(plate(r))}</b></td><td data-label="Vivienda">${esc(house(r))}</td><td data-label="Tipo">${esc(requestTypeLabel(r.Tipo))}</td><td data-label="Estado"><span class="status ${r.Estado==='Pendiente'?'bad':''}">${esc(r.Estado)}</span></td><td data-label="Resolución" class="resolution-cell">${r.Estado==='Pendiente'?'<span class="muted">Pendiente</span>':`<div class="message owner-resolution"><b>Resolución:</b> ${esc(r.Estado)}<br><b>Comentario:</b> ${esc(r.ObservacionesResolucion||'—')}<br><span class="subtle">${esc(r.Estado==='Aprobada'?'Aprobada':'Rechazada')} por ${esc(r.NombreResolucion||r.UsuarioResolucion||'—')} · ${esc(shortDateTime(r.FechaResolucion))}</span></div>`}</td></tr>`;const render=()=>{const q=$('#or-search').value.trim().toLowerCase(),st=$('#or-state').value,tp=$('#or-type').value,period=$('#or-period').value,from=$('#or-from').value,to=$('#or-to').value,group=$('#or-group').value;saveViewUiState('ownerRequestsTable',{q,st,tp,period,from,to,group,sortKey,sortDir,v:'1.2.12.2'});const rows=reqs.filter(r=>(!st||r.Estado===st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&Object.values(r).join(' ').toLowerCase().includes(q));$('#or-count').textContent=`${rows.length} solicitud${rows.length===1?'':'es'}`;if(group==='none')$('#or-body').innerHTML=[...rows].sort(cmp).map(rowHtml).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>';else{const keyFn=group==='plate'?plate:group==='housing'?house:r=>requestTypeLabel(r.Tipo),entries=groupedRowsStable(rows,keyFn,cmp,(a,b)=>naturalSort(a[0],b[0]));$('#or-body').innerHTML=entries.map(([key,list])=>`<tr class="table-group-row"><td colspan="6"><b>${esc(key)}</b> · ${list.length} solicitud(es)</td></tr>${list.map(rowHtml).join('')}`).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>'}};$('#or-search').oninput=render;['or-state','or-type','or-period','or-from','or-to','or-group'].forEach(id=>$(`#${id}`).onchange=render);document.querySelectorAll('.sortable-th').forEach(th=>{th.dataset.dir=th.dataset.sort===sortKey?sortDir:'';th.onclick=()=>{const k=th.dataset.sort;sortDir=sortKey===k&&sortDir==='asc'?'desc':'asc';sortKey=k;document.querySelectorAll('.sortable-th').forEach(x=>x.dataset.dir=x.dataset.sort===sortKey?sortDir:'');render()}});render()}catch(e){err(e)}}
 
 
-// 1.2.17.4 - Inicio propietario: accesos con filtros deterministas
+// 1.2.17.5 - Inicio propietario: accesos con filtros deterministas
 async function ownerHome(){
   try{
     const {hs,vs,reqs,incs}=await ownerData();
