@@ -15,7 +15,7 @@ async function dashboard(){
         ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests-pending',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents-open',d.openIncidents>0)}
         ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
-        ${card(d.activeWithoutQr,'Activos sin QR válido','No incluye motos','vehicles-active-revoked',d.activeWithoutQr>0)}
+        ${card(d.activeWithoutSlot||0,'Activos sin slot','No incluye motos','vehicles-active-noslot',(d.activeWithoutSlot||0)>0)}
         ${card(d.temporary,'Temporales vigentes','','vehicles-temporary')}
         ${card(d.temporaryExpiring7,'Temporales que vencen ≤ 7 días','Revisar próximos vencimientos','vehicles-temporary-expiring',d.temporaryExpiring7>0)}
       </div></section>
@@ -43,7 +43,7 @@ function openSummaryAction(action){
   if(action==='vehicles-suspended'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Suspendido'}};go('vehicles');return}
   if(action==='vehicles-low'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Baja'}};go('vehicles');return}
   if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{QR_Estado:'Revocado'}};go('vehicles');return}
-  if(action==='vehicles-active-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',QR_Estado:'Revocado',__Clase:'Vehículo'}};go('vehicles');return}
+  if(action==='vehicles-active-noslot'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Vehículo',__Slot:'Sin slot'}};go('vehicles');return}
   if(action==='vehicles-temporary'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vigente'}};go('vehicles');return}
   if(action==='vehicles-temporary-expiring'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vence en 7 días'}};go('vehicles');return}
   if(action==='vehicles-30'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__AltaPeriodo:'Últimos 30 días'}};go('vehicles');return}
