@@ -32,14 +32,19 @@ function resultCard(r){state.scanResult=r;const v=r.vehicle||{},h=r.housing||{},
 // 1.2.13.14 ESTABLE - sincronizado con la implementación efectiva del bundle.
 // 1.2.13.6 - Control: incidencias abiertas, seguimiento diario y contexto habitual/temporal
 function incidentTypesForContext(p){
-  const observational=['Vehículo inmovilizado / posible abandono','Estacionamiento o ubicación indebida','Fuga / pérdida de líquidos'],v=p.vehicle||{},status=p.status||'',source=p.source||'Manual',fixed=incidentTypeFromStatus(status);
-  if(fixed)return [fixed];
+  const observational=['Vehículo inmovilizado / posible abandono','Estacionamiento o ubicación indebida','Fuga / pérdida de líquidos'],v=p.vehicle||{},status=p.status||'',source=p.source||'Manual',contextual=incidentTypeFromStatus(status);
   if(source==='Manual'&&!status)return ['Otro',...observational];
+  if(source==='QR'&&v.ID_Vehiculo&&v.Tipo!=='Moto'){
+    const out=[];
+    if(contextual)out.push(contextual);
+    out.push('QR no corresponde con matrícula','Uso indebido',...observational,'Otro');
+    return [...new Set(out)];
+  }
+  if(contextual)return [contextual];
   if(status==='AUTORIZADO'&&v.Tipo==='Moto')return observational;
   if(status==='AUTORIZADO'&&source==='MATRICULA'){
     const out=[];if(v.ID_Vehiculo&&v.QR_Estado==='Activo')out.push('QR no presentado');return [...out,...observational,'Otro'];
   }
-  if(status==='AUTORIZADO'&&source==='QR')return ['QR no corresponde con matrícula','Uso indebido',...observational,'Otro'];
   return [...observational,'Otro'];
 }
 
