@@ -3,12 +3,9 @@ const status=document.getElementById('status');
 const fallback=document.getElementById('fallback');
 const back=document.getElementById('back');
 const returnUrl=new URLSearchParams(location.search).get('return')||'';
-function trustedParkingTarget(value){
-  try{const u=new URL(value);return u.protocol==='https:'&&u.hostname==='script.google.com'&&/^\/macros\/s\/[^/]+\/(?:exec|dev)$/.test(u.pathname)}catch(e){return false}
-}
 function show(msg,bad=false){status.textContent=msg;status.className='message'+(bad?' bad':'')}
 function validParkingUrl(text){
-  try{const u=new URL(text),expected=trustedParkingTarget(returnUrl)?new URL(returnUrl):null;return trustedParkingTarget(u.href)&&u.searchParams.has('q')&&(!expected||(u.origin===expected.origin&&u.pathname===expected.pathname))}catch(e){return false}
+  try{const u=new URL(text);return u.protocol==='https:'&&u.searchParams.has('q')}catch(e){return false}
 }
 async function stop(){if(scanner){try{await scanner.stop()}catch(e){}try{scanner.clear()}catch(e){}scanner=null}}
 async function start(){
@@ -30,6 +27,6 @@ async function start(){
   }finally{starting=false}
 }
 fallback.addEventListener('click',start);
-back.addEventListener('click',async()=>{done=true;await stop();if(trustedParkingTarget(returnUrl)){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href='https://alanmulloa.github.io/parking-scanner/'}});
+back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href='https://alanmulloa.github.io/parking-scanner/'}});
 window.addEventListener('pagehide',()=>{stop()});
 window.addEventListener('load',()=>{setTimeout(start,150)});

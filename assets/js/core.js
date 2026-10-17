@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.7';
+const APP_FRONTEND_VERSION='1.2.13.14';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -8,7 +8,7 @@ function appBrandHtml(compact=false){const logo=appLogoUrl(),name=appDisplayName
 function applyParkingSettings(settings){settings=settings||{};const root=document.documentElement;if(settings.ColorPrincipal)root.style.setProperty('--brand',settings.ColorPrincipal);if(settings.ColorSecundario)root.style.setProperty('--dark',settings.ColorSecundario);if(settings.ColorAcento)root.style.setProperty('--accent',settings.ColorAcento);document.title=settings.NombreOficial||'Parking Comunidad'}
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SERVER_TIMEOUT_MS=18000;
-const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listIncidentsPayload','listAudit','listAuditPage','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
+const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listIncidentsPayload','listAudit','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 function server(fn,...args){
   return new Promise((resolve,reject)=>{
@@ -23,104 +23,26 @@ function server(fn,...args){
   })
 }
 const CLIENT_CALL_METRICS=[];
-const CLIENT_VIEW_METRICS=[];
-const CLIENT_RESPONSE_CACHE=new Map();
-const CLIENT_INFLIGHT_CALLS=new Map();
-const CLIENT_READ_CACHE_TTL={
-  bootstrap:60000,
-  dashboard:20000,
-  managerData:15000,
-  listUsers:15000,
-  listHousing:15000,
-  listVehicles:15000,
-  formOptions:30000,
-  listIncidents:10000,
-  listIncidentsPayload:10000,
-  listAudit:10000,
-  listAuditPage:5000,
-  listRequests:10000,
-  ownerBundle:20000,
-  listTemporaryPeriods:10000,
-  housingDetail:10000,
-  vehicleHistory:10000,
-  getSettings:30000
-};
-const CLIENT_MUTATING_ACTIONS=new Set([
-  'saveUser','saveHousing','saveVehicle','saveTemporaryPeriod','extendTemporaryPeriod','deleteTemporaryPeriod','renewQr','assignVehicleSlot','releaseVehicleSlot',
-  'saveIncident','saveIncidentFollowup','closeIncident','saveSettings','consistencyFix','replaceVehicle','bulkVehicleAction','updateProfile','adminSetPassword',
-  'createRequest','resolveRequest'
-]);
-function stableClientPayload(value){
-  if(value===null||value===undefined)return value;
-  if(Array.isArray(value))return value.map(stableClientPayload);
-  if(typeof value==='object')return Object.keys(value).sort().reduce((o,k)=>(o[k]=stableClientPayload(value[k]),o),{});
-  return value;
-}
-function clientReadCacheKey(action,payload){
-  const sessionKey=String(state.token||'');
-  try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
-}
-function invalidateClientReadCache(){CLIENT_RESPONSE_CACHE.clear()}
-function seedClientRead(action,payload,value){
-  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
-  CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),{value,expires:Date.now()+ttl});
-}
-function applyInitialContext(context){
-  context=context||{};state.user=context.user||state.user;
-  state.cache=state.cache||{};state.cache.bootstrap={user:state.user,settings:context.settings||appSettings(),serverDate:context.serverDate||'',timeZone:context.timeZone||'Europe/Madrid',version:context.version||APP_FRONTEND_VERSION};
-  applyParkingSettings(state.cache.bootstrap.settings);
-  if(context.resource?.kind==='read')seedClientRead(context.resource.action,context.resource.payload||{},context.resource.data);
-  if(context.resource?.kind==='controlScan')state.cache.initialControlResult={token:context.resource.token,data:context.resource.data};
-  state.cache.initialViewReady=context.initialView||'';
-  return context;
-}
-function recordClientCall(action,ms,ok=true,source='network'){
+function recordClientCall(action,ms,ok=true){
   if(/^systemPerformanceHistory$/.test(action))return;
-  CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,source:String(source||'network'),at:Date.now()});
-  if(CLIENT_CALL_METRICS.length>240)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-240);
+  CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,at:Date.now()});
+  if(CLIENT_CALL_METRICS.length>160)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
 }
 function clientCallSummary(){
-  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,network:0,cacheHits:0,coalesced:0,total:0,max:0,errors:0});m.count++;if(x.source==='cache')m.cacheHits++;else if(x.source==='coalesced')m.coalesced++;else{m.network++;m.total+=x.ms;m.max=Math.max(m.max,x.ms)}if(!x.ok)m.errors++});
-  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.network))})).sort((a,b)=>b.total-a.total||b.network-a.network);
-}
-function recordClientView(view,ms,callStartIndex){
-  const calls=CLIENT_CALL_METRICS.slice(callStartIndex),network=calls.filter(x=>x.source==='network'),cacheHits=calls.filter(x=>x.source==='cache').length,coalesced=calls.filter(x=>x.source==='coalesced').length;
-  CLIENT_VIEW_METRICS.push({view:String(view||''),ms:Math.round(ms),networkCalls:network.length,cacheHits,coalesced,at:Date.now()});
-  if(CLIENT_VIEW_METRICS.length>100)CLIENT_VIEW_METRICS.splice(0,CLIENT_VIEW_METRICS.length-100);
-}
-function clientViewSummary(){
-  const map={};CLIENT_VIEW_METRICS.forEach(x=>{const k=x.view||'—',m=map[k]||(map[k]={view:k,count:0,total:0,max:0,networkCalls:0,cacheHits:0,coalesced:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);m.networkCalls+=x.networkCalls;m.cacheHits+=x.cacheHits;m.coalesced+=x.coalesced});
-  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count)),avgNetwork:(x.networkCalls/Math.max(1,x.count)).toFixed(1)})).sort((a,b)=>b.total-a.total);
+  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,total:0,max:0,errors:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);if(!x.ok)m.errors++});
+  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count))})).sort((a,b)=>b.total-a.total);
 }
 async function call(action,payload={}){
-  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),key=ttl?clientReadCacheKey(action,payload):'';
-  if(ttl){
-    const cached=CLIENT_RESPONSE_CACHE.get(key);
-    if(cached&&cached.expires>Date.now()){recordClientCall(action,0,true,'cache');return cached.value}
-    if(cached)CLIENT_RESPONSE_CACHE.delete(key);
-    const pending=CLIENT_INFLIGHT_CALLS.get(key);
-    if(pending){const started=performance.now();try{const value=await pending;recordClientCall(action,performance.now()-started,true,'coalesced');return value}catch(e){recordClientCall(action,performance.now()-started,false,'coalesced');throw e}}
-  }
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
-  const networkPromise=(async()=>{
-    let last;const callStarted=performance.now();
-    for(let i=0;i<attempts;i++){
-      try{
-        const value=await server('api',state.token,action,payload);
-        recordClientCall(action,performance.now()-callStarted,true,'network');
-        if(ttl)CLIENT_RESPONSE_CACHE.set(key,{value,expires:Date.now()+ttl});
-        if(CLIENT_MUTATING_ACTIONS.has(action))invalidateClientReadCache();
-        return value;
-      }catch(e){
-        last=e;
-        if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false,'network');localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
-        if(i+1<attempts)await sleep(650);
-      }
+  let last;const callStarted=performance.now();
+  for(let i=0;i<attempts;i++){
+    try{const value=await server('api',state.token,action,payload);recordClientCall(action,performance.now()-callStarted,true);return value}catch(e){
+      last=e;
+      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false);localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
+      if(i+1<attempts)await sleep(650);
     }
-    recordClientCall(action,performance.now()-callStarted,false,'network');throw last;
-  })();
-  if(ttl)CLIENT_INFLIGHT_CALLS.set(key,networkPromise);
-  try{return await networkPromise}finally{if(ttl&&CLIENT_INFLIGHT_CALLS.get(key)===networkPromise)CLIENT_INFLIGHT_CALLS.delete(key)}
+  }
+  recordClientCall(action,performance.now()-callStarted,false);throw last;
 }
 function busy(el,on=true){if(el)el.disabled=on}
 function toast(message,bad=false){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.className='message '+(bad?'bad':'');t.textContent=message;t.style.cssText='position:fixed;right:1rem;bottom:1rem;z-index:99;max-width:420px';clearTimeout(t.timer);t.timer=setTimeout(()=>t.remove(),4500)}
@@ -172,7 +94,6 @@ function loadUiState(){try{return JSON.parse(sessionStorage.getItem(UI_STATE_KEY
 function saveUiState(patch){try{const next=Object.assign({},loadUiState(),patch||{});sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(next));return next}catch(e){return {}}}
 function viewUiState(view=state.view){const all=loadUiState();return (all.views&&all.views[view])||{}}
 function saveViewUiState(view,patch){try{const all=loadUiState(),views=Object.assign({},all.views||{});views[view]=Object.assign({},views[view]||{},patch||{});all.views=views;sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(all));return views[view]}catch(e){return {}}}
-function replaceViewUiState(view,value={}){try{const all=loadUiState(),views=Object.assign({},all.views||{});views[view]=Object.assign({},value||{});all.views=views;sessionStorage.setItem(UI_STATE_KEY,JSON.stringify(all));return views[view]}catch(e){return {}}}
 function rememberCurrentView(view){if(view)saveUiState({view})}
 function clearUiState(){try{sessionStorage.removeItem(UI_STATE_KEY)}catch(e){}}
 function defaultViewForRole(role){return role==='ADMIN'?'dashboard':role==='CONTROL'?'control':'ownerHome'}
@@ -202,7 +123,6 @@ function bindPeriodVisibility(prefix){const p=$(`#${prefix}-period`),a=$(`#${pre
   const sync=details=>{if(!details)return;if(details.open){document.querySelectorAll('details.action-menu[open]').forEach(x=>{if(x!==details){x.open=false;reset(x)}});requestAnimationFrame(()=>requestAnimationFrame(()=>position(details)))}else reset(details)};
   document.addEventListener('click',e=>{const summary=e.target.closest?.('details.action-menu > summary');if(!summary)return;const d=summary.parentElement;setTimeout(()=>sync(d),0)},true);
   document.addEventListener('toggle',e=>{const d=e.target;if(d instanceof HTMLDetailsElement&&d.classList.contains('action-menu'))sync(d)},true);
-  document.addEventListener('click',e=>{const action=e.target.closest?.('details.action-menu .action-menu-panel button, details.action-menu .action-menu-panel a');if(!action)return;const d=action.closest('details.action-menu');if(d){d.open=false;reset(d)}} ,true);
   document.addEventListener('click',e=>{if(e.target.closest?.('.action-menu'))return;document.querySelectorAll('details.action-menu[open]').forEach(d=>{d.open=false;reset(d)})});
   window.addEventListener('resize',()=>document.querySelectorAll('details.action-menu[open]').forEach(position));
   window.addEventListener('scroll',()=>document.querySelectorAll('details.action-menu[open]').forEach(position),true);
