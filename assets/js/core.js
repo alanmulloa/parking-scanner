@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.0';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.17.7';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -26,56 +26,30 @@ const CLIENT_CALL_METRICS=[];
 const CLIENT_VIEW_METRICS=[];
 const CLIENT_RESPONSE_CACHE=new Map();
 const CLIENT_INFLIGHT_CALLS=new Map();
-const CLIENT_CACHE_GENERATION=new Map();
 const CLIENT_READ_CACHE_TTL={
-  bootstrap:120000,
-  dashboard:30000,
-  managerData:60000,
-  listUsers:60000,
-  listHousing:60000,
-  listVehicles:60000,
-  formOptions:120000,
-  listIncidents:30000,
-  listIncidentsPayload:30000,
-  listAudit:30000,
-  listAuditPage:30000,
-  listRequests:30000,
-  ownerBundle:60000,
-  listTemporaryPeriods:30000,
-  housingDetail:60000,
-  vehicleHistory:60000,
-  getSettings:120000
+  bootstrap:60000,
+  dashboard:20000,
+  managerData:15000,
+  listUsers:15000,
+  listHousing:15000,
+  listVehicles:15000,
+  formOptions:30000,
+  listIncidents:10000,
+  listIncidentsPayload:10000,
+  listAudit:10000,
+  listAuditPage:5000,
+  listRequests:10000,
+  ownerBundle:20000,
+  listTemporaryPeriods:10000,
+  housingDetail:10000,
+  vehicleHistory:10000,
+  getSettings:30000
 };
-const CLIENT_READ_CACHE_STALE_TTL={
-  bootstrap:300000,dashboard:120000,managerData:300000,listUsers:300000,listHousing:300000,listVehicles:300000,formOptions:600000,
-  listIncidents:120000,listIncidentsPayload:120000,listAudit:120000,listAuditPage:120000,listRequests:120000,ownerBundle:300000,
-  listTemporaryPeriods:120000,housingDetail:300000,vehicleHistory:300000,getSettings:600000
-};
-const CLIENT_MUTATION_INVALIDATION={
-  saveUser:['dashboard','managerData','listUsers','formOptions','ownerBundle','housingDetail','listAudit','listAuditPage'],
-  closeUserSessions:['managerData','listUsers','listAudit','listAuditPage'],
-  adminSetPassword:['managerData','listUsers','listAudit','listAuditPage'],
-  saveHousing:['dashboard','managerData','listHousing','formOptions','ownerBundle','housingDetail','listIncidents','listIncidentsPayload','listRequests','listAudit','listAuditPage'],
-  saveVehicle:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listIncidents','listIncidentsPayload','listRequests','listAudit','listAuditPage'],
-  saveTemporaryPeriod:['dashboard','managerData','listVehicles','ownerBundle','listTemporaryPeriods','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  extendTemporaryPeriod:['dashboard','managerData','listVehicles','ownerBundle','listTemporaryPeriods','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  deleteTemporaryPeriod:['dashboard','managerData','listVehicles','ownerBundle','listTemporaryPeriods','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  renewQr:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listRequests','listAudit','listAuditPage'],
-  assignVehicleSlot:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  releaseVehicleSlot:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  saveIncident:['dashboard','listIncidents','listIncidentsPayload','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  saveIncidentFollowup:['dashboard','listIncidents','listIncidentsPayload','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  closeIncident:['dashboard','managerData','listVehicles','listIncidents','listIncidentsPayload','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  saveSettings:['bootstrap','getSettings'],
-  consistencyFix:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  replaceVehicle:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listIncidents','listIncidentsPayload','listRequests','listAudit','listAuditPage'],
-  bulkVehicleAction:['dashboard','managerData','listVehicles','ownerBundle','housingDetail','vehicleHistory','listIncidents','listIncidentsPayload','listRequests','listAudit','listAuditPage'],
-  updateProfile:['managerData','listUsers','formOptions','ownerBundle','housingDetail','listAudit','listAuditPage'],
-  changePassword:['listAudit','listAuditPage'],
-  createRequest:['dashboard','managerData','listRequests','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage'],
-  resolveRequest:['dashboard','managerData','listVehicles','listRequests','ownerBundle','housingDetail','vehicleHistory','listAudit','listAuditPage']
-};
-const CLIENT_MUTATING_ACTIONS=new Set(Object.keys(CLIENT_MUTATION_INVALIDATION));
+const CLIENT_MUTATING_ACTIONS=new Set([
+  'saveUser','saveHousing','saveVehicle','saveTemporaryPeriod','extendTemporaryPeriod','deleteTemporaryPeriod','renewQr','assignVehicleSlot','releaseVehicleSlot',
+  'saveIncident','saveIncidentFollowup','closeIncident','saveSettings','consistencyFix','replaceVehicle','bulkVehicleAction','updateProfile','adminSetPassword',
+  'createRequest','resolveRequest'
+]);
 function stableClientPayload(value){
   if(value===null||value===undefined)return value;
   if(Array.isArray(value))return value.map(stableClientPayload);
@@ -86,29 +60,10 @@ function clientReadCacheKey(action,payload){
   const sessionKey=String(state.token||'');
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
-function invalidateClientReadCache(actions){
-  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();return}
-  if(!actions.length)return;
-  const affected=new Set(actions);
-  affected.forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));
-  for(const [key,entry] of CLIENT_RESPONSE_CACHE.entries())if(affected.has(entry.action))CLIENT_RESPONSE_CACHE.delete(key);
-}
-function clientCacheEntry(action,payload,value){
-  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),staleTtl=Math.max(ttl,Number(CLIENT_READ_CACHE_STALE_TTL[action]||ttl)),now=Date.now();
-  return {action,payload:stableClientPayload(payload||{}),value,expires:now+ttl,staleUntil:now+staleTtl};
-}
+function invalidateClientReadCache(){CLIENT_RESPONSE_CACHE.clear()}
 function seedClientRead(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
-  CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),clientCacheEntry(action,payload,value));
-}
-const CLIENT_VIEW_READS={
-  dashboard:['dashboard',{}],users:['managerData',{kind:'users'}],housing:['managerData',{kind:'housing'}],vehicles:['managerData',{kind:'vehicles'}],
-  incidents:['listIncidentsPayload',{}],requests:['listRequests',{}],ownerHome:['ownerBundle',{}],ownerHousing:['ownerBundle',{}],
-  ownerVehicles:['ownerBundle',{}],ownerIncidents:['ownerBundle',{}],ownerRequests:['ownerBundle',{}]
-};
-function clientViewHasUsableData(view){
-  const read=CLIENT_VIEW_READS[view];if(!read)return false;
-  const cached=CLIENT_RESPONSE_CACHE.get(clientReadCacheKey(read[0],read[1]));return !!(cached&&cached.staleUntil>Date.now());
+  CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),{value,expires:Date.now()+ttl});
 }
 function applyInitialContext(context){
   context=context||{};state.user=context.user||state.user;
@@ -125,34 +80,23 @@ function recordClientCall(action,ms,ok=true,source='network'){
   if(CLIENT_CALL_METRICS.length>240)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-240);
 }
 function clientCallSummary(){
-  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,network:0,background:0,cacheHits:0,staleHits:0,coalesced:0,total:0,max:0,errors:0});m.count++;if(x.source==='cache')m.cacheHits++;else if(x.source==='stale')m.staleHits++;else if(x.source==='coalesced')m.coalesced++;else if(x.source==='background')m.background++;else{m.network++;m.total+=x.ms;m.max=Math.max(m.max,x.ms)}if(!x.ok)m.errors++});
+  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,network:0,cacheHits:0,coalesced:0,total:0,max:0,errors:0});m.count++;if(x.source==='cache')m.cacheHits++;else if(x.source==='coalesced')m.coalesced++;else{m.network++;m.total+=x.ms;m.max=Math.max(m.max,x.ms)}if(!x.ok)m.errors++});
   return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.network))})).sort((a,b)=>b.total-a.total||b.network-a.network);
 }
 function recordClientView(view,ms,callStartIndex){
-  const calls=CLIENT_CALL_METRICS.slice(callStartIndex),network=calls.filter(x=>x.source==='network'),cacheHits=calls.filter(x=>x.source==='cache').length,staleHits=calls.filter(x=>x.source==='stale').length,coalesced=calls.filter(x=>x.source==='coalesced').length;
-  CLIENT_VIEW_METRICS.push({view:String(view||''),ms:Math.round(ms),networkCalls:network.length,cacheHits,staleHits,coalesced,at:Date.now()});
+  const calls=CLIENT_CALL_METRICS.slice(callStartIndex),network=calls.filter(x=>x.source==='network'),cacheHits=calls.filter(x=>x.source==='cache').length,coalesced=calls.filter(x=>x.source==='coalesced').length;
+  CLIENT_VIEW_METRICS.push({view:String(view||''),ms:Math.round(ms),networkCalls:network.length,cacheHits,coalesced,at:Date.now()});
   if(CLIENT_VIEW_METRICS.length>100)CLIENT_VIEW_METRICS.splice(0,CLIENT_VIEW_METRICS.length-100);
 }
 function clientViewSummary(){
-  const map={};CLIENT_VIEW_METRICS.forEach(x=>{const k=x.view||'—',m=map[k]||(map[k]={view:k,count:0,total:0,max:0,networkCalls:0,cacheHits:0,staleHits:0,coalesced:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);m.networkCalls+=x.networkCalls;m.cacheHits+=x.cacheHits;m.staleHits+=x.staleHits||0;m.coalesced+=x.coalesced});
+  const map={};CLIENT_VIEW_METRICS.forEach(x=>{const k=x.view||'—',m=map[k]||(map[k]={view:k,count:0,total:0,max:0,networkCalls:0,cacheHits:0,coalesced:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);m.networkCalls+=x.networkCalls;m.cacheHits+=x.cacheHits;m.coalesced+=x.coalesced});
   return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count)),avgNetwork:(x.networkCalls/Math.max(1,x.count)).toFixed(1)})).sort((a,b)=>b.total-a.total);
 }
-function refreshClientReadInBackground(action,payload,key){
-  const current=CLIENT_INFLIGHT_CALLS.get(key);if(current)return current;
-  const started=performance.now(),cached=CLIENT_RESPONSE_CACHE.get(key),generation=Number(CLIENT_CACHE_GENERATION.get(action)||0);
-  const promise=server('api',state.token,action,payload).then(value=>{
-    if(Number(CLIENT_CACHE_GENERATION.get(action)||0)===generation)CLIENT_RESPONSE_CACHE.set(key,clientCacheEntry(action,payload,value));recordClientCall(action,performance.now()-started,true,'background');return value;
-  }).catch(e=>{recordClientCall(action,performance.now()-started,false,'background');return cached&&cached.value}).finally(()=>{if(CLIENT_INFLIGHT_CALLS.get(key)===promise)CLIENT_INFLIGHT_CALLS.delete(key)});
-  CLIENT_INFLIGHT_CALLS.set(key,promise);return promise;
-}
 async function call(action,payload={}){
-  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),key=ttl?clientReadCacheKey(action,payload):'',generation=Number(CLIENT_CACHE_GENERATION.get(action)||0);
+  const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),key=ttl?clientReadCacheKey(action,payload):'';
   if(ttl){
     const cached=CLIENT_RESPONSE_CACHE.get(key);
     if(cached&&cached.expires>Date.now()){recordClientCall(action,0,true,'cache');return cached.value}
-    if(cached&&cached.staleUntil>Date.now()){
-      refreshClientReadInBackground(action,payload,key);recordClientCall(action,0,true,'stale');return cached.value;
-    }
     if(cached)CLIENT_RESPONSE_CACHE.delete(key);
     const pending=CLIENT_INFLIGHT_CALLS.get(key);
     if(pending){const started=performance.now();try{const value=await pending;recordClientCall(action,performance.now()-started,true,'coalesced');return value}catch(e){recordClientCall(action,performance.now()-started,false,'coalesced');throw e}}
@@ -164,8 +108,8 @@ async function call(action,payload={}){
       try{
         const value=await server('api',state.token,action,payload);
         recordClientCall(action,performance.now()-callStarted,true,'network');
-        if(ttl&&Number(CLIENT_CACHE_GENERATION.get(action)||0)===generation)CLIENT_RESPONSE_CACHE.set(key,clientCacheEntry(action,payload,value));
-        if(CLIENT_MUTATING_ACTIONS.has(action))invalidateClientReadCache(CLIENT_MUTATION_INVALIDATION[action]||[]);
+        if(ttl)CLIENT_RESPONSE_CACHE.set(key,{value,expires:Date.now()+ttl});
+        if(CLIENT_MUTATING_ACTIONS.has(action))invalidateClientReadCache();
         return value;
       }catch(e){
         last=e;
