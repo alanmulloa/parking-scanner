@@ -1,9 +1,16 @@
+function clearScannedQrFromAddress(){
+  try{const u=new URL(location.href);if(!u.searchParams.has('q'))return;u.searchParams.delete('q');history.replaceState(null,'',u.toString())}catch(e){}
+}
 async function control(token=''){
+  const initial=state.cache?.initialControlResult;
+  // initialContext ya validó el QR en el mismo viaje de arranque. go('control') no
+  // transmite argumentos, por eso consumimos aquí el resultado precargado.
+  if(!token&&initial){delete state.cache.initialControlResult;clearScannedQrFromAddress();resultCard(initial.data);return}
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
-    const initial=state.cache?.initialControlResult;
-    if(initial&&initial.token===token){delete state.cache.initialControlResult;resultCard(initial.data);return}
+    if(initial&&initial.token===token){delete state.cache.initialControlResult;clearScannedQrFromAddress();resultCard(initial.data);return}
     await lookupQr(token);
+    clearScannedQrFromAddress();
     return;
   }
   const returnUrl=WEB_APP_URL||location.href.split('?')[0];
