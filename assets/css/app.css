@@ -1037,3 +1037,23 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .control-open-incident:first-of-type{border-top:0;padding-top:0}
 .control-open-incident .actions{justify-content:flex-start;margin-top:.55rem;gap:.5rem;align-items:center;flex-wrap:wrap}
 @media (max-width:700px){.control-open-incidents{padding:.8rem}.control-open-incident .actions button{width:100%;min-height:44px}.control-open-incident .actions .subtle{display:block;width:100%}}
+
+/* 1.2.13.15 - Control e incidencias: jerarquía operativa y estados visibles */
+.control-actions-grid{align-items:stretch}
+.control-primary-action{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:.9rem!important;text-align:left!important;min-height:92px!important;padding:1rem 1.15rem!important}
+.control-primary-action .control-action-icon{font-size:1.8rem;line-height:1;flex:0 0 auto}
+.control-primary-action > span:last-child{display:flex;flex-direction:column;gap:.2rem}
+.control-primary-action small{display:block;font-size:.76rem;font-weight:600;opacity:.8;line-height:1.25}
+.control-search-card .head{align-items:flex-start}
+.control-search-card .head p{margin:.25rem 0 0}
+.plate-search-input{text-transform:uppercase;font-size:1.2rem!important;font-weight:800;letter-spacing:.08em;text-align:center}
+.control-decision{display:flex;align-items:center;justify-content:center;gap:.65rem;margin:.1rem 0 .6rem}
+.control-decision-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:1.35rem;font-weight:900;color:#fff;background:var(--brand)}
+.control-decision.denied .control-decision-icon{background:var(--danger,#b42318)}
+.control-decision .control-result-title{margin:0;text-align:left}
+.control-result-actions{gap:.7rem;flex-wrap:wrap}
+.photo-upload-status{margin-top:.5rem;min-height:1.3rem;font-weight:700}
+.photo-upload-status.ready{color:var(--brand)}
+.photo-upload-status.bad{padding:.45rem .6rem;border-radius:8px;color:var(--danger,#b42318);background:#fee4e2}
+.inline-spinner{display:inline-block;width:1rem;height:1rem;margin-right:.45rem;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .75s linear infinite;vertical-align:-.15rem}
+@media(max-width:700px){.control-primary-action{min-height:82px!important}.control-decision{align-items:flex-start}.control-result-actions button{width:100%;min-height:48px}.control-search-card .head{gap:.6rem}.control-search-card .head button{flex:0 0 auto}}
