@@ -14,7 +14,7 @@ async function dashboard(){
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
         ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests-pending',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents-open',d.openIncidents>0)}
-        ${card(d.revoked,'QR revocados','Vehículos activos con slot','vehicles-revoked',d.revoked>0)}
+        ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
         ${card(d.activeWithoutSlot||0,'Activos sin slot','No incluye motos','vehicles-active-noslot',(d.activeWithoutSlot||0)>0)}
         ${card(d.temporary,'Temporales vigentes','','vehicles-temporary')}
         ${card(d.temporaryExpiring7,'Temporales que vencen ≤ 7 días','Revisar próximos vencimientos','vehicles-temporary-expiring',d.temporaryExpiring7>0)}
@@ -29,7 +29,6 @@ async function dashboard(){
     const renderAttention=()=>{const pages=Math.max(1,Math.ceil(attentionRows.length/ATTENTION_PAGE_SIZE));attentionPage=Math.min(Math.max(1,attentionPage),pages);const start=(attentionPage-1)*ATTENTION_PAGE_SIZE,slice=attentionRows.slice(start,start+ATTENTION_PAGE_SIZE);$('#summary-attention-list').innerHTML=slice.map((x,i)=>`<div class="attention-item"><div><strong>${esc(x.label)}</strong><span>${esc(x.detail||'')}</span></div><button class="secondary summary-attention" data-i="${start+i}">Ver</button></div>`).join('')||'<div class="card empty">No hay elementos que requieran atención especial.</div>';$('#summary-attention-pager').innerHTML=attentionRows.length>ATTENTION_PAGE_SIZE?`<div class="pager"><span class="muted">Página ${attentionPage} de ${pages} · ${attentionRows.length} elementos</span><div class="actions"><button class="secondary" id="attention-prev" ${attentionPage<=1?'disabled':''}>← Anterior</button><button class="secondary" id="attention-next" ${attentionPage>=pages?'disabled':''}>Siguiente →</button></div></div>`:'';document.querySelectorAll('.summary-attention').forEach(b=>b.onclick=()=>openSummaryAttention(attentionRows[Number(b.dataset.i)]));if($('#attention-prev'))$('#attention-prev').onclick=()=>{attentionPage--;renderAttention()};if($('#attention-next'))$('#attention-next').onclick=()=>{attentionPage++;renderAttention()}};
     renderAttention();
     document.querySelectorAll('[data-summary-action]').forEach(el=>el.onclick=()=>openSummaryAction(el.dataset.summaryAction));
-    scheduleAdminOperationalPrefetch();
   }catch(e){err(e)}
 }
 function resetSummaryDestination(view){replaceViewUiState(view,{})}
@@ -43,7 +42,7 @@ function openSummaryAction(action){
   if(action==='vehicles-motorcycles'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Suspendido'}};go('vehicles');return}
   if(action==='vehicles-low'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Baja'}};go('vehicles');return}
-  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Vehículo',__Slot:'Con slot',QR_Estado:'Revocado'}};go('vehicles');return}
+  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{QR_Estado:'Revocado'}};go('vehicles');return}
   if(action==='vehicles-active-noslot'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Vehículo',__Slot:'Sin slot'}};go('vehicles');return}
   if(action==='vehicles-temporary'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vigente'}};go('vehicles');return}
   if(action==='vehicles-temporary-expiring'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vence en 7 días'}};go('vehicles');return}

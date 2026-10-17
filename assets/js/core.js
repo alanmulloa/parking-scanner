@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.5';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.0';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -87,12 +87,11 @@ function clientReadCacheKey(action,payload){
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
 function invalidateClientReadCache(actions){
-  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();markAdminOperationalPrefetchDirty();return}
+  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();return}
   if(!actions.length)return;
   const affected=new Set(actions);
   affected.forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));
   for(const [key,entry] of CLIENT_RESPONSE_CACHE.entries())if(affected.has(entry.action))CLIENT_RESPONSE_CACHE.delete(key);
-  if([...affected].some(action=>['managerData','listIncidentsPayload','listRequests'].includes(action)))markAdminOperationalPrefetchDirty();
 }
 function clientCacheEntry(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),staleTtl=Math.max(ttl,Number(CLIENT_READ_CACHE_STALE_TTL[action]||ttl)),now=Date.now();
@@ -101,79 +100,6 @@ function clientCacheEntry(action,payload,value){
 function seedClientRead(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
   CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),clientCacheEntry(action,payload,value));
-}
-
-// 1.2.18.2 - precarga operativa ADMIN. El objetivo no es acelerar Apps Script,
-// sino evitar viajes de 2-3 s cuando el usuario navega desde Resumen.
-const ADMIN_OPERATIONAL_PREFETCH_TARGETS=new Set([
-  'managerData|{"kind":"users"}',
-  'managerData|{"kind":"housing"}',
-  'managerData|{"kind":"vehicles"}',
-  'listIncidentsPayload|{}',
-  'listRequests|{}'
-]);
-let ADMIN_PREFETCH_TOKEN='',ADMIN_PREFETCH_TIMER=null,ADMIN_PREFETCH_PROMISE=null,ADMIN_PREFETCH_COMPLETE=false,ADMIN_PREFETCH_EPOCH=0;
-function adminPrefetchKey(action,payload){try{return action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return action+'|{}'}}
-function adminPrefetchSupports(action,payload){return ADMIN_OPERATIONAL_PREFETCH_TARGETS.has(adminPrefetchKey(action,payload))}
-function adminPrefetchScope(){
-  const token=String(state.token||'');
-  if(token===ADMIN_PREFETCH_TOKEN)return;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-  ADMIN_PREFETCH_TOKEN=token;ADMIN_PREFETCH_PROMISE=null;ADMIN_PREFETCH_COMPLETE=false;ADMIN_PREFETCH_EPOCH++;
-}
-function markAdminOperationalPrefetchDirty(){
-  adminPrefetchScope();ADMIN_PREFETCH_EPOCH++;ADMIN_PREFETCH_COMPLETE=false;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-}
-function clientAdminRoleActive(){
-  const active=String(state.activeRole||'').toUpperCase();
-  if(active)return active==='ADMIN';
-  return String(state.user?.Rol||'').toUpperCase().split(/[,;|]/).map(x=>x.trim()).includes('ADMIN');
-}
-function seedAdminOperationalBundle(bundle,generations,epoch){
-  if(epoch!==ADMIN_PREFETCH_EPOCH||!bundle||!Array.isArray(bundle.resources))return;
-  bundle.resources.forEach(resource=>{
-    if(!resource||!adminPrefetchSupports(resource.action,resource.payload||{}))return;
-    const before=Number(generations.get(resource.action)||0),now=Number(CLIENT_CACHE_GENERATION.get(resource.action)||0);
-    if(before!==now)return;
-    seedClientRead(resource.action,resource.payload||{},resource.data);
-    if(resource.action==='managerData'&&resource.data){
-      if(resource.data.options)state.cache.formOptions=resource.data.options;
-      if(resource.payload?.kind==='vehicles'){state.cache.vehicles=resource.data.rows||[];state.cache.adminRequests=resource.data.requests||[];state.cache.adminIncidents=resource.data.incidents||[]}
-    }
-  });
-}
-function runAdminOperationalPrefetch(){
-  adminPrefetchScope();
-  if(!state.token||!clientAdminRoleActive())return Promise.resolve(null);
-  if(ADMIN_PREFETCH_COMPLETE)return Promise.resolve(null);
-  if(ADMIN_PREFETCH_PROMISE)return ADMIN_PREFETCH_PROMISE;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-  const token=String(state.token||''),epoch=ADMIN_PREFETCH_EPOCH,generations=new Map();
-  ['managerData','listIncidentsPayload','listRequests'].forEach(action=>generations.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)));
-  const started=performance.now();
-  const promise=server('api',token,'adminOperationalBundle',{}).then(bundle=>{
-    if(String(state.token||'')===token)seedAdminOperationalBundle(bundle,generations,epoch);
-    recordClientCall('adminOperationalBundle',performance.now()-started,true,'background');
-    if(epoch===ADMIN_PREFETCH_EPOCH&&String(state.token||'')===token)ADMIN_PREFETCH_COMPLETE=true;
-    return bundle;
-  }).catch(e=>{recordClientCall('adminOperationalBundle',performance.now()-started,false,'background');return null}).finally(()=>{
-    if(ADMIN_PREFETCH_PROMISE===promise)ADMIN_PREFETCH_PROMISE=null;
-  });
-  ADMIN_PREFETCH_PROMISE=promise;return promise;
-}
-function scheduleAdminOperationalPrefetch(delay=450){
-  adminPrefetchScope();
-  if(!state.token||!clientAdminRoleActive()||ADMIN_PREFETCH_COMPLETE||ADMIN_PREFETCH_PROMISE||ADMIN_PREFETCH_TIMER)return;
-  ADMIN_PREFETCH_TIMER=setTimeout(()=>{ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()},Math.max(0,Number(delay)||0));
-}
-async function awaitAdminOperationalPrefetch(action,payload){
-  if(!adminPrefetchSupports(action,payload)||!clientAdminRoleActive())return null;
-  adminPrefetchScope();
-  if(ADMIN_PREFETCH_TIMER&&!ADMIN_PREFETCH_PROMISE){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()}
-  if(ADMIN_PREFETCH_PROMISE)await ADMIN_PREFETCH_PROMISE;
-  const key=clientReadCacheKey(action,payload||{}),cached=CLIENT_RESPONSE_CACHE.get(key);
-  return cached&&cached.staleUntil>Date.now()?cached.value:null;
 }
 const CLIENT_VIEW_READS={
   dashboard:['dashboard',{}],users:['managerData',{kind:'users'}],housing:['managerData',{kind:'housing'}],vehicles:['managerData',{kind:'vehicles'}],
@@ -230,8 +156,6 @@ async function call(action,payload={}){
     if(cached)CLIENT_RESPONSE_CACHE.delete(key);
     const pending=CLIENT_INFLIGHT_CALLS.get(key);
     if(pending){const started=performance.now();try{const value=await pending;recordClientCall(action,performance.now()-started,true,'coalesced');return value}catch(e){recordClientCall(action,performance.now()-started,false,'coalesced');throw e}}
-    const prefetched=await awaitAdminOperationalPrefetch(action,payload);
-    if(prefetched!==null){recordClientCall(action,0,true,'cache');return prefetched}
   }
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
   const networkPromise=(async()=>{

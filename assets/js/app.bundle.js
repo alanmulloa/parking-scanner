@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.5';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.0';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -87,12 +87,11 @@ function clientReadCacheKey(action,payload){
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
 function invalidateClientReadCache(actions){
-  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();markAdminOperationalPrefetchDirty();return}
+  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();return}
   if(!actions.length)return;
   const affected=new Set(actions);
   affected.forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));
   for(const [key,entry] of CLIENT_RESPONSE_CACHE.entries())if(affected.has(entry.action))CLIENT_RESPONSE_CACHE.delete(key);
-  if([...affected].some(action=>['managerData','listIncidentsPayload','listRequests'].includes(action)))markAdminOperationalPrefetchDirty();
 }
 function clientCacheEntry(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),staleTtl=Math.max(ttl,Number(CLIENT_READ_CACHE_STALE_TTL[action]||ttl)),now=Date.now();
@@ -101,79 +100,6 @@ function clientCacheEntry(action,payload,value){
 function seedClientRead(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
   CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),clientCacheEntry(action,payload,value));
-}
-
-// 1.2.18.2 - precarga operativa ADMIN. El objetivo no es acelerar Apps Script,
-// sino evitar viajes de 2-3 s cuando el usuario navega desde Resumen.
-const ADMIN_OPERATIONAL_PREFETCH_TARGETS=new Set([
-  'managerData|{"kind":"users"}',
-  'managerData|{"kind":"housing"}',
-  'managerData|{"kind":"vehicles"}',
-  'listIncidentsPayload|{}',
-  'listRequests|{}'
-]);
-let ADMIN_PREFETCH_TOKEN='',ADMIN_PREFETCH_TIMER=null,ADMIN_PREFETCH_PROMISE=null,ADMIN_PREFETCH_COMPLETE=false,ADMIN_PREFETCH_EPOCH=0;
-function adminPrefetchKey(action,payload){try{return action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return action+'|{}'}}
-function adminPrefetchSupports(action,payload){return ADMIN_OPERATIONAL_PREFETCH_TARGETS.has(adminPrefetchKey(action,payload))}
-function adminPrefetchScope(){
-  const token=String(state.token||'');
-  if(token===ADMIN_PREFETCH_TOKEN)return;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-  ADMIN_PREFETCH_TOKEN=token;ADMIN_PREFETCH_PROMISE=null;ADMIN_PREFETCH_COMPLETE=false;ADMIN_PREFETCH_EPOCH++;
-}
-function markAdminOperationalPrefetchDirty(){
-  adminPrefetchScope();ADMIN_PREFETCH_EPOCH++;ADMIN_PREFETCH_COMPLETE=false;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-}
-function clientAdminRoleActive(){
-  const active=String(state.activeRole||'').toUpperCase();
-  if(active)return active==='ADMIN';
-  return String(state.user?.Rol||'').toUpperCase().split(/[,;|]/).map(x=>x.trim()).includes('ADMIN');
-}
-function seedAdminOperationalBundle(bundle,generations,epoch){
-  if(epoch!==ADMIN_PREFETCH_EPOCH||!bundle||!Array.isArray(bundle.resources))return;
-  bundle.resources.forEach(resource=>{
-    if(!resource||!adminPrefetchSupports(resource.action,resource.payload||{}))return;
-    const before=Number(generations.get(resource.action)||0),now=Number(CLIENT_CACHE_GENERATION.get(resource.action)||0);
-    if(before!==now)return;
-    seedClientRead(resource.action,resource.payload||{},resource.data);
-    if(resource.action==='managerData'&&resource.data){
-      if(resource.data.options)state.cache.formOptions=resource.data.options;
-      if(resource.payload?.kind==='vehicles'){state.cache.vehicles=resource.data.rows||[];state.cache.adminRequests=resource.data.requests||[];state.cache.adminIncidents=resource.data.incidents||[]}
-    }
-  });
-}
-function runAdminOperationalPrefetch(){
-  adminPrefetchScope();
-  if(!state.token||!clientAdminRoleActive())return Promise.resolve(null);
-  if(ADMIN_PREFETCH_COMPLETE)return Promise.resolve(null);
-  if(ADMIN_PREFETCH_PROMISE)return ADMIN_PREFETCH_PROMISE;
-  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
-  const token=String(state.token||''),epoch=ADMIN_PREFETCH_EPOCH,generations=new Map();
-  ['managerData','listIncidentsPayload','listRequests'].forEach(action=>generations.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)));
-  const started=performance.now();
-  const promise=server('api',token,'adminOperationalBundle',{}).then(bundle=>{
-    if(String(state.token||'')===token)seedAdminOperationalBundle(bundle,generations,epoch);
-    recordClientCall('adminOperationalBundle',performance.now()-started,true,'background');
-    if(epoch===ADMIN_PREFETCH_EPOCH&&String(state.token||'')===token)ADMIN_PREFETCH_COMPLETE=true;
-    return bundle;
-  }).catch(e=>{recordClientCall('adminOperationalBundle',performance.now()-started,false,'background');return null}).finally(()=>{
-    if(ADMIN_PREFETCH_PROMISE===promise)ADMIN_PREFETCH_PROMISE=null;
-  });
-  ADMIN_PREFETCH_PROMISE=promise;return promise;
-}
-function scheduleAdminOperationalPrefetch(delay=450){
-  adminPrefetchScope();
-  if(!state.token||!clientAdminRoleActive()||ADMIN_PREFETCH_COMPLETE||ADMIN_PREFETCH_PROMISE||ADMIN_PREFETCH_TIMER)return;
-  ADMIN_PREFETCH_TIMER=setTimeout(()=>{ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()},Math.max(0,Number(delay)||0));
-}
-async function awaitAdminOperationalPrefetch(action,payload){
-  if(!adminPrefetchSupports(action,payload)||!clientAdminRoleActive())return null;
-  adminPrefetchScope();
-  if(ADMIN_PREFETCH_TIMER&&!ADMIN_PREFETCH_PROMISE){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()}
-  if(ADMIN_PREFETCH_PROMISE)await ADMIN_PREFETCH_PROMISE;
-  const key=clientReadCacheKey(action,payload||{}),cached=CLIENT_RESPONSE_CACHE.get(key);
-  return cached&&cached.staleUntil>Date.now()?cached.value:null;
 }
 const CLIENT_VIEW_READS={
   dashboard:['dashboard',{}],users:['managerData',{kind:'users'}],housing:['managerData',{kind:'housing'}],vehicles:['managerData',{kind:'vehicles'}],
@@ -230,8 +156,6 @@ async function call(action,payload={}){
     if(cached)CLIENT_RESPONSE_CACHE.delete(key);
     const pending=CLIENT_INFLIGHT_CALLS.get(key);
     if(pending){const started=performance.now();try{const value=await pending;recordClientCall(action,performance.now()-started,true,'coalesced');return value}catch(e){recordClientCall(action,performance.now()-started,false,'coalesced');throw e}}
-    const prefetched=await awaitAdminOperationalPrefetch(action,payload);
-    if(prefetched!==null){recordClientCall(action,0,true,'cache');return prefetched}
   }
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
   const networkPromise=(async()=>{
@@ -351,8 +275,7 @@ function hasUiRole(role){return activeUiRole()===role}
 function canConfigure(){return !!state.user?.CanConfigure&&activeUiRole()==='ADMIN'}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return roles[0]||'PROPIETARIO'}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
-function isMobileViewport(){return typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(max-width:720px)').matches}
-function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'];if(canConfigure())adminViews.push('config');const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};if(role==='ADMIN'&&view==='audit'&&isMobileViewport())return 'dashboard';return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
+function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','control','profile'];if(canConfigure())adminViews.push('config');const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
 async function init(){applyParkingSettings(appSettings());if(!state.token)return login();try{const ui=loadUiState(),data=applyInitialContext(await call('initialContext',{role:ui.activeRole||'',initialToken:INITIAL_TOKEN||''}));state.activeRole=data.role||activeUiRole();saveUiState({activeRole:state.activeRole});shell();go(data.initialView||defaultViewForRole(state.activeRole))}catch(e){login(e.message)}}
 function login(message=''){
   const renderLogin=()=>{
@@ -363,68 +286,32 @@ function login(message=''){
   renderLogin();
   if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
 }
-function navigationItemsForRole(role){
-  return {
-    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control']].concat(canConfigure()?[['config','Configuración']]:[]),
-    CONTROL:[['control','Control'],['incidents','Incidencias']],
-    PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
-  }[role]||[];
-}
-function mobileNavigationForRole(role){
-  if(role==='ADMIN')return {
-    primary:[['dashboard','Inicio','⌂'],['housing','Viviendas','⌂'],['vehicles','Vehículos','▣']],
-    more:[['dataReview','Revisión de datos'],['users','Usuarios'],['incidents','Incidencias'],['requests','Solicitudes'],['control','Control']].concat(canConfigure()?[['config','Configuración']]:[])
-  };
-  if(role==='CONTROL')return {primary:[['control','Control','✓'],['incidents','Incidencias','!']],more:[]};
-  return {primary:[['ownerHome','Inicio','⌂'],['ownerHousing','Viviendas','⌂'],['ownerVehicles','Vehículos','▣']],more:[['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]};
-}
 function shell(){
   const roles=userRoles(),active=activeUiRole();
   const roleSelector=roles.length>1?`<label class="role-switch-wrap"><span>Perfil</span><select id="role-switch" class="role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`:`<span class="role-single">${esc(active)}</span>`;
-  const mobileRoleSelector=roles.length>1?`<div class="mobile-role-row"><span>Perfil</span><select id="mobile-role-switch" class="mobile-role-switch" aria-label="Perfil activo">${roles.map(r=>`<option value="${esc(r)}" ${r===active?'selected':''}>${esc(r)}</option>`).join('')}</select></div>`:`<div class="mobile-role-row"><span>Perfil</span><b>${esc(active)}</b></div>`;
-  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><div class="mobile-header-actions"><button type="button" class="mobile-icon-btn mobile-user-trigger" id="mobile-user-trigger" aria-label="Abrir menú" aria-expanded="false" title="Menú">☰</button></div><div class="mobile-user-menu" id="mobile-user-menu" aria-hidden="true"><div class="mobile-user-summary"><b>${esc(state.user.Nombre)}</b><span>${esc(state.user.Email||'')}</span></div>${mobileRoleSelector}<button type="button" class="mobile-menu-action mobile-menu-search" id="mobile-menu-search"><span>⌕</span><span>Buscar</span></button><button type="button" class="mobile-menu-action" id="mobile-profile"><span>👤</span><span>Mis datos</span></button><button type="button" class="mobile-menu-action danger-text" id="mobile-logout"><span>↪</span><span>Salir</span></button></div><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><nav class="mobile-dock" id="mobile-nav" data-role="${esc(active)}" aria-label="Navegación móvil"></nav><div class="mobile-more-sheet" id="mobile-more-sheet" aria-hidden="true"><button type="button" class="mobile-sheet-backdrop" id="mobile-more-backdrop" aria-label="Cerrar menú"></button><section class="mobile-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title"><div class="mobile-sheet-handle"></div><div class="mobile-sheet-head"><b id="mobile-more-title">Más secciones</b><button type="button" class="mobile-sheet-close" id="mobile-more-close" aria-label="Cerrar">×</button></div><div class="mobile-more-list" id="mobile-more-list"></div></section></div><main class="wrap" id="main"></main>`;
+  $('#app').innerHTML=`<header class="top"><div class="brand">${appBrandHtml(true)}</div><button type="button" class="global-search-trigger global-search-trigger-mobile" id="global-search-trigger-mobile" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button><div class="who"><button type="button" class="who-name" id="profile-link" aria-label="Abrir Mis datos" title="Abrir Mis datos"><span class="who-name-text">${esc(state.user.Nombre)}</span><span class="who-profile-hint">Mis datos</span></button><div class="who-role">${roleSelector}</div></div><button class="secondary" id="logout">Salir</button></header><div class="section-nav"><nav class="nav" id="nav"></nav><button type="button" class="global-search-trigger global-search-trigger-desktop" id="global-search-trigger" aria-label="Buscar" title="Buscar">⌕<span>Buscar</span></button></div><main class="wrap" id="main"></main>`;
   const profileLink=$('#profile-link');if(profileLink)profileLink.addEventListener('click',e=>{e.preventDefault();go('profile')});
   document.querySelectorAll('.global-search-trigger').forEach(searchBtn=>searchBtn.addEventListener('click',()=>openGlobalSearchOverlay()));
-  const menuSearch=$('#mobile-menu-search');if(menuSearch)menuSearch.onclick=()=>{closeMobileMenus();openGlobalSearchOverlay()};
-  const mobileTrigger=$('#mobile-user-trigger');if(mobileTrigger)mobileTrigger.onclick=e=>{e.stopPropagation();toggleMobileUserMenu()};
-  const mobileProfile=$('#mobile-profile');if(mobileProfile)mobileProfile.onclick=()=>{closeMobileMenus();go('profile')};
   const rs=$('#role-switch');if(rs)rs.addEventListener('change',()=>setActiveUiRole(rs.value));
-  const mrs=$('#mobile-role-switch');if(mrs)mrs.addEventListener('change',()=>setActiveUiRole(mrs.value));
-  const doLogout=async()=>{closeMobileMenus();await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
-  $('#logout').onclick=doLogout;const mobileLogout=$('#mobile-logout');if(mobileLogout)mobileLogout.onclick=doLogout;
-  const moreClose=$('#mobile-more-close'),moreBackdrop=$('#mobile-more-backdrop');if(moreClose)moreClose.onclick=closeMobileMore;if(moreBackdrop)moreBackdrop.onclick=closeMobileMore;
+  $('#logout').onclick=async()=>{await server('logout',state.token);localStorage.removeItem('parking_token');clearUiState();state.token='';login()};
   renderNav();
 }
 function resetDirectNavigationState(view){if(['users','housing','vehicles','incidents','requests'].includes(view)){replaceViewUiState(view,{});if(view==='vehicles')delete state.cache.tablePreset;if(view==='incidents'){delete state.cache.incidentPreset;delete state.cache.incidentFocus}if(view==='requests'){delete state.cache.requestPreset;delete state.cache.requestFocus}}}
-function renderMobileNavigation(){
-  const role=activeUiRole(),model=mobileNavigationForRole(role),dock=$('#mobile-nav'),moreList=$('#mobile-more-list');if(!dock||!moreList)return;
-  dock.dataset.role=role;
-  const isMoreActive=model.more.some(([v])=>v===state.view),hasMore=model.more.length>0;
-  const dockItems=model.primary.map(([v,l,icon])=>`<button type="button" class="mobile-dock-item ${state.view===v?'active':''}" data-mobile-view="${v}"><span class="mobile-dock-icon">${icon}</span><span>${esc(l)}</span></button>`);
-  if(hasMore)dockItems.push(`<button type="button" class="mobile-dock-item ${isMoreActive?'active':''}" id="mobile-more-trigger"><span class="mobile-dock-icon">•••</span><span>Más</span></button>`);
-  dock.dataset.count=String(dockItems.length);dock.innerHTML=dockItems.join('');
-  moreList.innerHTML=model.more.map(([v,l])=>`<button type="button" class="mobile-more-item ${state.view===v?'active':''}" data-mobile-view="${v}"><span>${esc(l)}</span><span aria-hidden="true">›</span></button>`).join('');
-  dock.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>{const view=b.dataset.mobileView;closeMobileMenus();resetDirectNavigationState(view);go(view)});
-  moreList.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>{const view=b.dataset.mobileView;closeMobileMenus();resetDirectNavigationState(view);go(view)});
-  const moreTrigger=$('#mobile-more-trigger');if(moreTrigger)moreTrigger.onclick=openMobileMore;
-  const sheet=$('#mobile-more-sheet');if(sheet&&!hasMore){sheet.classList.remove('open');sheet.setAttribute('aria-hidden','true')}
-}
 function renderNav(){
-  const role=activeUiRole(),items=navigationItemsForRole(role),nav=$('#nav');if(!nav)return;
-  nav.innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
-  nav.querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const view=b.dataset.view;resetDirectNavigationState(view);go(view)});
-  renderMobileNavigation();
+  const role=activeUiRole();
+  const map={
+    ADMIN:[['dashboard','Resumen'],['dataReview','Revisión de datos'],['users','Usuarios'],['housing','Viviendas'],['vehicles','Vehículos'],['incidents','Incidencias'],['requests','Solicitudes'],['audit','Auditoría'],['control','Control']].concat(canConfigure()?[['config','Configuración']]:[]),
+    CONTROL:[['control','Control'],['incidents','Incidencias']],
+    PROPIETARIO:[['ownerHome','Inicio'],['ownerHousing','Mis viviendas'],['ownerVehicles','Mis vehículos'],['ownerIncidents','Mis incidencias'],['ownerRequests','Mis solicitudes']]
+  };
+  const items=map[role]||[];
+  $('#nav').innerHTML=items.map(([v,l])=>`<button data-view="${v}" class="${state.view===v?'active':''}">${l}</button>`).join('');
+  $('#nav').querySelectorAll('button[data-view]').forEach(b=>b.onclick=()=>{const view=b.dataset.view;resetDirectNavigationState(view);go(view)});
 }
-function mobileOutsideClick(e){const menu=$('#mobile-user-menu'),trigger=$('#mobile-user-trigger');if(menu&&menu.classList.contains('open')&&!menu.contains(e.target)&&!trigger?.contains(e.target))closeMobileUserMenu()}
-function toggleMobileUserMenu(){const menu=$('#mobile-user-menu'),trigger=$('#mobile-user-trigger');if(!menu)return;const open=!menu.classList.contains('open');closeMobileMore();menu.classList.toggle('open',open);menu.setAttribute('aria-hidden',String(!open));if(trigger)trigger.setAttribute('aria-expanded',String(open));document.removeEventListener('click',mobileOutsideClick);if(open)setTimeout(()=>document.addEventListener('click',mobileOutsideClick),0)}
-function closeMobileUserMenu(){const menu=$('#mobile-user-menu'),trigger=$('#mobile-user-trigger');document.removeEventListener('click',mobileOutsideClick);if(menu){menu.classList.remove('open');menu.setAttribute('aria-hidden','true')}if(trigger)trigger.setAttribute('aria-expanded','false')}
-function openMobileMore(){const sheet=$('#mobile-more-sheet');if(!sheet||!$('#mobile-more-list')?.children.length)return;closeMobileUserMenu();sheet.classList.add('open');sheet.setAttribute('aria-hidden','false');document.body.classList.add('mobile-sheet-open')}
-function closeMobileMore(){const sheet=$('#mobile-more-sheet');if(sheet){sheet.classList.remove('open');sheet.setAttribute('aria-hidden','true')}document.body.classList.remove('mobile-sheet-open')}
-function closeMobileMenus(){closeMobileUserMenu();closeMobileMore()}
 function stopScanner(){if(state.scanner){try{state.scanner.stop().catch(()=>{})}catch(e){}state.scanner=null}}
 function viewLabel(view){const labels={dashboard:'Resumen',search:'Buscar',config:'Configuración',dataReview:'Revisión de datos',users:'Usuarios',housing:'Viviendas',vehicles:'Vehículos',incidents:'Incidencias',requests:'Solicitudes',audit:'Auditoría',control:'Control',ownerHome:'Inicio',ownerHousing:'Mis viviendas',ownerVehicles:'Mis vehículos',ownerRequests:'Mis solicitudes',ownerIncidents:'Mis incidencias',profile:'Mis datos'};return labels[view]||'Parking'}
 function renderLoading(view){const main=$('#main');if(!main)return;main.innerHTML=`<section class="card loading-state"><div class="spinner"></div><h2>${esc(viewLabel(view))}</h2><p class="muted">Cargando datos…</p></section>`}
-function go(view){if(view==='audit'&&activeUiRole()==='ADMIN'&&isMobileViewport())view='dashboard';if(view==='config'&&!canConfigure()){view=defaultViewForRole(activeUiRole());toast('No tienes permisos para acceder a Configuración.',true)}closeMobileMenus();stopScanner();state.view=view;rememberCurrentView(view);const navId=++state.navSeq,started=performance.now(),callStart=CLIENT_CALL_METRICS.length,initialReady=state.cache?.initialViewReady===view,ready=initialReady||clientViewHasUsableData(view);if(initialReady)delete state.cache.initialViewReady;renderNav();if(!ready)renderLoading(view);const fn=({dashboard,search:globalSearchView,config:configurationView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).then(()=>{if(navId===state.navSeq)recordClientView(view,performance.now()-started,callStart)}).catch(err)}
+function go(view){if(view==='config'&&!canConfigure()){view=defaultViewForRole(activeUiRole());toast('No tienes permisos para acceder a Configuración.',true)}stopScanner();state.view=view;rememberCurrentView(view);const navId=++state.navSeq,started=performance.now(),callStart=CLIENT_CALL_METRICS.length,initialReady=state.cache?.initialViewReady===view,ready=initialReady||clientViewHasUsableData(view);if(initialReady)delete state.cache.initialViewReady;renderNav();if(!ready)renderLoading(view);const fn=({dashboard,search:globalSearchView,config:configurationView,dataReview:consistencyReviewView,users,housing,vehicles,incidents,requests,audit,control,ownerHome,ownerHousing,ownerVehicles,ownerIncidents,ownerRequests,profile}[view]||ownerHome);Promise.resolve().then(fn).then(()=>{if(navId===state.navSeq)recordClientView(view,performance.now()-started,callStart)}).catch(err)}
 function err(e){const message=(e&&e.message)||String(e)||'No se pudo cargar la información.';toast(message,true);const main=$('#main');if(!main)return;const stillLoading=!!main.querySelector('.loading-state,.spinner')||!main.textContent.trim();if(stillLoading){const view=state.view;main.innerHTML=`<section class="card retry-state"><h2>No se pudo cargar ${esc(viewLabel(view).toLowerCase())}</h2><p class="muted">${esc(message)}</p><div class="actions"><button id="retry-view">Reintentar</button><button class="secondary" id="retry-home">Ir al inicio</button></div></section>`;$('#retry-view').onclick=()=>go(view);$('#retry-home').onclick=()=>go(defaultViewForRole(activeUiRole()))}}
 
 async function dashboard(){
@@ -443,7 +330,7 @@ async function dashboard(){
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
         ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests-pending',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents-open',d.openIncidents>0)}
-        ${card(d.revoked,'QR revocados','Vehículos activos con slot','vehicles-revoked',d.revoked>0)}
+        ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
         ${card(d.activeWithoutSlot||0,'Activos sin slot','No incluye motos','vehicles-active-noslot',(d.activeWithoutSlot||0)>0)}
         ${card(d.temporary,'Temporales vigentes','','vehicles-temporary')}
         ${card(d.temporaryExpiring7,'Temporales que vencen ≤ 7 días','Revisar próximos vencimientos','vehicles-temporary-expiring',d.temporaryExpiring7>0)}
@@ -458,7 +345,6 @@ async function dashboard(){
     const renderAttention=()=>{const pages=Math.max(1,Math.ceil(attentionRows.length/ATTENTION_PAGE_SIZE));attentionPage=Math.min(Math.max(1,attentionPage),pages);const start=(attentionPage-1)*ATTENTION_PAGE_SIZE,slice=attentionRows.slice(start,start+ATTENTION_PAGE_SIZE);$('#summary-attention-list').innerHTML=slice.map((x,i)=>`<div class="attention-item"><div><strong>${esc(x.label)}</strong><span>${esc(x.detail||'')}</span></div><button class="secondary summary-attention" data-i="${start+i}">Ver</button></div>`).join('')||'<div class="card empty">No hay elementos que requieran atención especial.</div>';$('#summary-attention-pager').innerHTML=attentionRows.length>ATTENTION_PAGE_SIZE?`<div class="pager"><span class="muted">Página ${attentionPage} de ${pages} · ${attentionRows.length} elementos</span><div class="actions"><button class="secondary" id="attention-prev" ${attentionPage<=1?'disabled':''}>← Anterior</button><button class="secondary" id="attention-next" ${attentionPage>=pages?'disabled':''}>Siguiente →</button></div></div>`:'';document.querySelectorAll('.summary-attention').forEach(b=>b.onclick=()=>openSummaryAttention(attentionRows[Number(b.dataset.i)]));if($('#attention-prev'))$('#attention-prev').onclick=()=>{attentionPage--;renderAttention()};if($('#attention-next'))$('#attention-next').onclick=()=>{attentionPage++;renderAttention()}};
     renderAttention();
     document.querySelectorAll('[data-summary-action]').forEach(el=>el.onclick=()=>openSummaryAction(el.dataset.summaryAction));
-    scheduleAdminOperationalPrefetch();
   }catch(e){err(e)}
 }
 function resetSummaryDestination(view){replaceViewUiState(view,{})}
@@ -472,7 +358,7 @@ function openSummaryAction(action){
   if(action==='vehicles-motorcycles'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Suspendido'}};go('vehicles');return}
   if(action==='vehicles-low'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Baja'}};go('vehicles');return}
-  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Vehículo',__Slot:'Con slot',QR_Estado:'Revocado'}};go('vehicles');return}
+  if(action==='vehicles-revoked'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{QR_Estado:'Revocado'}};go('vehicles');return}
   if(action==='vehicles-active-noslot'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{Estado:'Activo',__Clase:'Vehículo',__Slot:'Sin slot'}};go('vehicles');return}
   if(action==='vehicles-temporary'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vigente'}};go('vehicles');return}
   if(action==='vehicles-temporary-expiring'){resetSummaryDestination('vehicles');state.cache.tablePreset={kind:'vehicles',search:'',filters:{__Temporal:'Vence en 7 días'}};go('vehicles');return}
@@ -507,7 +393,7 @@ function housingFilterOptions(){return state.cache.formOptions?.housing||[]}
 function blockFilterHtml(){const blocks=[...new Set(housingFilterOptions().map(h=>String(h.Bloque||'').trim()).filter(Boolean))].sort(naturalSort);return `<div class="field"><label>Bloque</label><select data-filter="__Bloque" id="filter-block"><option value="">Todos</option>${blocks.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></div>`}
 function dwellingFilterHtml(){const hs=[...housingFilterOptions()].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));return `<div class="field"><label>Vivienda</label><select data-filter="__Vivienda" id="filter-housing"><option value="">Todas</option>${hs.map(h=>`<option value="${esc(h.ID_Vivienda)}" data-block="${esc(h.Bloque)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`}
 function renderFilterBar(kind){const defs=filterDefinitions(kind),locationFilters=kind==='housing'?blockFilterHtml():kind==='vehicles'?blockFilterHtml()+dwellingFilterHtml():'';return `<div class="filterbar" id="filterbar"><div class="field filter-search"><label>Buscar</label><input class="search" id="table-search" placeholder="Buscar en ${kind==='vehicles'?'matrículas o vivienda':'esta sección'}..."></div>${locationFilters}${defs.map(([key,label,values])=>`<div class="field"><label>${label}</label><select data-filter="${key}"><option value="">Todos</option>${values.map(v=>`<option>${v}</option>`).join('')}</select></div>`).join('')}<button type="button" class="secondary hide" id="clear-filters">Limpiar</button><span class="count" id="filter-count"></span></div>`}
-function bindTableFilters(kind,rows){const search=$('#table-search'),selects=[...document.querySelectorAll('[data-filter]')],clear=$('#clear-filters'),body=$('#data-body'),count=$('#filter-count'),block=$('#filter-block'),housingSelect=$('#filter-housing');if(!body||!search)return;const housingById=new Map(housingFilterOptions().map(h=>[h.ID_Vivienda,h]));const refreshHousingOptions=()=>{if(!housingSelect)return;const selected=housingSelect.value,selectedBlock=block?.value||'';[...housingSelect.options].forEach((o,i)=>{if(i===0)return;o.hidden=!!selectedBlock&&o.dataset.block!==selectedBlock});if(selected&&housingSelect.selectedOptions[0]?.hidden)housingSelect.value=''};const preset=state.cache.tablePreset&&state.cache.tablePreset.kind===kind?state.cache.tablePreset:null;if(preset){search.value=preset.search||'';selects.forEach(s=>s.value=(preset.filters&&preset.filters[s.dataset.filter])||'');delete state.cache.tablePreset}refreshHousingOptions();const matchesFilter=(r,s)=>{if(!s.value)return true;if(s.dataset.filter==='Rol')return String(r.Rol||'').split(',').includes(s.value);if(s.dataset.filter==='__Bloque'){const h=kind==='housing'?r:housingById.get(r.ID_Vivienda);return String(h?.Bloque||'')===s.value}if(s.dataset.filter==='__Vivienda')return String(r.ID_Vivienda||'')===s.value;if(s.dataset.filter==='__Clase')return s.value==='Moto'?r.Tipo==='Moto':r.Tipo!=='Moto';if(s.dataset.filter==='__Slot'){const has=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return s.value==='Con slot'?has:!has}if(s.dataset.filter==='__SolicitudesPendientes'){const has=(state.cache.adminRequests||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&['Abierta','Pendiente'].includes(x.Estado));return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__IncidenciasPendientes'){const has=(state.cache.adminIncidents||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado!=='Cerrada');return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__Temporal'){if(!r.PeriodoTemporalActual)return false;if(s.value==='Vigente')return true;if(s.value==='Vence en 7 días'){const today=clientDateOnly(new Date().toISOString()),limit=clientDateOnly(new Date(Date.now()+7*86400000).toISOString());return r.PeriodoTemporalActual.Hasta>=today&&r.PeriodoTemporalActual.Hasta<=limit}}if(s.dataset.filter==='__AltaPeriodo')return s.value==='Últimos 30 días'?periodMatches(r.FechaAlta,'30'):true;if(s.dataset.filter==='QR_Estado'){const hasQrScope=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return hasQrScope&&String(r.QR_Estado||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()}return String(r[s.dataset.filter]||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()};const render=()=>{refreshHousingOptions();const q=search.value.trim().toLowerCase(),active=selects.some(s=>s.value)||q;const filtered=rows.map((r,i)=>({r,i})).filter(({r})=>rowSearchText(kind,r).includes(q)&&selects.every(s=>matchesFilter(r,s)));state.cache.currentFilteredRows=filtered.map(x=>x.r);body.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('hide',!filtered.some(x=>String(x.i)===tr.dataset.i)));count.textContent=`Mostrando ${filtered.length} de ${rows.length}`;clear.classList.toggle('hide',!active)};search.oninput=render;selects.forEach(s=>s.onchange=()=>{if(s===block)refreshHousingOptions();render()});clear.onclick=()=>{search.value='';selects.forEach(s=>s.value='');refreshHousingOptions();render()};render()}
+function bindTableFilters(kind,rows){const search=$('#table-search'),selects=[...document.querySelectorAll('[data-filter]')],clear=$('#clear-filters'),body=$('#data-body'),count=$('#filter-count'),block=$('#filter-block'),housingSelect=$('#filter-housing');if(!body||!search)return;const housingById=new Map(housingFilterOptions().map(h=>[h.ID_Vivienda,h]));const refreshHousingOptions=()=>{if(!housingSelect)return;const selected=housingSelect.value,selectedBlock=block?.value||'';[...housingSelect.options].forEach((o,i)=>{if(i===0)return;o.hidden=!!selectedBlock&&o.dataset.block!==selectedBlock});if(selected&&housingSelect.selectedOptions[0]?.hidden)housingSelect.value=''};const preset=state.cache.tablePreset&&state.cache.tablePreset.kind===kind?state.cache.tablePreset:null;if(preset){search.value=preset.search||'';selects.forEach(s=>s.value=(preset.filters&&preset.filters[s.dataset.filter])||'');delete state.cache.tablePreset}refreshHousingOptions();const matchesFilter=(r,s)=>{if(!s.value)return true;if(s.dataset.filter==='Rol')return String(r.Rol||'').split(',').includes(s.value);if(s.dataset.filter==='__Bloque'){const h=kind==='housing'?r:housingById.get(r.ID_Vivienda);return String(h?.Bloque||'')===s.value}if(s.dataset.filter==='__Vivienda')return String(r.ID_Vivienda||'')===s.value;if(s.dataset.filter==='__Clase')return s.value==='Moto'?r.Tipo==='Moto':r.Tipo!=='Moto';if(s.dataset.filter==='__Slot'){const has=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return s.value==='Con slot'?has:!has}if(s.dataset.filter==='__SolicitudesPendientes'){const has=(state.cache.adminRequests||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&['Abierta','Pendiente'].includes(x.Estado));return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__IncidenciasPendientes'){const has=(state.cache.adminIncidents||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado!=='Cerrada');return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__Temporal'){if(!r.PeriodoTemporalActual)return false;if(s.value==='Vigente')return true;if(s.value==='Vence en 7 días'){const today=clientDateOnly(new Date().toISOString()),limit=clientDateOnly(new Date(Date.now()+7*86400000).toISOString());return r.PeriodoTemporalActual.Hasta>=today&&r.PeriodoTemporalActual.Hasta<=limit}}if(s.dataset.filter==='__AltaPeriodo')return s.value==='Últimos 30 días'?periodMatches(r.FechaAlta,'30'):true;return String(r[s.dataset.filter]||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()};const render=()=>{refreshHousingOptions();const q=search.value.trim().toLowerCase(),active=selects.some(s=>s.value)||q;const filtered=rows.map((r,i)=>({r,i})).filter(({r})=>rowSearchText(kind,r).includes(q)&&selects.every(s=>matchesFilter(r,s)));state.cache.currentFilteredRows=filtered.map(x=>x.r);body.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('hide',!filtered.some(x=>String(x.i)===tr.dataset.i)));count.textContent=`Mostrando ${filtered.length} de ${rows.length}`;clear.classList.toggle('hide',!active)};search.oninput=render;selects.forEach(s=>s.onchange=()=>{if(s===block)refreshHousingOptions();render()});clear.onclick=()=>{search.value='';selects.forEach(s=>s.value='');refreshHousingOptions();render()};render()}
 async function manager(kind){
   const c=configs[kind];
   try{
@@ -568,7 +454,7 @@ function vehicleEditor(row,contextHousing=null){
 async function showQr(v,backFn=null){if(v.Tipo==='Moto'){toast('Las motos se controlan por matrícula y no utilizan QR.',true);return}const valid=v.Estado==='Activo'&&['1','2'].includes(String(v.Slot||''))&&v.QR_Estado==='Activo'&&!!v.QR_Token;$('#main').innerHTML=`<div class="head"><h1>QR del vehículo</h1><button class="secondary" id="back-list">Volver</button></div><div class="grid"><div class="card result ${valid?'':'bad'}"><span class="status ${valid?'':'bad'}">${esc(v.Estado)} · QR ${esc(v.QR_Estado)}</span>${qrVehicleIdentityHtml(v)}<div class="actions" style="justify-content:center;margin-top:1rem"><button class="secondary" id="qr-view-vehicle">Ver vehículo</button>${hasUiRole('ADMIN')&&v.Estado==='Activo'&&['1','2'].includes(String(v.Slot||''))?`${v.QR_Estado==='Revocado'?'<button class="secondary" id="qr-renew">Renovar QR</button>':''}${v.QR_Estado==='Activo'?'<button class="danger" id="qr-revoke">Revocar QR</button>':''}`:''}</div></div><div class="card" style="text-align:center"><h2>Código QR</h2>${valid?`<div id="qr"><div class="spinner"></div></div><p class="muted">Este QR identifica al vehículo y valida la matrícula habitual o la temporal vigente.</p><button id="print">Imprimir</button>`:`<div class="message bad">Este vehículo no tiene un QR válido. Debe estar Activo y con QR Activo.</div>`}</div></div>`;$('#back-list').onclick=backFn||vehicles;$('#qr-view-vehicle').onclick=()=>vehicleDetailView(v.ID_Vehiculo,backFn||(()=>go('vehicles')));if($('#qr-renew'))$('#qr-renew').onclick=async()=>{if(!confirm('El QR anterior dejará de ser válido. ¿Generar uno nuevo?'))return;try{const out=await call('renewQr',{id:v.ID_Vehiculo});invalidateClientParkingData();toast('QR renovado.');showQr(out,backFn)}catch(e){err(e)}};if($('#qr-revoke'))$('#qr-revoke').onclick=async()=>{if(!confirm('El QR quedará revocado y dejará de autorizar accesos. ¿Continuar?'))return;try{const out=await call('saveVehicle',Object.assign({},v,{QR_Estado:'Revocado'}));invalidateClientParkingData();toast('QR revocado.');showQr(out,backFn)}catch(e){err(e)}};if(!valid)return;$('#print').onclick=()=>window.print();try{await ensureQr();$('#qr').innerHTML='';const size=qrSize();new QRCode($('#qr'),{text:qrTarget(v.QR_Token),width:size,height:size,correctLevel:QRCode.CorrectLevel.L})}catch(e){$('#qr').innerHTML=`<div class="message bad">${esc(e.message)}</div>`}}
 
 // 1.2.11.2: persistencia de filtros al refrescar y después de acciones
-function bindTableFilters(kind,rows){const search=$('#table-search'),selects=[...document.querySelectorAll('[data-filter]')],clear=$('#clear-filters'),body=$('#data-body'),count=$('#filter-count'),block=$('#filter-block'),housingSelect=$('#filter-housing');if(!body||!search)return;const housingById=new Map(housingFilterOptions().map(h=>[h.ID_Vivienda,h])),saved=viewUiState(kind);search.value=saved.search||'';selects.forEach(s=>{s.value=(saved.filters&&saved.filters[s.dataset.filter])||''});const refreshHousingOptions=()=>{if(!housingSelect)return;const selected=housingSelect.value,selectedBlock=block?.value||'';[...housingSelect.options].forEach((o,i)=>{if(i===0)return;o.hidden=!!selectedBlock&&o.dataset.block!==selectedBlock});if(selected&&housingSelect.selectedOptions[0]?.hidden)housingSelect.value=''};const preset=state.cache.tablePreset&&state.cache.tablePreset.kind===kind?state.cache.tablePreset:null;if(preset){search.value=preset.search||'';selects.forEach(s=>s.value=(preset.filters&&preset.filters[s.dataset.filter])||'');delete state.cache.tablePreset}refreshHousingOptions();const matchesFilter=(r,s)=>{if(!s.value)return true;if(s.dataset.filter==='Rol')return String(r.Rol||'').split(',').includes(s.value);if(s.dataset.filter==='__Bloque'){const h=kind==='housing'?r:housingById.get(r.ID_Vivienda);return String(h?.Bloque||'')===s.value}if(s.dataset.filter==='__Vivienda')return String(r.ID_Vivienda||'')===s.value;if(s.dataset.filter==='__Clase')return s.value==='Moto'?r.Tipo==='Moto':r.Tipo!=='Moto';if(s.dataset.filter==='__Slot'){const has=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return s.value==='Con slot'?has:!has}if(s.dataset.filter==='__SolicitudesPendientes'){const has=(state.cache.adminRequests||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&['Abierta','Pendiente'].includes(x.Estado));return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__IncidenciasPendientes'){const has=(state.cache.adminIncidents||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado!=='Cerrada');return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__Temporal'){if(!r.PeriodoTemporalActual)return false;if(s.value==='Vigente')return true;if(s.value==='Vence en 7 días'){const today=clientDateOnly(new Date().toISOString()),limit=clientDateOnly(new Date(Date.now()+7*86400000).toISOString());return r.PeriodoTemporalActual.Hasta>=today&&r.PeriodoTemporalActual.Hasta<=limit}}if(s.dataset.filter==='__AltaPeriodo')return s.value==='Últimos 30 días'?periodMatches(r.FechaAlta,'30'):true;if(s.dataset.filter==='QR_Estado'){const hasQrScope=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return hasQrScope&&String(r.QR_Estado||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()}return String(r[s.dataset.filter]||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()};const persist=()=>saveViewUiState(kind,{search:search.value,filters:Object.fromEntries(selects.map(s=>[s.dataset.filter,s.value]))});const render=()=>{refreshHousingOptions();persist();const q=search.value.trim().toLowerCase(),active=selects.some(s=>s.value)||q;const filtered=rows.map((r,i)=>({r,i})).filter(({r})=>rowSearchText(kind,r).includes(q)&&selects.every(s=>matchesFilter(r,s)));state.cache.currentFilteredRows=filtered.map(x=>x.r);body.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('hide',!filtered.some(x=>String(x.i)===tr.dataset.i)));count.textContent=`Mostrando ${filtered.length} de ${rows.length}`;clear.classList.toggle('hide',!active)};search.oninput=render;selects.forEach(s=>s.onchange=()=>{if(s===block)refreshHousingOptions();render()});clear.onclick=()=>{search.value='';selects.forEach(s=>s.value='');refreshHousingOptions();render()};render()}
+function bindTableFilters(kind,rows){const search=$('#table-search'),selects=[...document.querySelectorAll('[data-filter]')],clear=$('#clear-filters'),body=$('#data-body'),count=$('#filter-count'),block=$('#filter-block'),housingSelect=$('#filter-housing');if(!body||!search)return;const housingById=new Map(housingFilterOptions().map(h=>[h.ID_Vivienda,h])),saved=viewUiState(kind);search.value=saved.search||'';selects.forEach(s=>{s.value=(saved.filters&&saved.filters[s.dataset.filter])||''});const refreshHousingOptions=()=>{if(!housingSelect)return;const selected=housingSelect.value,selectedBlock=block?.value||'';[...housingSelect.options].forEach((o,i)=>{if(i===0)return;o.hidden=!!selectedBlock&&o.dataset.block!==selectedBlock});if(selected&&housingSelect.selectedOptions[0]?.hidden)housingSelect.value=''};const preset=state.cache.tablePreset&&state.cache.tablePreset.kind===kind?state.cache.tablePreset:null;if(preset){search.value=preset.search||'';selects.forEach(s=>s.value=(preset.filters&&preset.filters[s.dataset.filter])||'');delete state.cache.tablePreset}refreshHousingOptions();const matchesFilter=(r,s)=>{if(!s.value)return true;if(s.dataset.filter==='Rol')return String(r.Rol||'').split(',').includes(s.value);if(s.dataset.filter==='__Bloque'){const h=kind==='housing'?r:housingById.get(r.ID_Vivienda);return String(h?.Bloque||'')===s.value}if(s.dataset.filter==='__Vivienda')return String(r.ID_Vivienda||'')===s.value;if(s.dataset.filter==='__Clase')return s.value==='Moto'?r.Tipo==='Moto':r.Tipo!=='Moto';if(s.dataset.filter==='__Slot'){const has=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return s.value==='Con slot'?has:!has}if(s.dataset.filter==='__SolicitudesPendientes'){const has=(state.cache.adminRequests||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&['Abierta','Pendiente'].includes(x.Estado));return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__IncidenciasPendientes'){const has=(state.cache.adminIncidents||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado!=='Cerrada');return s.value==='Con pendientes'?has:!has}if(s.dataset.filter==='__Temporal'){if(!r.PeriodoTemporalActual)return false;if(s.value==='Vigente')return true;if(s.value==='Vence en 7 días'){const today=clientDateOnly(new Date().toISOString()),limit=clientDateOnly(new Date(Date.now()+7*86400000).toISOString());return r.PeriodoTemporalActual.Hasta>=today&&r.PeriodoTemporalActual.Hasta<=limit}}if(s.dataset.filter==='__AltaPeriodo')return s.value==='Últimos 30 días'?periodMatches(r.FechaAlta,'30'):true;return String(r[s.dataset.filter]||'').trim().toLowerCase()===String(s.value||'').trim().toLowerCase()};const persist=()=>saveViewUiState(kind,{search:search.value,filters:Object.fromEntries(selects.map(s=>[s.dataset.filter,s.value]))});const render=()=>{refreshHousingOptions();persist();const q=search.value.trim().toLowerCase(),active=selects.some(s=>s.value)||q;const filtered=rows.map((r,i)=>({r,i})).filter(({r})=>rowSearchText(kind,r).includes(q)&&selects.every(s=>matchesFilter(r,s)));state.cache.currentFilteredRows=filtered.map(x=>x.r);body.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('hide',!filtered.some(x=>String(x.i)===tr.dataset.i)));count.textContent=`Mostrando ${filtered.length} de ${rows.length}`;clear.classList.toggle('hide',!active)};search.oninput=render;selects.forEach(s=>s.onchange=()=>{if(s===block)refreshHousingOptions();render()});clear.onclick=()=>{search.value='';selects.forEach(s=>s.value='');refreshHousingOptions();render()};render()}
 
 function trendText(t){if(!t)return '';const d=(Number(t.current)||0)-(Number(t.previous)||0);return `${d===0?'=':d>0?'▲':'▼'} ${Math.abs(d)} vs. 30 días anteriores`}
 async function globalSearchView(initial=''){
@@ -928,27 +814,12 @@ async function configurationView(initialTab='identity'){
   }catch(e){err(e)}
 }
 
-function clearScannedQrFromAddress(){
-  try{const u=new URL(location.href);if(!u.searchParams.has('q'))return;u.searchParams.delete('q');history.replaceState(null,'',u.toString())}catch(e){}
-}
-function ensureControlBody(){
-  let host=$('#control-body');
-  if(host)return host;
-  $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Resultado de la comprobación.</p></section><div id="control-body"></div>`;
-  host=$('#control-body');
-  if(!host)throw new Error('No se pudo preparar la pantalla de Control.');
-  return host;
-}
 async function control(token=''){
-  const initial=state.cache?.initialControlResult;
-  // initialContext ya validó el QR en el mismo viaje de arranque. go('control') no
-  // transmite argumentos, por eso consumimos aquí el resultado precargado.
-  if(!token&&initial){delete state.cache.initialControlResult;clearScannedQrFromAddress();resultCard(initial.data);return}
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
-    if(initial&&initial.token===token){delete state.cache.initialControlResult;clearScannedQrFromAddress();resultCard(initial.data);return}
+    const initial=state.cache?.initialControlResult;
+    if(initial&&initial.token===token){delete state.cache.initialControlResult;resultCard(initial.data);return}
     await lookupQr(token);
-    clearScannedQrFromAddress();
     return;
   }
   const returnUrl=WEB_APP_URL||location.href.split('?')[0];
@@ -974,7 +845,7 @@ function resultCard(r){state.scanResult=r;const v=r.vehicle||{},h=r.housing||{},
 
 
 // 1.2.12 - resultado de Control centrado en la decisión operativa
-function resultCard(r){state.scanResult=r;const v=r.vehicle||{},h=r.housing||{},o=r.owner||{},good=r.status==='AUTORIZADO',query=r.query||'',temp=v.MatriculaTemporal&&v.Estado==='Activo'&&r.isTemporary,habitualNotCurrent=r.status==='MATRICULA HABITUAL NO VIGENTE'&&v.MatriculaTemporal,validPlate=temp?v.MatriculaTemporal:habitualNotCurrent?v.MatriculaTemporal:(r.currentPlate||query||v.MatriculaHabitual||''),title=good?'ACCESO AUTORIZADO':r.status,host=ensureControlBody();host.innerHTML=`<article class="card result wide ${good?'':'bad'}"><h2 class="control-result-title">${esc(title)}</h2>${validPlate?`<div class="control-current-label">${habitualNotCurrent?'Matrícula válida actualmente':'Matrícula comprobada'}</div><div class="plate ${good||habitualNotCurrent?'control-valid-plate':''}">${esc(validPlate)}</div>`:''}${habitualNotCurrent?`<div class="message bad"><b>La matrícula habitual ${esc(v.MatriculaHabitual||query)} no está vigente para el acceso.</b><br>Temporal vigente: <b>${esc(v.MatriculaTemporal)}</b>${v.TemporalHasta?` hasta ${esc(dateEs(v.TemporalHasta))}`:''}.</div>`:''}${v.ID_Vehiculo?`<div class="details control-secondary-info"><div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Slot</small>${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Sin slot')}</div><div><small>Tipo</small>${esc(v.Tipo==='Moto'?'Moto':'Vehículo')}</div><div><small>Estado</small>${esc(v.Estado||'—')}</div>${v.MatriculaHabitual?`<div><small>Matrícula habitual</small>${esc(v.MatriculaHabitual)}</div>`:''}${v.MatriculaTemporal?`<div><small>Matrícula temporal</small>${esc(v.MatriculaTemporal)}${v.TemporalHasta?`<span class="subtle ${temp||habitualNotCurrent?'temp-active':''}">Vigente hasta ${esc(dateEs(v.TemporalHasta))}</span>`:''}</div>`:''}${v.Marca||v.Modelo?`<div><small>Marca / modelo</small>${esc([v.Marca,v.Modelo].filter(Boolean).join(' '))}</div>`:''}<div><small>Propietario</small>${esc(o.Nombre||h.Responsable||'—')}</div>${v.Tipo==='Moto'?'':`<div><small>QR</small>${esc(v.QR_Estado||'—')}</div>`}${r.longStay?`<div><small>Permanencia autorizada</small>${esc(dateEs(r.longStay.FechaInicio))} → ${esc(dateEs(r.longStay.FechaFin))}</div>`:''}</div>`:''}<div class="actions" style="justify-content:center;margin-top:1rem"><button id="incident-result">Registrar incidencia</button><button class="secondary" id="again">Otra consulta</button></div></article>`;$('#again').onclick=()=>control();$('#incident-result').onclick=()=>incidentForm(Object.assign({},r,{query:query||validPlate}))}
+function resultCard(r){state.scanResult=r;const v=r.vehicle||{},h=r.housing||{},o=r.owner||{},good=r.status==='AUTORIZADO',query=r.query||'',temp=v.MatriculaTemporal&&v.Estado==='Activo'&&r.isTemporary,habitualNotCurrent=r.status==='MATRICULA HABITUAL NO VIGENTE'&&v.MatriculaTemporal,validPlate=temp?v.MatriculaTemporal:habitualNotCurrent?v.MatriculaTemporal:(r.currentPlate||query||v.MatriculaHabitual||''),title=good?'ACCESO AUTORIZADO':r.status;$('#control-body').innerHTML=`<article class="card result wide ${good?'':'bad'}"><h2 class="control-result-title">${esc(title)}</h2>${validPlate?`<div class="control-current-label">${habitualNotCurrent?'Matrícula válida actualmente':'Matrícula comprobada'}</div><div class="plate ${good||habitualNotCurrent?'control-valid-plate':''}">${esc(validPlate)}</div>`:''}${habitualNotCurrent?`<div class="message bad"><b>La matrícula habitual ${esc(v.MatriculaHabitual||query)} no está vigente para el acceso.</b><br>Temporal vigente: <b>${esc(v.MatriculaTemporal)}</b>${v.TemporalHasta?` hasta ${esc(dateEs(v.TemporalHasta))}`:''}.</div>`:''}${v.ID_Vehiculo?`<div class="details control-secondary-info"><div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Slot</small>${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Sin slot')}</div><div><small>Tipo</small>${esc(v.Tipo==='Moto'?'Moto':'Vehículo')}</div><div><small>Estado</small>${esc(v.Estado||'—')}</div>${v.MatriculaHabitual?`<div><small>Matrícula habitual</small>${esc(v.MatriculaHabitual)}</div>`:''}${v.MatriculaTemporal?`<div><small>Matrícula temporal</small>${esc(v.MatriculaTemporal)}${v.TemporalHasta?`<span class="subtle ${temp||habitualNotCurrent?'temp-active':''}">Vigente hasta ${esc(dateEs(v.TemporalHasta))}</span>`:''}</div>`:''}${v.Marca||v.Modelo?`<div><small>Marca / modelo</small>${esc([v.Marca,v.Modelo].filter(Boolean).join(' '))}</div>`:''}<div><small>Propietario</small>${esc(o.Nombre||h.Responsable||'—')}</div>${v.Tipo==='Moto'?'':`<div><small>QR</small>${esc(v.QR_Estado||'—')}</div>`}${r.longStay?`<div><small>Permanencia autorizada</small>${esc(dateEs(r.longStay.FechaInicio))} → ${esc(dateEs(r.longStay.FechaFin))}</div>`:''}</div>`:''}<div class="actions" style="justify-content:center;margin-top:1rem"><button id="incident-result">Registrar incidencia</button><button class="secondary" id="again">Otra consulta</button></div></article>`;$('#again').onclick=()=>control();$('#incident-result').onclick=()=>incidentForm(Object.assign({},r,{query:query||validPlate}))}
 
 // 1.2.13.6: la implementación efectiva de resultado/seguimiento está consolidada en app.bundle.js.
 
@@ -982,7 +853,7 @@ function requestTypeLabel(v){return v==='REACTIVACION_VEHICULO'?'Reactivación d
 const PAGE_SIZE=20;
 function shortDateTime(v){if(!v)return '—';const x=String(v);const d=x.slice(0,10),t=x.length>=16?x.slice(11,16):'';return `${dateEs(d)}${t?' '+t:''}`}
 function recordHousingLabel(r,h=null){if(h)return housingShort(h);if(r&&r.Bloque)return `Bloque ${r.Bloque}, ${r.Planta||''} ${r.Apartamento||''}`.replace(/\s+/g,' ').trim();return r?.ID_Vivienda||'—'}
-function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&['Abierta','Pendiente'].includes(r.Estado));if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Reactivación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
+function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado==='Pendiente');if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Reactivación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
 function incidentSummaryForVehicle(id){const rows=(state.cache.adminIncidents||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');if(!rows.length)return '<span class="request-chip none">—</span>';const first=rows[0];return `<button type="button" class="request-chip request-chip-btn incident-chip-btn" data-incident-id="${esc(first.ID_Incidencia)}" title="Abrir incidencia">● ${rows.length} pendiente${rows.length===1?'':'s'}</button>`}
 function invalidateClientParkingData(){delete state.cache.adminRequests;delete state.cache.adminIncidents;delete state.cache.vehicles;delete state.cache.ownerHousing;delete state.cache.ownerVehicles;delete state.cache.ownerRequests;delete state.cache.ownerIncidents}
 function bindRequestLinks(){document.querySelectorAll('.request-chip-btn').forEach(b=>b.onclick=()=>{state.cache.requestFocus=b.dataset.requestId||'';go('requests')})}
