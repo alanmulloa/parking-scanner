@@ -9,7 +9,7 @@ function openGlobalResult(r){if(!r)return;if(r.view==='housingDetail'){housingDe
 async function housingDetailView(id){
   renderLoading('housing');try{const d=await call('housingDetail',{id}),h=d.housing,o=d.owner||{},vs=d.vehicles||[],incs=d.incidents||[],reqs=d.requests||[];
   $('#main').innerHTML=`<div class="head"><div><h1>${esc(housingShort(h))}</h1><div class="muted">Ficha completa de vivienda</div></div><div class="actions"><button class="secondary" id="hd-back">← Viviendas</button><button id="hd-add">＋ Vehículo</button></div></div>
-  <div class="summary-grid"><article class="summary-card"><b>${esc(d.slotsUsed)}</b><span>Slots ocupados</span><small>${esc(d.slotsFree)} libres</small></article><article class="summary-card"><b>${vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto').length}</b><span>Motos activas</span></article><article class="summary-card"><b>${incs.filter(i=>(i.Estado||'Abierta')!=='Cerrada').length}</b><span>Incidencias abiertas</span></article><article class="summary-card"><b>${reqs.filter(r=>r.Estado==='Pendiente').length}</b><span>Solicitudes pendientes</span></article></div>
+  <div class="summary-grid"><article class="summary-card"><b>${esc(d.slotsUsed)}</b><span>Slots ocupados</span><small>${esc(d.slotsFree)} libres</small></article><article class="summary-card"><b>${vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto').length}</b><span>Motos activas</span></article><article class="summary-card"><b>${incs.filter(i=>(i.Estado||'Abierta')!=='Cerrada').length}</b><span>Incidencias abiertas</span></article><article class="summary-card"><b>${reqs.filter(r=>r.Estado==='Abierta').length}</b><span>Solicitudes abiertas</span></article></div>
   <section class="card" style="margin-top:1rem"><h2>Propietario</h2><div class="details"><div><small>Nombre</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div><div><small>Estado vivienda</small>${esc(h.Estado)}</div></div></section>
   <section class="card" style="margin-top:1rem"><div class="head"><h2>Vehículos</h2></div><div class="tablebox"><table class="table"><thead><tr><th>Matrícula</th><th>Clase</th><th>Estado</th><th>Slot</th><th>Temporal</th><th></th></tr></thead><tbody>${vs.map((v,i)=>`<tr><td><b>${esc(v.MatriculaHabitual)}</b></td><td>${esc(v.Tipo==='Moto'?'Moto':'Vehículo')}</td><td>${esc(v.Estado)}</td><td>${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Liberado')}</td><td>${esc(displayCell('vehicles',v,'MatriculaTemporal'))}</td><td><button class="secondary hd-history" data-i="${i}">Historial</button></td></tr>`).join('')}</tbody></table></div></section>
   <section class="grid" style="margin-top:1rem"><article class="card"><h2>Incidencias recientes</h2>${incs.slice(0,10).map(i=>`<div class="attention-item"><div><strong>${esc(i.Tipo)}</strong><span>${esc(i.MatriculaObservada||'')} · ${esc(shortDateTime(i.FechaHora))}</span></div></div>`).join('')||'<div class="empty">Sin incidencias.</div>'}</article><article class="card"><h2>Solicitudes recientes</h2>${reqs.slice(0,10).map(r=>`<div class="attention-item"><div><strong>${esc(requestTypeLabel(r.Tipo))}</strong><span>${esc(r.Estado)} · ${esc(shortDateTime(r.FechaHora))}</span></div></div>`).join('')||'<div class="empty">Sin solicitudes.</div>'}</article></section>`;
@@ -70,14 +70,14 @@ async function quickVehicleState(v,newState,backFn){const impact=[newState==='Su
 // 1.2.12 - ficha operativa de vivienda
 async function housingDetailView(id){
   renderLoading('housing');try{const d=await call('housingDetail',{id}),h=d.housing,o=d.owner||{},vs=d.vehicles||[],incs=d.incidents||[],reqs=d.requests||[];
-  const openInc=incs.filter(x=>(x.Estado||'Abierta')!=='Cerrada'),pendingReq=reqs.filter(x=>x.Estado==='Pendiente'),tmp=vs.filter(v=>v.PeriodoTemporalActual),slotVehicle=n=>vs.find(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&String(v.Slot)===String(n));
+  const openInc=incs.filter(x=>(x.Estado||'Abierta')!=='Cerrada'),pendingReq=reqs.filter(x=>x.Estado==='Abierta'),tmp=vs.filter(v=>v.PeriodoTemporalActual),slotVehicle=n=>vs.find(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&String(v.Slot)===String(n));
   const slotCard=n=>{const v=slotVehicle(n);return `<article class="summary-card clickable hd-slot" data-plate="${esc(v?.MatriculaHabitual||'')}"><b>${v?esc(v.MatriculaHabitual):'Libre'}</b><span>Slot ${n}</span><small>${v?esc(v.Estado):'Disponible'}</small></article>`};
   $('#main').innerHTML=`<div class="head"><div><h1>${esc(housingShort(h))}</h1><div class="muted">Ficha operativa de vivienda</div></div><div class="actions"><button class="secondary" id="hd-back">← Viviendas</button><button id="hd-add">＋ Vehículo</button></div></div>
-  <div class="summary-grid">${slotCard(1)}${slotCard(2)}<button class="summary-card clickable" id="hd-inc"><b>${openInc.length}</b><span>Incidencias abiertas</span><small>Ver incidencias</small></button><button class="summary-card clickable" id="hd-req"><b>${pendingReq.length}</b><span>Solicitudes pendientes</span><small>Ver solicitudes</small></button><article class="summary-card"><b>${tmp.length}</b><span>Temporales vigentes</span></article></div>
+  <div class="summary-grid">${slotCard(1)}${slotCard(2)}<button class="summary-card clickable" id="hd-inc"><b>${openInc.length}</b><span>Incidencias abiertas</span><small>Ver incidencias</small></button><button class="summary-card clickable" id="hd-req"><b>${pendingReq.length}</b><span>Solicitudes abiertas</span><small>Ver solicitudes</small></button><article class="summary-card"><b>${tmp.length}</b><span>Temporales vigentes</span></article></div>
   <section class="card" style="margin-top:1rem"><h2>Vivienda y propietario</h2><div class="details"><div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Estado</small>${esc(h.Estado||'—')}</div><div><small>Responsable</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div></div></section>
   <section class="card" style="margin-top:1rem"><div class="head"><h2>Vehículos registrados</h2><button class="secondary" id="hd-open-vehicles">Abrir en Vehículos</button></div><div class="tablebox compact-table"><table class="table responsive-data-table"><thead><tr><th>Habitual</th><th>Temporal</th><th>Vigencia</th><th>Clase</th><th>Estado</th><th>Slot</th><th>QR</th></tr></thead><tbody>${vs.map(v=>`<tr><td data-label="Habitual"><b>${esc(v.MatriculaHabitual||'—')}</b></td><td data-label="Temporal">${esc(v.PeriodoTemporalActual?.MatriculaTemporal||'—')}</td><td data-label="Vigencia">${v.PeriodoTemporalActual?`${esc(dateEs(v.PeriodoTemporalActual.Desde))} → ${esc(dateEs(v.PeriodoTemporalActual.Hasta))}`:'—'}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado">${esc(v.Estado||'—')}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Sin slot')}</td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':v.QR_Estado||'—')}</td></tr>`).join('')}</tbody></table></div></section>`;
   $('#hd-back').onclick=()=>go('housing');$('#hd-add').onclick=()=>{state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda}};go('vehicles')};$('#hd-open-vehicles').onclick=$('#hd-add').onclick;
-  $('#hd-inc').onclick=()=>{state.cache.incidentPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('incidents')};$('#hd-req').onclick=()=>{state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Pendiente'};go('requests')};
+  $('#hd-inc').onclick=()=>{state.cache.incidentPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('incidents')};$('#hd-req').onclick=()=>{state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('requests')};
   document.querySelectorAll('.hd-slot').forEach(x=>x.onclick=()=>{if(!x.dataset.plate)return;state.cache.tablePreset={kind:'vehicles',search:x.dataset.plate};go('vehicles')});
   }catch(e){err(e)}
 }
@@ -89,7 +89,7 @@ async function housingDetailView(id){
   try{
     const d=await call('housingDetail',{id}),h=d.housing,o=d.owner||{},vs=d.vehicles||[],incs=d.incidents||[],reqs=d.requests||[];
     const openInc=incs.filter(x=>(x.Estado||'Abierta')!=='Cerrada');
-    const pendingReq=reqs.filter(x=>x.Estado==='Pendiente');
+    const pendingReq=reqs.filter(x=>x.Estado==='Abierta');
     const tmp=vs.filter(v=>v.PeriodoTemporalActual);
     const activeSlots=vs.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')));
     const motos=vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto');
@@ -104,7 +104,7 @@ async function housingDetailView(id){
       </div></section>
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
         ${card(openInc.length,'Incidencias abiertas','Pendientes de resolución','incidents',openInc.length>0)}
-        ${card(pendingReq.length,'Solicitudes pendientes','Requieren revisión','requests',pendingReq.length>0)}
+        ${card(pendingReq.length,'Solicitudes abiertas','Requieren revisión','requests',pendingReq.length>0)}
       </div></section>
       <section class="card housing-detail-card"><div class="head"><h2>Vivienda y propietario</h2></div><div class="details">
         <div><small>Vivienda</small>${esc(housingShort(h))}</div><div><small>Estado</small>${esc(h.Estado||'—')}</div><div><small>Responsable</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div>
@@ -117,7 +117,7 @@ async function housingDetailView(id){
       const a=el.dataset.hdAction;
       if(a==='vehicles'){openVehicles();return}
       if(a==='incidents'){state.cache.incidentPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('incidents');return}
-      if(a==='requests'){state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Pendiente'};go('requests');return}
+      if(a==='requests'){state.cache.requestPreset={housingId:h.ID_Vivienda,status:'Abierta'};go('requests');return}
       if(a==='slot1'||a==='slot2'){const v=slot(a==='slot1'?1:2);if(v){state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda},search:v.MatriculaHabitual||''};go('vehicles')}}
     });
   }catch(e){err(e)}

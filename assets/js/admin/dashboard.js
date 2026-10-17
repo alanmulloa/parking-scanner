@@ -13,7 +13,7 @@ async function dashboard(){
         <article class="summary-card"><b>${esc(d.occupiedSlots)}</b><span>Slots ocupados</span><small>${esc(d.availableSlots)} libres de ${esc(d.slotCapacity)}</small><div class="slot-meter"><span style="width:${Math.max(0,Math.min(100,pct))}%"></span></div></article>
       </div></section>
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
-        ${card(d.pendingRequests,'Solicitudes pendientes','Requieren revisión','requests',d.pendingRequests>0)}
+        ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents',d.openIncidents>0)}
         ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
         ${card(d.activeWithoutQr,'Activos sin QR válido','No incluye motos','vehicles-active-revoked',d.activeWithoutQr>0)}
@@ -31,7 +31,7 @@ async function dashboard(){
   }catch(e){err(e)}
 }
 function openSummaryAction(action){
-  if(action==='requests'){state.cache.requestPreset={status:'Pendiente'};go('requests');return}if(action==='incidents'){state.cache.incidentPreset={status:'Abierta'};go('incidents');return}if(action==='housing'){state.cache.tablePreset={kind:'housing',filters:{Estado:'Activa'}};go('housing');return}
+  if(action==='requests'){state.cache.requestPreset={status:'Abierta'};go('requests');return}if(action==='incidents'){state.cache.incidentPreset={status:'Abierta'};go('incidents');return}if(action==='housing'){state.cache.tablePreset={kind:'housing',filters:{Estado:'Activa'}};go('housing');return}
   if(action==='vehicles-active-slot'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Vehículo con slot'}};go('vehicles');return}
   if(action==='vehicles-motorcycles'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Suspendido'}};go('vehicles');return}
