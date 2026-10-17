@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.1';
+const APP_FRONTEND_VERSION=(typeof APP_RELEASE_VERSION!=='undefined'&&APP_RELEASE_VERSION)||'1.2.18.2';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -87,11 +87,12 @@ function clientReadCacheKey(action,payload){
   try{return sessionKey+'|'+action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return sessionKey+'|'+action+'|{}'}
 }
 function invalidateClientReadCache(actions){
-  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();return}
+  if(!Array.isArray(actions)){Object.keys(CLIENT_READ_CACHE_TTL).forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));CLIENT_RESPONSE_CACHE.clear();markAdminOperationalPrefetchDirty();return}
   if(!actions.length)return;
   const affected=new Set(actions);
   affected.forEach(action=>CLIENT_CACHE_GENERATION.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)+1));
   for(const [key,entry] of CLIENT_RESPONSE_CACHE.entries())if(affected.has(entry.action))CLIENT_RESPONSE_CACHE.delete(key);
+  if([...affected].some(action=>['managerData','listIncidentsPayload','listRequests'].includes(action)))markAdminOperationalPrefetchDirty();
 }
 function clientCacheEntry(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0),staleTtl=Math.max(ttl,Number(CLIENT_READ_CACHE_STALE_TTL[action]||ttl)),now=Date.now();
@@ -100,6 +101,79 @@ function clientCacheEntry(action,payload,value){
 function seedClientRead(action,payload,value){
   const ttl=Number(CLIENT_READ_CACHE_TTL[action]||0);if(!ttl)return;
   CLIENT_RESPONSE_CACHE.set(clientReadCacheKey(action,payload||{}),clientCacheEntry(action,payload,value));
+}
+
+// 1.2.18.2 - precarga operativa ADMIN. El objetivo no es acelerar Apps Script,
+// sino evitar viajes de 2-3 s cuando el usuario navega desde Resumen.
+const ADMIN_OPERATIONAL_PREFETCH_TARGETS=new Set([
+  'managerData|{"kind":"users"}',
+  'managerData|{"kind":"housing"}',
+  'managerData|{"kind":"vehicles"}',
+  'listIncidentsPayload|{}',
+  'listRequests|{}'
+]);
+let ADMIN_PREFETCH_TOKEN='',ADMIN_PREFETCH_TIMER=null,ADMIN_PREFETCH_PROMISE=null,ADMIN_PREFETCH_COMPLETE=false,ADMIN_PREFETCH_EPOCH=0;
+function adminPrefetchKey(action,payload){try{return action+'|'+JSON.stringify(stableClientPayload(payload||{}))}catch(e){return action+'|{}'}}
+function adminPrefetchSupports(action,payload){return ADMIN_OPERATIONAL_PREFETCH_TARGETS.has(adminPrefetchKey(action,payload))}
+function adminPrefetchScope(){
+  const token=String(state.token||'');
+  if(token===ADMIN_PREFETCH_TOKEN)return;
+  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
+  ADMIN_PREFETCH_TOKEN=token;ADMIN_PREFETCH_PROMISE=null;ADMIN_PREFETCH_COMPLETE=false;ADMIN_PREFETCH_EPOCH++;
+}
+function markAdminOperationalPrefetchDirty(){
+  adminPrefetchScope();ADMIN_PREFETCH_EPOCH++;ADMIN_PREFETCH_COMPLETE=false;
+  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
+}
+function clientAdminRoleActive(){
+  const active=String(state.activeRole||'').toUpperCase();
+  if(active)return active==='ADMIN';
+  return String(state.user?.Rol||'').toUpperCase().split(/[,;|]/).map(x=>x.trim()).includes('ADMIN');
+}
+function seedAdminOperationalBundle(bundle,generations,epoch){
+  if(epoch!==ADMIN_PREFETCH_EPOCH||!bundle||!Array.isArray(bundle.resources))return;
+  bundle.resources.forEach(resource=>{
+    if(!resource||!adminPrefetchSupports(resource.action,resource.payload||{}))return;
+    const before=Number(generations.get(resource.action)||0),now=Number(CLIENT_CACHE_GENERATION.get(resource.action)||0);
+    if(before!==now)return;
+    seedClientRead(resource.action,resource.payload||{},resource.data);
+    if(resource.action==='managerData'&&resource.data){
+      if(resource.data.options)state.cache.formOptions=resource.data.options;
+      if(resource.payload?.kind==='vehicles'){state.cache.vehicles=resource.data.rows||[];state.cache.adminRequests=resource.data.requests||[];state.cache.adminIncidents=resource.data.incidents||[]}
+    }
+  });
+}
+function runAdminOperationalPrefetch(){
+  adminPrefetchScope();
+  if(!state.token||!clientAdminRoleActive())return Promise.resolve(null);
+  if(ADMIN_PREFETCH_COMPLETE)return Promise.resolve(null);
+  if(ADMIN_PREFETCH_PROMISE)return ADMIN_PREFETCH_PROMISE;
+  if(ADMIN_PREFETCH_TIMER){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null}
+  const token=String(state.token||''),epoch=ADMIN_PREFETCH_EPOCH,generations=new Map();
+  ['managerData','listIncidentsPayload','listRequests'].forEach(action=>generations.set(action,Number(CLIENT_CACHE_GENERATION.get(action)||0)));
+  const started=performance.now();
+  const promise=server('api',token,'adminOperationalBundle',{}).then(bundle=>{
+    if(String(state.token||'')===token)seedAdminOperationalBundle(bundle,generations,epoch);
+    recordClientCall('adminOperationalBundle',performance.now()-started,true,'background');
+    if(epoch===ADMIN_PREFETCH_EPOCH&&String(state.token||'')===token)ADMIN_PREFETCH_COMPLETE=true;
+    return bundle;
+  }).catch(e=>{recordClientCall('adminOperationalBundle',performance.now()-started,false,'background');return null}).finally(()=>{
+    if(ADMIN_PREFETCH_PROMISE===promise)ADMIN_PREFETCH_PROMISE=null;
+  });
+  ADMIN_PREFETCH_PROMISE=promise;return promise;
+}
+function scheduleAdminOperationalPrefetch(delay=450){
+  adminPrefetchScope();
+  if(!state.token||!clientAdminRoleActive()||ADMIN_PREFETCH_COMPLETE||ADMIN_PREFETCH_PROMISE||ADMIN_PREFETCH_TIMER)return;
+  ADMIN_PREFETCH_TIMER=setTimeout(()=>{ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()},Math.max(0,Number(delay)||0));
+}
+async function awaitAdminOperationalPrefetch(action,payload){
+  if(!adminPrefetchSupports(action,payload)||!clientAdminRoleActive())return null;
+  adminPrefetchScope();
+  if(ADMIN_PREFETCH_TIMER&&!ADMIN_PREFETCH_PROMISE){clearTimeout(ADMIN_PREFETCH_TIMER);ADMIN_PREFETCH_TIMER=null;runAdminOperationalPrefetch()}
+  if(ADMIN_PREFETCH_PROMISE)await ADMIN_PREFETCH_PROMISE;
+  const key=clientReadCacheKey(action,payload||{}),cached=CLIENT_RESPONSE_CACHE.get(key);
+  return cached&&cached.staleUntil>Date.now()?cached.value:null;
 }
 const CLIENT_VIEW_READS={
   dashboard:['dashboard',{}],users:['managerData',{kind:'users'}],housing:['managerData',{kind:'housing'}],vehicles:['managerData',{kind:'vehicles'}],
@@ -156,6 +230,8 @@ async function call(action,payload={}){
     if(cached)CLIENT_RESPONSE_CACHE.delete(key);
     const pending=CLIENT_INFLIGHT_CALLS.get(key);
     if(pending){const started=performance.now();try{const value=await pending;recordClientCall(action,performance.now()-started,true,'coalesced');return value}catch(e){recordClientCall(action,performance.now()-started,false,'coalesced');throw e}}
+    const prefetched=await awaitAdminOperationalPrefetch(action,payload);
+    if(prefetched!==null){recordClientCall(action,0,true,'cache');return prefetched}
   }
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
   const networkPromise=(async()=>{
@@ -345,6 +421,7 @@ async function dashboard(){
     const renderAttention=()=>{const pages=Math.max(1,Math.ceil(attentionRows.length/ATTENTION_PAGE_SIZE));attentionPage=Math.min(Math.max(1,attentionPage),pages);const start=(attentionPage-1)*ATTENTION_PAGE_SIZE,slice=attentionRows.slice(start,start+ATTENTION_PAGE_SIZE);$('#summary-attention-list').innerHTML=slice.map((x,i)=>`<div class="attention-item"><div><strong>${esc(x.label)}</strong><span>${esc(x.detail||'')}</span></div><button class="secondary summary-attention" data-i="${start+i}">Ver</button></div>`).join('')||'<div class="card empty">No hay elementos que requieran atención especial.</div>';$('#summary-attention-pager').innerHTML=attentionRows.length>ATTENTION_PAGE_SIZE?`<div class="pager"><span class="muted">Página ${attentionPage} de ${pages} · ${attentionRows.length} elementos</span><div class="actions"><button class="secondary" id="attention-prev" ${attentionPage<=1?'disabled':''}>← Anterior</button><button class="secondary" id="attention-next" ${attentionPage>=pages?'disabled':''}>Siguiente →</button></div></div>`:'';document.querySelectorAll('.summary-attention').forEach(b=>b.onclick=()=>openSummaryAttention(attentionRows[Number(b.dataset.i)]));if($('#attention-prev'))$('#attention-prev').onclick=()=>{attentionPage--;renderAttention()};if($('#attention-next'))$('#attention-next').onclick=()=>{attentionPage++;renderAttention()}};
     renderAttention();
     document.querySelectorAll('[data-summary-action]').forEach(el=>el.onclick=()=>openSummaryAction(el.dataset.summaryAction));
+    scheduleAdminOperationalPrefetch();
   }catch(e){err(e)}
 }
 function resetSummaryDestination(view){replaceViewUiState(view,{})}
@@ -853,7 +930,7 @@ function requestTypeLabel(v){return v==='REACTIVACION_VEHICULO'?'Reactivación d
 const PAGE_SIZE=20;
 function shortDateTime(v){if(!v)return '—';const x=String(v);const d=x.slice(0,10),t=x.length>=16?x.slice(11,16):'';return `${dateEs(d)}${t?' '+t:''}`}
 function recordHousingLabel(r,h=null){if(h)return housingShort(h);if(r&&r.Bloque)return `Bloque ${r.Bloque}, ${r.Planta||''} ${r.Apartamento||''}`.replace(/\s+/g,' ').trim();return r?.ID_Vivienda||'—'}
-function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado==='Pendiente');if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Reactivación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
+function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&['Abierta','Pendiente'].includes(r.Estado));if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Reactivación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
 function incidentSummaryForVehicle(id){const rows=(state.cache.adminIncidents||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');if(!rows.length)return '<span class="request-chip none">—</span>';const first=rows[0];return `<button type="button" class="request-chip request-chip-btn incident-chip-btn" data-incident-id="${esc(first.ID_Incidencia)}" title="Abrir incidencia">● ${rows.length} pendiente${rows.length===1?'':'s'}</button>`}
 function invalidateClientParkingData(){delete state.cache.adminRequests;delete state.cache.adminIncidents;delete state.cache.vehicles;delete state.cache.ownerHousing;delete state.cache.ownerVehicles;delete state.cache.ownerRequests;delete state.cache.ownerIncidents}
 function bindRequestLinks(){document.querySelectorAll('.request-chip-btn').forEach(b=>b.onclick=()=>{state.cache.requestFocus=b.dataset.requestId||'';go('requests')})}
