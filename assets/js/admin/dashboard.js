@@ -9,7 +9,7 @@ async function dashboard(){
         ${card(d.activeSlotVehicles,'Vehículos con slot activos','','vehicles-active-slot')}
         ${card(d.activeMotorcycles,'Motos activas','Control por matrícula','vehicles-motorcycles')}
         ${card(d.suspendedVehicles,'Suspendidos','','vehicles-suspended',d.suspendedVehicles>0)}
-        ${card(d.inactiveVehicles||0,'Inactivos','','vehicles-inactive',d.inactiveVehicles>0)}
+        ${card(d.inactiveVehicles||0,'Desasignados','','vehicles-inactive',d.inactiveVehicles>0)}
         ${card(d.lowVehicles,'De baja','','vehicles-low')}
         <article class="summary-card"><b>${esc(d.occupiedSlots)}</b><span>Slots ocupados</span><small>${esc(d.availableSlots)} libres de ${esc(d.slotCapacity)}</small><div class="slot-meter"><span style="width:${Math.max(0,Math.min(100,pct))}%"></span></div></article>
       </div></section>
@@ -36,7 +36,7 @@ function openSummaryAction(action){
   if(action==='vehicles-active-slot'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Vehículo con slot'}};go('vehicles');return}
   if(action==='vehicles-motorcycles'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Suspendido'}};go('vehicles');return}
-  if(action==='vehicles-inactive'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Inactivo'}};go('vehicles');return}
+  if(action==='vehicles-inactive'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Desasignado'}};go('vehicles');return}
   if(action==='vehicles-low'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Baja'}};go('vehicles');return}
     if(action==='incidents-followup'){state.cache.incidentPreset={status:'Abierta',followup:true};go('incidents');return}
   if(action==='vehicles-active-revoked'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',QR_Estado:'Revocado',__Clase:'Vehículo con slot'}};go('vehicles');return}

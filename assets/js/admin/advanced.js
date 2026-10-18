@@ -26,7 +26,7 @@ async function runBulkVehicleAction(action){
   const ids=selectedVehicleIds();if(!ids.length){toast('Selecciona al menos un vehículo.',true);return}
   try{const p=await call('bulkVehiclePreview',{ids,action}),label={SUSPENDER:'Suspender',BAJA:'Dar de baja',REVOCAR_QR:'Revocar QR'}[action]||action;
     const lines=[`${p.selected} seleccionado(s): ${p.cars} vehículo(s) con slot y ${p.motos} moto(s).`];
-    if(p.stateChanges)lines.push(`${p.stateChanges} cambiarán de estado.`);if(p.slotsReleased)lines.push(`${p.slotsReleased} slot(s) serán liberados.`);if(p.qrRevoked)lines.push(`${p.qrRevoked} QR serán revocados.`);if(p.temporalsAnnulled)lines.push(`${p.temporalsAnnulled} temporal(es) vigente(s) serán anulados.`);if(p.qrSkippedMotos)lines.push(`${p.qrSkippedMotos} moto(s) se omitirán porque no usan QR.`);
+    if(p.stateChanges)lines.push(`${p.stateChanges} cambiarán de estado.`);if(p.slotsReleased)lines.push(`${p.slotsReleased} slot(s) serán liberados.`);if(p.qrRevoked)lines.push(`${p.qrRevoked} QR serán revocados.`);if(p.qrRemoved)lines.push(`${p.qrRemoved} QR dejarán de estar asignados.`);if(p.temporalsAnnulled)lines.push(`${p.temporalsAnnulled} temporal(es) vigente(s) serán anulados.`);if(p.qrSkippedMotos)lines.push(`${p.qrSkippedMotos} moto(s) se omitirán porque no usan QR.`);
     if(!confirm(`${label}\n\n${lines.join('\n')}\n\n¿Confirmar operación?`))return;
     const out=await call('bulkVehicleAction',{ids,action});invalidateClientParkingData();toast(`${out.changed} vehículo(s) actualizados.`);manager('vehicles')
   }catch(e){err(e)}
@@ -57,14 +57,13 @@ async function vehicleDetailView(id,backFn=null){
     const h=(data.options?.housing||[]).find(x=>x.ID_Vivienda===v.ID_Vivienda),isMoto=v.Tipo==='Moto',temp=v.PeriodoTemporalActual;
     $('#main').innerHTML=`<div class="head"><div><h1>${esc(v.MatriculaHabitual)}</h1><div class="muted">Ficha del vehículo · ${esc(h?housingShort(h):v.ID_Vivienda||'')}</div></div><button class="secondary" id="vd-back">Volver</button></div>
       <section class="card"><div class="details"><div><small>Clase / tipo</small>${esc(isMoto?'Moto':v.Tipo||'Vehículo')}</div><div><small>Estado</small>${esc(v.Estado)}</div><div><small>Slot</small>${esc(isMoto?'No aplica':v.Slot||'Liberado')}</div><div><small>QR</small>${esc(isMoto?'No aplica':v.QR_Estado||'—')}</div><div><small>Marca/modelo</small>${esc([v.Marca,v.Modelo].filter(Boolean).join(' ')||'—')}</div><div><small>Temporal vigente</small>${temp?`${esc(temp.MatriculaTemporal)} · hasta ${esc(dateEs(temp.Hasta))}`:'—'}</div></div>
-      <div class="actions" style="margin-top:1rem"><button id="vd-edit">Editar</button><button class="secondary" id="vd-temporals">Temporales</button>${!isMoto?`<button class="secondary" id="vd-qr">QR</button>`:''}<button class="secondary" id="vd-history">Historial</button>${v.Estado==='Activo'?`<button class="secondary" id="vd-suspend">Suspender</button><button class="danger" id="vd-low">Dar de baja</button>`:''}${v.Estado!=='Activo'?`<button class="secondary" id="vd-reactivate">Reactivar</button>`:''}<button class="secondary" id="vd-replace">Reemplazar</button></div></section><div id="editor" style="margin-top:1rem"></div>`;
+      <div class="actions" style="margin-top:1rem"><button id="vd-edit">Editar</button><button class="secondary" id="vd-temporals">Temporales</button>${!isMoto?`<button class="secondary" id="vd-qr">QR</button>`:''}<button class="secondary" id="vd-history">Historial</button>${v.Estado==='Activo'?`<button class="secondary" id="vd-suspend">Suspender</button><button class="danger" id="vd-low">Dar de baja</button>`:''}<button class="secondary" id="vd-replace">Reemplazar</button></div></section><div id="editor" style="margin-top:1rem"></div>`;
     $('#vd-back').onclick=backFn||(()=>go('vehicles'));$('#vd-edit').onclick=()=>vehicleEditor(v);$('#vd-temporals').onclick=()=>temporaryPeriodsPanel(v,()=>vehicleDetailView(v.ID_Vehiculo,backFn));$('#vd-history').onclick=()=>vehicleHistoryView(v.ID_Vehiculo,()=>vehicleDetailView(v.ID_Vehiculo,backFn));$('#vd-replace').onclick=()=>replaceVehicleView(v);
     if($('#vd-qr'))$('#vd-qr').onclick=()=>showQr(v,()=>vehicleDetailView(v.ID_Vehiculo,backFn));
     if($('#vd-suspend'))$('#vd-suspend').onclick=()=>quickVehicleState(v,'Suspendido',backFn);if($('#vd-low'))$('#vd-low').onclick=()=>quickVehicleState(v,'Baja',backFn);
-    if($('#vd-reactivate'))$('#vd-reactivate').onclick=()=>{vehicleEditor(v);toast('Selecciona Activo y, si corresponde, un slot libre.');};
   }catch(e){err(e)}
 }
-async function quickVehicleState(v,newState,backFn){const impact=[newState==='Suspendido'?'El vehículo quedará suspendido.':'El vehículo será dado de baja.',v.Tipo==='Moto'?'No ocupa slot.':v.Slot?`Se liberará el Slot ${v.Slot}.`:'',v.Tipo==='Moto'?'':'El QR quedará revocado.',v.PeriodoTemporalActual?`Se anulará el temporal ${v.PeriodoTemporalActual.MatriculaTemporal}.`:''].filter(Boolean).join('\n');if(!confirm(`${impact}\n\n¿Confirmar?`))return;try{await call('saveVehicle',Object.assign({},v,{Estado:newState}));invalidateClientParkingData();toast(`Vehículo ${newState.toLowerCase()}.`);vehicleDetailView(v.ID_Vehiculo,backFn)}catch(e){err(e)}}
+async function quickVehicleState(v,newState,backFn){const impact=[newState==='Suspendido'?'El vehículo quedará suspendido.':'El vehículo será dado de baja.',v.Tipo==='Moto'?'No ocupa slot.':v.Slot?`Se liberará el Slot ${v.Slot}.`:'',v.Tipo==='Moto'?'':'El vehículo quedará sin QR asignado.',v.PeriodoTemporalActual?`Se anulará el temporal ${v.PeriodoTemporalActual.MatriculaTemporal}.`:''].filter(Boolean).join('\n');if(!confirm(`${impact}\n\n¿Confirmar?`))return;try{await call('saveVehicle',Object.assign({},v,{Estado:newState}));invalidateClientParkingData();toast(`Vehículo ${newState.toLowerCase()}.`);vehicleDetailView(v.ID_Vehiculo,backFn)}catch(e){err(e)}}
 
 
 // 1.2.12 - ficha operativa de vivienda
@@ -197,13 +196,13 @@ async function configurationView(initialTab='identity'){
     const editable=canConfigure();
     if(!editable)initialTab='system';
     const s=editable?await call('getSettings'):appSettings();
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad de la comunidad y estado técnico del sistema.':'Estado técnico y diagnóstico del sistema.'}</div></div>${editable?'<button type="button" class="secondary" id="config-system-shortcut">Sistema</button>':''}</div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad de la comunidad y estado técnico del sistema.':'Estado técnico y diagnóstico del sistema.'}</div></div></div>
       <div class="config-tabs" role="tablist" aria-label="Configuración">
         ${editable?'<button type="button" class="config-tab active" data-config-tab="identity">Identidad</button>':''}
         <button type="button" class="config-tab ${editable?'':'active'}" data-config-tab="system">Sistema</button>
       </div>
       <div id="config-panel"></div>`;
-    const panel=$('#config-panel'),systemShortcut=$('#config-system-shortcut'),tabs=[...document.querySelectorAll('[data-config-tab]')];
+    const panel=$('#config-panel'),tabs=[...document.querySelectorAll('[data-config-tab]')];
     const setActive=tab=>tabs.forEach(b=>b.classList.toggle('active',b.dataset.configTab===tab));
 
     async function renderIdentity(){
@@ -259,7 +258,7 @@ async function configurationView(initialTab='identity'){
       async function refreshOverview(){const box=$('#perf-overview');if(!box)return;try{const p=await call('systemPerformanceHistory'),health=(p.health||[]).map(x=>`<div class="health-card ${esc(x.tone||'neutral')}"><span>${esc(x.label||'')}</span><b>${esc(x.value||'—')}</b><small>${esc(x.detail||'')}</small></div>`).join(''),typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real',roundtrip:'Round-trip',concurrency:'Concurrencia'},history=(p.history||[]).slice(0,8).map(x=>{const slow=(x.metrics||[]).slice().sort((a,b)=>Number(b.ms||0)-Number(a.ms||0))[0];return `<div class="perf-history-row"><div><b>${esc(typeLabel[x.type]||x.type||'Prueba')}</b><span>${esc(x.checkedAt||'')}</span></div><div><span>${slow?esc(slow.label)+' · '+Number(slow.ms||0)+' ms':''}</span><strong class="perf-badge ${performanceHistoryTone(x.totalMs,x.ok)}">${Number(x.totalMs||0)} ms</strong></div></div>`}).join('');box.className='';box.innerHTML=`<section class="perf-health"><h3>Resumen de salud</h3><div class="health-grid">${health}</div></section><section class="perf-history"><div class="system-status-head"><div><h3>Histórico de diagnósticos</h3><p class="muted">Últimas comprobaciones técnicas guardadas sin datos personales.</p></div></div>${history||'<div class="diagnostic-empty"><span>Todavía no hay histórico suficiente.</span></div>'}</section>`}catch(e){box.className='diagnostic-empty';box.innerHTML=`<b>Histórico de diagnósticos</b><span>${esc(e.message||String(e))}</span>`}}
       loadStatus();
     }
-    tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());if(systemShortcut)systemShortcut.onclick=renderSystem;
+    tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());
     if(initialTab==='system')await renderSystem();else await renderIdentity();
   }catch(e){err(e)}
 }
