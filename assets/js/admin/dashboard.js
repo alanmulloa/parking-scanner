@@ -9,13 +9,14 @@ async function dashboard(){
         ${card(d.activeSlotVehicles,'Vehículos con slot activos','','vehicles-active-slot')}
         ${card(d.activeMotorcycles,'Motos activas','Control por matrícula','vehicles-motorcycles')}
         ${card(d.suspendedVehicles,'Suspendidos','','vehicles-suspended',d.suspendedVehicles>0)}
+        ${card(d.inactiveVehicles||0,'Inactivos','','vehicles-inactive',d.inactiveVehicles>0)}
         ${card(d.lowVehicles,'De baja','','vehicles-low')}
         <article class="summary-card"><b>${esc(d.occupiedSlots)}</b><span>Slots ocupados</span><small>${esc(d.availableSlots)} libres de ${esc(d.slotCapacity)}</small><div class="slot-meter"><span style="width:${Math.max(0,Math.min(100,pct))}%"></span></div></article>
       </div></section>
       <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
         ${card(d.pendingRequests,'Solicitudes abiertas','Requieren revisión','requests',d.pendingRequests>0)}
         ${card(d.openIncidents,'Incidencias abiertas','Pendientes de resolución','incidents',d.openIncidents>0)}
-        ${card(d.revoked,'QR revocados','Solo vehículos con QR','vehicles-revoked',d.revoked>0)}
+        ${card(d.repeatOpenIncidents||0,'Incidencias con seguimiento','Más de un intento registrado','incidents-followup',(d.repeatOpenIncidents||0)>0)}
         ${card(d.activeWithoutQr,'Activos sin QR válido','No incluye motos','vehicles-active-revoked',d.activeWithoutQr>0)}
         ${card(d.temporary,'Temporales vigentes','','vehicles-temporary')}
         ${card(d.temporaryExpiring7,'Temporales que vencen ≤ 7 días','Revisar próximos vencimientos','vehicles-temporary-expiring',d.temporaryExpiring7>0)}
@@ -35,8 +36,9 @@ function openSummaryAction(action){
   if(action==='vehicles-active-slot'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Vehículo con slot'}};go('vehicles');return}
   if(action==='vehicles-motorcycles'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',__Clase:'Moto'}};go('vehicles');return}
   if(action==='vehicles-suspended'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Suspendido'}};go('vehicles');return}
+  if(action==='vehicles-inactive'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Inactivo'}};go('vehicles');return}
   if(action==='vehicles-low'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Baja'}};go('vehicles');return}
-  if(action==='vehicles-revoked'){state.cache.tablePreset={kind:'vehicles',filters:{QR_Estado:'Revocado',__Clase:'Vehículo con slot'}};go('vehicles');return}
+    if(action==='incidents-followup'){state.cache.incidentPreset={status:'Abierta',followup:true};go('incidents');return}
   if(action==='vehicles-active-revoked'){state.cache.tablePreset={kind:'vehicles',filters:{Estado:'Activo',QR_Estado:'Revocado',__Clase:'Vehículo con slot'}};go('vehicles');return}
   if(action==='vehicles-temporary'){state.cache.tablePreset={kind:'vehicles',filters:{__Temporal:'Vigente'}};go('vehicles');return}
   if(action==='vehicles-temporary-expiring'){state.cache.tablePreset={kind:'vehicles',filters:{__Temporal:'Vence en 7 días'}};go('vehicles');return}
