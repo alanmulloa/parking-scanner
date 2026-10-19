@@ -11,7 +11,7 @@ async function incidents(openId=''){
     const repeatOnly=!!navPreset?.followup;
     const filtered=()=>{
       const q=$('#incident-search').value.trim().toLowerCase(),type=$('#incident-type').value,status=$('#incident-state').value,origin=$('#incident-origin').value,period=$('#incident-period').value,from=$('#incident-from').value,to=$('#incident-to').value,group=$('#incident-group').value;
-      saveViewUiState('incidents',{q,type,status,origin,period,from,to,group,page,sortKey,sortDir,v:'1.2.13.14-FIX11.2'});
+      saveViewUiState('incidents',{q,type,status,origin,period,from,to,group,page,sortKey,sortDir,v:'1.2.13.14-FIX11.3'});
       const val=(r,k)=>k==='Vivienda'?incidentHouse(r):k==='MatriculaObservada'?incidentPlate(r):r[k]||'';
       return rows.filter(r=>(!type||r.Tipo===type)&&(!status||r.Estado===status)&&(!origin||(r.OrigenControl||'Manual')===origin)&&(!repeatOnly||Number(r.Intentos||1)>1)&&periodMatches(r.FechaHora,period,from,to)&&[...Object.values(r),recordHousingLabel(r,housingMap[r.ID_Vivienda])].join(' ').toLowerCase().includes(q)).sort((a,b)=>{if(group!=='none'){const ga=group==='plate'?incidentPlate(a):incidentHouse(a),gb=group==='plate'?incidentPlate(b):incidentHouse(b);const gc=naturalSort(ga,gb);if(gc)return gc}const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true,sensitivity:'base'});return sortDir==='asc'?c:-c});
     };
