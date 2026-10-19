@@ -196,10 +196,11 @@ async function configurationView(initialTab='identity'){
     const editable=canConfigure();
     if(!editable)initialTab='system';
     const s=editable?await call('getSettings'):appSettings();
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad de la comunidad y estado técnico del sistema.':'Estado técnico y diagnóstico del sistema.'}</div></div></div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad, carga inicial de datos y estado técnico del sistema.':'Carga inicial de datos y diagnóstico del sistema.'}</div></div></div>
       <div class="config-tabs" role="tablist" aria-label="Configuración">
-        ${editable?'<button type="button" class="config-tab active" data-config-tab="identity">Identidad</button>':''}
-        <button type="button" class="config-tab ${editable?'':'active'}" data-config-tab="system">Sistema</button>
+        ${editable?'<button type="button" class="config-tab" data-config-tab="identity">Identidad</button>':''}
+        <button type="button" class="config-tab" data-config-tab="data">Datos</button>
+        <button type="button" class="config-tab" data-config-tab="system">Sistema</button>
       </div>
       <div id="config-panel"></div>`;
     const panel=$('#config-panel'),tabs=[...document.querySelectorAll('[data-config-tab]')];
@@ -231,6 +232,13 @@ async function configurationView(initialTab='identity'){
       form.onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const fd=new FormData(form),payload=Object.fromEntries(fd.entries()),out=await call('saveSettings',payload);Object.assign(s,out||{});state.cache.bootstrap.settings=out;applyParkingSettings(out);toast('Configuración guardada.');shell();go('config')}catch(x){toast(x.message,true);busy(b,false)}};
     }
 
+    async function renderData(){
+      setActive('data');
+      panel.innerHTML=`<section class="card"><div class="system-status-head"><div><h2>Importación de viviendas y propietarios</h2><p class="muted">Carga inicial o actualización controlada de viviendas, propietarios y correos. La importación siempre muestra una previsualización antes de aplicar cambios.</p></div></div><div class="actions"><button type="button" class="secondary" id="owner-template-config">Plantilla viviendas/propietarios</button><button type="button" id="owner-import-config">Importar viviendas/propietarios</button></div><p class="muted" style="margin-top:.8rem">La plantilla puede utilizar viviendas existentes o crear las que falten si activas esa opción durante la importación. Los cambios se registran en Auditoría.</p></section><div id="editor"></div>`;
+      $('#owner-template-config').onclick=downloadOwnerImportTemplate;
+      $('#owner-import-config').onclick=openOwnerImporter;
+    }
+
     async function renderSystem(){
       setActive('system');
       panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
@@ -258,7 +266,7 @@ async function configurationView(initialTab='identity'){
       async function refreshOverview(){const box=$('#perf-overview');if(!box)return;try{const p=await call('systemPerformanceHistory'),health=(p.health||[]).map(x=>`<div class="health-card ${esc(x.tone||'neutral')}"><span>${esc(x.label||'')}</span><b>${esc(x.value||'—')}</b><small>${esc(x.detail||'')}</small></div>`).join(''),typeLabel={diagnostic_full:'Diagnóstico completo',diagnostic_quick:'Prueba rápida',control:'Control',volume:'Volumen',sheets_real:'Sheets real',roundtrip:'Round-trip',concurrency:'Concurrencia'},history=(p.history||[]).slice(0,8).map(x=>{const slow=(x.metrics||[]).slice().sort((a,b)=>Number(b.ms||0)-Number(a.ms||0))[0];return `<div class="perf-history-row"><div><b>${esc(typeLabel[x.type]||x.type||'Prueba')}</b><span>${esc(x.checkedAt||'')}</span></div><div><span>${slow?esc(slow.label)+' · '+Number(slow.ms||0)+' ms':''}</span><strong class="perf-badge ${performanceHistoryTone(x.totalMs,x.ok)}">${Number(x.totalMs||0)} ms</strong></div></div>`}).join('');box.className='';box.innerHTML=`<section class="perf-health"><h3>Resumen de salud</h3><div class="health-grid">${health}</div></section><section class="perf-history"><div class="system-status-head"><div><h3>Histórico de diagnósticos</h3><p class="muted">Últimas comprobaciones técnicas guardadas sin datos personales.</p></div></div>${history||'<div class="diagnostic-empty"><span>Todavía no hay histórico suficiente.</span></div>'}</section>`}catch(e){box.className='diagnostic-empty';box.innerHTML=`<b>Histórico de diagnósticos</b><span>${esc(e.message||String(e))}</span>`}}
       loadStatus();
     }
-    tabs.forEach(b=>b.onclick=()=>b.dataset.configTab==='system'?renderSystem():renderIdentity());
-    if(initialTab==='system')await renderSystem();else await renderIdentity();
+    tabs.forEach(b=>b.onclick=()=>{const tab=b.dataset.configTab;if(tab==='system')return renderSystem();if(tab==='data')return renderData();return renderIdentity()});
+    if(initialTab==='system')await renderSystem();else if(initialTab==='data')await renderData();else await renderIdentity();
   }catch(e){err(e)}
 }
