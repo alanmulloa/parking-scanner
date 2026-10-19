@@ -7,7 +7,7 @@ async function control(token=''){
   const returnUrl=WEB_APP_URL||location.href.split('?')[0];
   const scannerUrl=EXTERNAL_SCANNER_URL+'?return='+encodeURIComponent(returnUrl);
   $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Escanea, comprueba y registra en pocos segundos.</p></section><div id="control-body" class="grid"><a class="btn big" id="scan" href="${esc(scannerUrl)}" target="_top">▣ ESCANEAR QR</a><button class="big" id="plate">⌕ BUSCAR MATRÍCULA</button><button class="big secondary" id="open-inc">! INCIDENCIAS ABIERTAS</button><button class="big secondary" id="new-inc">＋ REGISTRAR INCIDENCIA</button></div>`;
-  $('#plate').onclick=plateSearch;$('#open-inc').onclick=incidents;$('#new-inc').onclick=()=>incidentForm();
+  $('#plate').onclick=plateSearch;$('#open-inc').onclick=incidents;$('#new-inc').onclick=()=>{state.scanResult=null;incidentForm({source:'Manual',status:'Registro manual',manualEntry:true})};
 }
 async function startScanner(){
   $('#control-body').innerHTML=`<div class="card wide"><div class="head"><h2>Escanear QR</h2><button class="secondary" id="cback">Volver</button></div><div id="qr-reader" style="width:100%;min-height:260px"></div><div id="qr-file-reader" class="hide"></div><div id="camera-error"><div class="spinner"></div></div><div class="actions" style="margin-top:1rem"><button class="secondary" id="retry-camera" type="button">Reintentar cámara</button><label class="btn secondary" for="qr-file">Leer desde una foto</label><input id="qr-file" type="file" accept="image/*" capture="environment" class="hide"><button class="secondary" id="manual-code" type="button">Introducir código</button></div></div>`;
