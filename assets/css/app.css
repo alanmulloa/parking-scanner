@@ -1092,7 +1092,7 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .request-view-tabs button{padding:.58rem .85rem;background:transparent;color:#47615f;box-shadow:none}
 .request-view-tabs button.active{background:#fff;color:var(--brand);box-shadow:0 4px 14px rgba(19,48,49,.08)}
 .request-viewbar .count{color:var(--muted);font-size:.84rem}
-.request-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:0 0 1rem}
+.request-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8rem;margin:0 0 1rem}
 .request-stat-card{padding:1rem;display:flex;flex-direction:column;gap:.18rem;box-shadow:none}
 .request-stat-card>span{font-size:.76rem;font-weight:800;text-transform:uppercase;letter-spacing:.035em;color:var(--muted)}
 .request-stat-card>b{font-size:1.8rem;line-height:1.05;color:var(--brand)}
@@ -1133,9 +1133,9 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .request-dossier-description{max-width:760px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:.35rem}
 .vehicle-request-dossier-summary .vehicle-request-metrics{margin-bottom:.8rem}
 .empty.compact{padding:.75rem 0;text-align:left}
-@media(max-width:900px){.request-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.request-dossier-current,.request-dossier-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.requests-head{gap:.65rem}.request-viewbar{align-items:stretch;flex-direction:column}.request-view-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.request-view-tabs button{width:100%;min-width:0}.request-overview{grid-template-columns:1fr;gap:.55rem}.request-stat-card{padding:.8rem}.request-stat-card>b{font-size:1.45rem}.request-dossier-card{grid-template-columns:1fr;padding:.9rem}.request-dossier-card-title{align-items:flex-start;flex-direction:column}.request-dossier-card-action button{width:100%}.request-dossier-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .7rem}.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr 1fr}.request-dossier-item{align-items:stretch;flex-direction:column}.request-dossier-item>button{width:100%;min-height:44px}.request-dossier-description{white-space:normal}.request-dossier-detail .head>.actions{width:100%}.request-dossier-detail .head>.actions button{flex:1 1 100%;width:100%}.vehicle-request-dossier-summary .head{align-items:stretch}.vehicle-request-dossier-summary .head>button{width:100%}}
-@media(max-width:430px){.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr}.request-dossier-card-metrics{grid-template-columns:1fr}}
+@media(max-width:900px){.request-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.request-dossier-current,.request-dossier-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.requests-head{gap:.65rem}.request-viewbar{align-items:stretch;flex-direction:column}.request-view-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.request-view-tabs button{width:100%;min-width:0}.request-overview{grid-template-columns:1fr 1fr;gap:.55rem}.request-stat-card{padding:.8rem}.request-stat-card>b{font-size:1.45rem}.request-dossier-card{grid-template-columns:1fr;padding:.9rem}.request-dossier-card-title{align-items:flex-start;flex-direction:column}.request-dossier-card-action button{width:100%}.request-dossier-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .7rem}.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr 1fr}.request-dossier-item{align-items:stretch;flex-direction:column}.request-dossier-item>button{width:100%;min-height:44px}.request-dossier-description{white-space:normal}.request-dossier-detail .head>.actions{width:100%}.request-dossier-detail .head>.actions button{flex:1 1 100%;width:100%}.vehicle-request-dossier-summary .head{align-items:stretch}.vehicle-request-dossier-summary .head>button{width:100%}}
+@media(max-width:430px){.request-overview{grid-template-columns:1fr}.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr}.request-dossier-card-metrics{grid-template-columns:1fr}}
 
 
 /* 1.2.13.14-FIX11.9 - filtros plegables en movil */
