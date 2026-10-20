@@ -50,16 +50,42 @@ function incidentTypesForContext(p){
 
 function controlOpenIncidentsMarkup(r){
   const rows=r.openIncidents||[];if(!rows.length)return '';
-  return `<section class="control-open-incidents"><h3>Incidencias abiertas (${rows.length})</h3>${rows.map(x=>`<div class="control-open-incident"><div><b>${esc(x.Tipo)}</b>${x.Situacion?`<span class="subtle"> · ${esc(x.Situacion)}</span>`:''}</div><div class="subtle">Abierta ${esc(shortDateTime(x.FechaHora))} · Intentos ${esc(x.Intentos||1)} · Prioridad ${esc(x.Prioridad||'Normal')}</div><div class="actions"><button type="button" class="secondary control-view-incident" data-id="${esc(x.ID_Incidencia)}">Ver incidencia</button>${x.canFollowup?`<button type="button" class="control-follow-incident" data-id="${esc(x.ID_Incidencia)}">Registrar seguimiento</button>`:`<span class="subtle">${x.createdToday?'Creada hoy: seguimiento disponible mañana':x.followedToday?'Seguimiento de hoy ya registrado':''}</span>`}</div></div>`).join('')}</section>`;
+  return `<section class="control-open-incidents"><h3>Incidencias abiertas (${rows.length})</h3>${rows.map(x=>`<div class="control-open-incident"><div><b>${esc(x.Tipo)}</b>${x.Situacion?`<span class="subtle"> · ${esc(x.Situacion)}</span>`:''}${Number(x.linkedCount||0)>1?`<span class="subtle"> · Evento vinculado (${esc(x.linkedCount)})</span>`:''}</div><div class="subtle">Abierta ${esc(shortDateTime(x.FechaHora))} · Intentos ${esc(x.Intentos||1)} · Prioridad ${esc(x.Prioridad||'Normal')}</div><div class="actions"><button type="button" class="secondary control-view-incident" data-id="${esc(x.ID_Incidencia)}">Ver incidencia</button>${x.canFollowup?`<button type="button" class="control-follow-incident" data-id="${esc(x.ID_Incidencia)}">Registrar seguimiento</button>`:`<span class="subtle">${x.createdToday?'Creada hoy: seguimiento disponible mañana':x.followedToday?'Seguimiento de hoy ya registrado':''}</span>`}</div></div>`).join('')}</section>`;
+}
+
+function controlFollowupPlanText(plan){
+  const ops=plan?.operations||[],lines=[];
+  ops.forEach(op=>{
+    const detail=[op.Tipo,op.Situacion].filter(Boolean).join(' · '),plate=op.Matricula?` · ${op.Matricula}`:'';
+    if(op.action==='FOLLOWUP')lines.push(`• Seguimiento · ${op.ID_Incidencia} · ${detail}${plate}`);
+    else if(op.action==='CREATE')lines.push(`• Nueva incidencia · ${detail}${plate}`);
+    else if(op.action==='SKIP_TODAY')lines.push(`• Sin cambios · ${op.ID_Incidencia} · ya registrada/seguida hoy`);
+    else if(op.action==='SKIP_RESOLVED')lines.push(`• Sin cambios · ${op.ID_Incidencia} · incidencia vinculada resuelta`);
+  });
+  const s=plan?.summary||{};
+  return `Se registrará el evento de la siguiente forma:\n\n${lines.join('\n')}\n\nSeguimientos: ${s.followups||0} · Nuevas incidencias: ${s.created||0}${(s.skippedToday||s.skippedResolved)?` · Sin cambios: ${(s.skippedToday||0)+(s.skippedResolved||0)}`:''}\n\n¿Continuar?`;
 }
 
 function controlFollowupForm(r,incident){
-  const host=$('#control-body'),v=r.vehicle||{},plate=r.query||r.currentPlate||v.MatriculaHabitual||'';
+  const host=$('#control-body'),v=r.vehicle||{},linked=incident.linkedOpenIncidents||[],plate=incident.MatriculaObservada||r.query||r.currentPlate||v.MatriculaHabitual||'';
+  const linkedInfo=linked.length>1?`<div class="message wide"><b>Evento vinculado · ${esc(linked.length)} incidencias abiertas</b><br><span class="subtle">Al registrar el seguimiento se reevaluará el evento completo. Si la matrícula observada corresponde a otro vehículo, las incidencias existentes recibirán seguimiento y las patas nuevas se crearán como incidencias nuevas.</span><ul>${linked.map(x=>`<li>${esc(x.ID_Incidencia)} · ${esc(x.Tipo)}${x.Situacion?` · ${esc(x.Situacion)}`:''}${x.MatriculaInfraccion?` · ${esc(x.MatriculaInfraccion)}`:''}</li>`).join('')}</ul></div>`:'';
   document.body.classList.add('incident-entry-mode');
-  host.innerHTML=`<form class="card form incident-create-form" id="control-followup-form"><h2 class="wide">Registrar seguimiento</h2><div class="message wide"><b>${esc(incident.Tipo)}</b>${incident.Situacion?` · ${esc(incident.Situacion)}`:''}<br><span class="subtle">Incidencia ${esc(incident.ID_Incidencia)} · intento actual ${esc(incident.Intentos||1)}</span></div><div class="field"><label>Matrícula observada</label><input name="MatriculaObservada" value="${esc(plate)}" required></div><div class="field wide"><label>Observación *</label><textarea name="Observacion" required placeholder="Describe lo observado en este nuevo intento..."></textarea></div><div class="field"><label>Foto / evidencia *</label><input id="follow-photo" type="file" accept="image/*" capture="environment" required></div><input type="hidden" name="Foto"><div class="wide actions"><button type="submit">REGISTRAR SEGUIMIENTO</button><button type="button" class="secondary" id="cancel-followup">Cancelar</button></div></form>`;
+  host.innerHTML=`<form class="card form incident-create-form" id="control-followup-form"><h2 class="wide">Registrar seguimiento</h2><div class="message wide"><b>${esc(incident.Tipo)}</b>${incident.Situacion?` · ${esc(incident.Situacion)}`:''}<br><span class="subtle">Incidencia ${esc(incident.ID_Incidencia)} · intento actual ${esc(incident.Intentos||1)}</span></div>${linkedInfo}<div class="field"><label>Matrícula observada</label><input name="MatriculaObservada" value="${esc(plate)}" required></div><div class="field wide"><label>Observación *</label><textarea name="Observacion" required placeholder="Describe lo observado en este nuevo intento..."></textarea></div><div class="field"><label>Foto / evidencia *</label><input id="follow-photo" type="file" accept="image/*" capture="environment" required></div><input type="hidden" name="Foto"><div class="wide actions"><button type="submit">REGISTRAR SEGUIMIENTO</button><button type="button" class="secondary" id="cancel-followup">Cancelar</button></div></form>`;
   $('#cancel-followup').onclick=()=>{document.body.classList.remove('incident-entry-mode');resultCard(r)};
   $('#follow-photo').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>12*1024*1024){toast('La foto original no puede superar 12 MB.',true);e.target.value='';return}const submit=$('#control-followup-form button[type=submit]');busy(submit);try{const dataUrl=await optimizedImageData(file),out=await call('uploadPhoto',{dataUrl});$('#control-followup-form [name=Foto]').value=out.url;toast('Foto subida.')}catch(x){e.target.value='';$('#control-followup-form [name=Foto]').value='';err(x)}finally{busy(submit,false)}};
-  $('#control-followup-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter,data=Object.fromEntries(new FormData(e.target));if(!data.Foto){toast('La fotografía del seguimiento es obligatoria.',true);return}busy(b);try{await call('saveIncidentFollowup',{ids:[incident.ID_Incidencia],Observacion:data.Observacion,Foto:data.Foto,MatriculaObservada:data.MatriculaObservada,OrigenControl:r.source||'MATRICULA',EstadoOrigen:r.status||'',Situacion:incident.Situacion||''});toast('Seguimiento registrado.');document.body.classList.remove('incident-entry-mode');if(r.source==='QR'&&r.vehicle?.QR_Token)lookupQr(r.vehicle.QR_Token);else if(data.MatriculaObservada)resultCard(await call('searchPlate',{plate:data.MatriculaObservada}));else control()}catch(x){toast(x.message,true);busy(b,false)}};
+  $('#control-followup-form').onsubmit=async e=>{
+    e.preventDefault();const b=e.submitter,data=Object.fromEntries(new FormData(e.target));if(!data.Foto){toast('La fotografía del seguimiento es obligatoria.',true);return}
+    const payload={anchorId:incident.ID_Incidencia,autoEvent:true,Observacion:data.Observacion,Foto:data.Foto,MatriculaObservada:data.MatriculaObservada,OrigenControl:incident.OrigenControl||r.source||'MATRICULA',EstadoOrigen:incident.EstadoOrigen||r.status||''};
+    busy(b);try{
+      const plan=await call('previewIncidentFollowup',payload);
+      if(!plan.canSave){toast(plan.summary?.skippedToday?'Las incidencias vinculadas ya fueron registradas o seguidas hoy.':'No hay incidencias abiertas disponibles para seguimiento.',true);busy(b,false);return}
+      if(!confirm(controlFollowupPlanText(plan))){busy(b,false);return}
+      const out=await call('saveIncidentFollowup',payload),u=(out.updated||[]).length,c=(out.created||[]).length;
+      toast(c?`Evento registrado: ${u} seguimiento${u===1?'':'s'} y ${c} incidencia${c===1?' nueva':'s nuevas'}.`:`Seguimiento registrado en ${u} incidencia${u===1?'':'s'} vinculada${u===1?'':'s'}.`);
+      document.body.classList.remove('incident-entry-mode');
+      if(r.source==='QR'&&r.vehicle?.QR_Token)lookupQr(r.vehicle.QR_Token);else if(data.MatriculaObservada)resultCard(await call('searchPlate',{plate:data.MatriculaObservada}));else control();
+    }catch(x){toast(x.message,true);busy(b,false)}
+  };
 }
 
 function resultCard(r){
