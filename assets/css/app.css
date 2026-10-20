@@ -1085,3 +1085,68 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 @media(max-width:900px){.incident-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.incident-dossier-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.incidents-head{gap:.65rem}.incident-overview{grid-template-columns:1fr 1fr;gap:.55rem}.incident-stat-card{padding:.8rem}.incident-stat-card>b{font-size:1.45rem}.incident-viewbar{align-items:stretch;flex-direction:column}.incident-view-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.incident-view-tabs button{width:100%;min-width:0}.incident-dossier-card{grid-template-columns:1fr;padding:.9rem}.incident-dossier-card-title{align-items:flex-start;flex-direction:column}.incident-dossier-status{justify-content:flex-start}.incident-dossier-card-action button{width:100%}.incident-dossier-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .7rem}.incident-dossier-metrics{grid-template-columns:1fr 1fr}.incident-dossier-item{align-items:stretch;flex-direction:column}.incident-dossier-item>button{width:100%;min-height:44px}.incident-dossier-description{white-space:normal}.incident-dossier-detail .head>button{width:100%}}
 @media(max-width:430px){.incident-overview{grid-template-columns:1fr}.incident-dossier-metrics{grid-template-columns:1fr 1fr}.incident-dossier-card-metrics{grid-template-columns:1fr}}
+
+/* 1.2.13.14-FIX11.8 - Request inbox + vehicle request dossiers */
+.request-viewbar{display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin:.2rem 0 .8rem}
+.request-view-tabs{display:inline-flex;gap:.35rem;padding:.25rem;background:#eaf1f0;border-radius:13px}
+.request-view-tabs button{padding:.58rem .85rem;background:transparent;color:#47615f;box-shadow:none}
+.request-view-tabs button.active{background:#fff;color:var(--brand);box-shadow:0 4px 14px rgba(19,48,49,.08)}
+.request-viewbar .count{color:var(--muted);font-size:.84rem}
+.request-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:0 0 1rem}
+.request-stat-card{padding:1rem;display:flex;flex-direction:column;gap:.18rem;box-shadow:none}
+.request-stat-card>span{font-size:.76rem;font-weight:800;text-transform:uppercase;letter-spacing:.035em;color:var(--muted)}
+.request-stat-card>b{font-size:1.8rem;line-height:1.05;color:var(--brand)}
+.request-stat-card>small{font-size:.76rem;color:var(--muted)}
+.request-dossier-list{display:grid;gap:.75rem}
+.request-dossier-card{padding:1rem 1.05rem;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;box-shadow:none;border-left:4px solid #c8d7d5}
+.request-dossier-card.has-open{border-left-color:#c98a2b}
+.request-dossier-card-title{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem}
+.request-dossier-card-title>div{display:grid;gap:.12rem}
+.request-dossier-plate{display:block;font-size:1.18rem;letter-spacing:.025em}
+.request-dossier-card-metrics{display:flex;gap:.9rem;flex-wrap:wrap;margin:.55rem 0;color:#53696c;font-size:.8rem}
+.request-dossier-card-metrics b{color:var(--ink)}
+.request-dossier-tags{display:flex;gap:.35rem;flex-wrap:wrap}
+.request-dossier-tags span{display:inline-flex;align-items:center;min-height:26px;padding:.22rem .55rem;border-radius:999px;background:#f1f6f5;color:#345956;font-size:.74rem;font-weight:700}
+.request-dossier-card-action{display:flex;align-items:center}
+.request-dossier-card-action button{white-space:nowrap}
+.request-dossier-detail{margin-bottom:1rem;border-top:4px solid var(--brand)}
+.request-dossier-detail .eyebrow{font-size:.68rem;font-weight:850;letter-spacing:.08em;color:var(--brand);margin-bottom:.15rem}
+.request-dossier-detail h2{margin:.05rem 0 .18rem}
+.request-dossier-current{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin:.35rem 0 .8rem}
+.request-dossier-current>div{border:1px solid var(--line);border-radius:12px;padding:.72rem .78rem;background:#fbfcfc;display:flex;flex-direction:column;gap:.14rem;min-width:0}
+.request-dossier-current small{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.035em;font-weight:800}
+.request-dossier-current b{overflow-wrap:anywhere}
+.request-dossier-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin:.4rem 0 1rem}
+.request-dossier-metrics>div{border:1px solid var(--line);border-radius:12px;padding:.75rem;background:#f8fbfb;display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.request-dossier-metrics b{font-size:1.35rem;color:var(--brand);overflow-wrap:anywhere}
+.request-dossier-metrics span{font-size:.75rem;color:var(--muted)}
+.request-dossier-section{margin-top:1rem}
+.request-dossier-section-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.45rem}
+.request-dossier-section-head h3{margin:0}
+.request-dossier-section-head>span{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 .45rem;border-radius:999px;background:#edf5f3;color:var(--brand);font-size:.75rem;font-weight:800}
+.request-dossier-item{display:flex;align-items:center;justify-content:space-between;gap:.85rem;padding:.85rem 0;border-top:1px solid var(--line)}
+.request-dossier-item:first-of-type{border-top:0}
+.request-dossier-item.is-history{opacity:.88}
+.request-dossier-item-main{min-width:0;flex:1}
+.request-dossier-item-title{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.request-dossier-item-meta{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.35rem;color:var(--muted);font-size:.75rem}
+.request-dossier-description{max-width:760px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:.35rem}
+.vehicle-request-dossier-summary .vehicle-request-metrics{margin-bottom:.8rem}
+.empty.compact{padding:.75rem 0;text-align:left}
+@media(max-width:900px){.request-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.request-dossier-current,.request-dossier-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.requests-head{gap:.65rem}.request-viewbar{align-items:stretch;flex-direction:column}.request-view-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.request-view-tabs button{width:100%;min-width:0}.request-overview{grid-template-columns:1fr;gap:.55rem}.request-stat-card{padding:.8rem}.request-stat-card>b{font-size:1.45rem}.request-dossier-card{grid-template-columns:1fr;padding:.9rem}.request-dossier-card-title{align-items:flex-start;flex-direction:column}.request-dossier-card-action button{width:100%}.request-dossier-card-metrics{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .7rem}.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr 1fr}.request-dossier-item{align-items:stretch;flex-direction:column}.request-dossier-item>button{width:100%;min-height:44px}.request-dossier-description{white-space:normal}.request-dossier-detail .head>.actions{width:100%}.request-dossier-detail .head>.actions button{flex:1 1 100%;width:100%}.vehicle-request-dossier-summary .head{align-items:stretch}.vehicle-request-dossier-summary .head>button{width:100%}}
+@media(max-width:430px){.request-dossier-current,.request-dossier-metrics{grid-template-columns:1fr}.request-dossier-card-metrics{grid-template-columns:1fr}}
+
+
+/* 1.2.13.14-FIX11.9 - filtros plegables en movil */
+.mobile-filter-toggle-row{display:none}
+@media(max-width:720px){
+  .mobile-filter-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin:0 0 .55rem;min-width:0}
+  .mobile-filter-toggle{min-height:42px!important;padding:.58rem .78rem!important;flex:0 1 auto!important;width:auto!important;border-radius:11px!important}
+  .mobile-filter-active-badge{display:inline-flex;align-items:center;justify-content:center;padding:.16rem .42rem;border-radius:999px;background:#fff;color:#086b5b;font-size:.68rem;font-weight:850;white-space:nowrap}
+  .mobile-filter-result{min-width:0;margin-left:auto;color:var(--muted);font-size:.78rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mobile-filter-chevron{font-size:.88rem;line-height:1}
+  body:has(#mobile-nav) .filterbar.mobile-filter-collapsed{display:none!important}
+  .mobile-filter-toggle-row.is-open{margin-bottom:.4rem}
+}
+@media(min-width:721px){.mobile-filter-toggle-row{display:none!important}.filterbar.mobile-filter-collapsed{display:flex}}

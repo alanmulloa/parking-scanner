@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.13.14-FIX11.7';
+const APP_FRONTEND_VERSION='1.2.13.14-FIX11.9';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -105,6 +105,59 @@ function clientDateOnly(value){const m=String(value||'').match(/^(\d{4})-(\d{2})
 function periodMatches(value,period,from='',to=''){if(!period)return true;const d=clientDateOnly(value);if(!d)return false;const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;const dateAgo=n=>{const x=new Date(now.getFullYear(),now.getMonth(),now.getDate()-n);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`};if(period==='today')return d===today;if(period==='7')return d>=dateAgo(6)&&d<=today;if(period==='30')return d>=dateAgo(29)&&d<=today;if(period==='month'){const p=today.slice(0,7);return d.slice(0,7)===p}if(period==='prevmonth'){const x=new Date(now.getFullYear(),now.getMonth()-1,1),p=`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`;return d.slice(0,7)===p}if(period==='custom')return (!from||d>=from)&&(!to||d<=to);return true}
 function periodFilterFields(prefix){return `<div class="field"><label>Período</label><select id="${prefix}-period"><option value="">Todo</option><option value="today">Hoy</option><option value="7">7 días</option><option value="30">30 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="custom">Personalizado</option></select></div><div class="field period-custom hide" id="${prefix}-from-wrap"><label>Desde</label><input type="date" id="${prefix}-from"></div><div class="field period-custom hide" id="${prefix}-to-wrap"><label>Hasta</label><input type="date" id="${prefix}-to"></div>`}
 function bindPeriodVisibility(prefix){const p=$(`#${prefix}-period`),a=$(`#${prefix}-from-wrap`),b=$(`#${prefix}-to-wrap`);const refresh=()=>{const show=p&&p.value==='custom';a&&a.classList.toggle('hide',!show);b&&b.classList.toggle('hide',!show)};if(p)p.addEventListener('change',refresh);refresh()}
+
+// 1.2.13.14-FIX11.9 - filtros plegables en movil
+function mobileFilterActiveCount(bar){
+  if(!bar)return 0;
+  return [...bar.querySelectorAll('input,select,textarea')].filter(el=>{
+    if(el.disabled||el.type==='hidden'||el.closest('.hide'))return false;
+    if(el.type==='checkbox'||el.type==='radio')return !!el.checked;
+    return String(el.value||'').trim()!=='';
+  }).length;
+}
+function mobileFilterStorageKey(bar,index){
+  const explicit=bar.id||[...bar.classList].filter(c=>c!=='filterbar').join('.')||`filterbar-${index}`;
+  return `${state.view||'view'}:${explicit}`;
+}
+function enhanceMobileFilterBars(root=document){
+  const scope=root&&root.querySelectorAll?root:document;
+  [...scope.querySelectorAll('.filterbar')].forEach((bar,index)=>{
+    if(bar.dataset.mobileFilterReady==='1')return;
+    bar.dataset.mobileFilterReady='1';
+    const key=mobileFilterStorageKey(bar,index),row=document.createElement('div');
+    row.className='mobile-filter-toggle-row';
+    row.innerHTML='<button type="button" class="secondary mobile-filter-toggle" aria-expanded="false"><span class="mobile-filter-toggle-label">Filtros</span><span class="mobile-filter-active-badge hide"></span><span class="mobile-filter-chevron" aria-hidden="true">⌄</span></button><span class="mobile-filter-result" aria-live="polite"></span>';
+    bar.parentNode.insertBefore(row,bar);
+    const btn=row.querySelector('.mobile-filter-toggle'),badge=row.querySelector('.mobile-filter-active-badge'),result=row.querySelector('.mobile-filter-result'),chevron=row.querySelector('.mobile-filter-chevron'),count=bar.querySelector('.count');
+    const saved=viewUiState(state.view).mobileFilterPanels||{},initialOpen=saved[key]===true;
+    const sync=()=>{
+      const active=mobileFilterActiveCount(bar);
+      badge.textContent=active?`${active} activo${active===1?'':'s'}`:'';
+      badge.classList.toggle('hide',!active);
+      result.textContent=count?count.textContent:'';
+    };
+    const setOpen=(open,persist=true)=>{
+      bar.classList.toggle('mobile-filter-collapsed',!open);
+      row.classList.toggle('is-open',open);
+      btn.classList.toggle('open',open);
+      btn.setAttribute('aria-expanded',String(open));
+      btn.querySelector('.mobile-filter-toggle-label').textContent=open?'Ocultar filtros':'Filtros';
+      chevron.textContent=open?'⌃':'⌄';
+      if(persist){const current=viewUiState(state.view).mobileFilterPanels||{};saveViewUiState(state.view,{mobileFilterPanels:Object.assign({},current,{[key]:open})})}
+      sync();
+    };
+    btn.addEventListener('click',()=>setOpen(bar.classList.contains('mobile-filter-collapsed')));
+    [...bar.querySelectorAll('input,select,textarea')].forEach(el=>{el.addEventListener('input',()=>setTimeout(sync,0));el.addEventListener('change',()=>setTimeout(sync,0))});
+    if(count&&window.MutationObserver)new MutationObserver(sync).observe(count,{childList:true,subtree:true,characterData:true});
+    setOpen(initialOpen,false);
+  });
+}
+(function installMobileFilterEnhancer(){
+  if(window.__parkingMobileFilterEnhancerInstalled)return;window.__parkingMobileFilterEnhancerInstalled=true;
+  let queued=false;const run=()=>{queued=false;const main=document.querySelector('#main');if(main)enhanceMobileFilterBars(main)};const schedule=()=>{if(queued)return;queued=true;setTimeout(run,0)};
+  if(window.MutationObserver)new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('resize',schedule);
+})();
 
 
 // 1.2.12 - menús de acciones flotantes y agrupaciones estables
