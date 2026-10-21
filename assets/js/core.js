@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.13.14-FIX11.16';
+const APP_FRONTEND_VERSION='1.2.13.14-FIX11.17';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -106,7 +106,7 @@ function periodMatches(value,period,from='',to=''){if(!period)return true;const 
 function periodFilterFields(prefix){return `<div class="field"><label>Período</label><select id="${prefix}-period"><option value="">Todo</option><option value="today">Hoy</option><option value="7">7 días</option><option value="30">30 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="custom">Personalizado</option></select></div><div class="field period-custom hide" id="${prefix}-from-wrap"><label>Desde</label><input type="date" id="${prefix}-from"></div><div class="field period-custom hide" id="${prefix}-to-wrap"><label>Hasta</label><input type="date" id="${prefix}-to"></div>`}
 function bindPeriodVisibility(prefix){const p=$(`#${prefix}-period`),a=$(`#${prefix}-from-wrap`),b=$(`#${prefix}-to-wrap`);const refresh=()=>{const show=p&&p.value==='custom';a&&a.classList.toggle('hide',!show);b&&b.classList.toggle('hide',!show)};if(p)p.addEventListener('change',refresh);refresh()}
 
-// 1.2.13.14-FIX11.16 - filtros plegables en movil
+// 1.2.13.14-FIX11.17 - filtros plegables en movil
 function mobileFilterActiveCount(bar){
   if(!bar)return 0;
   return [...bar.querySelectorAll('input,select,textarea')].filter(el=>{
