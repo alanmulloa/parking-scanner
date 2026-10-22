@@ -1,5 +1,5 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='1.2.13.14-FIX11.25';
+const APP_FRONTEND_VERSION='1.2.13.14-FIX11.26';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
@@ -106,7 +106,7 @@ function periodMatches(value,period,from='',to=''){if(!period)return true;const 
 function periodFilterFields(prefix){return `<div class="field"><label>Período</label><select id="${prefix}-period"><option value="">Todo</option><option value="today">Hoy</option><option value="7">7 días</option><option value="30">30 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="custom">Personalizado</option></select></div><div class="field period-custom hide" id="${prefix}-from-wrap"><label>Desde</label><input type="date" id="${prefix}-from"></div><div class="field period-custom hide" id="${prefix}-to-wrap"><label>Hasta</label><input type="date" id="${prefix}-to"></div>`}
 function bindPeriodVisibility(prefix){const p=$(`#${prefix}-period`),a=$(`#${prefix}-from-wrap`),b=$(`#${prefix}-to-wrap`);const refresh=()=>{const show=p&&p.value==='custom';a&&a.classList.toggle('hide',!show);b&&b.classList.toggle('hide',!show)};if(p)p.addEventListener('change',refresh);refresh()}
 
-// 1.2.13.14-FIX11.25 - filtros plegables en movil
+// 1.2.13.14-FIX11.26 - filtros plegables en movil
 function mobileFilterActiveCount(bar){
   if(!bar)return 0;
   return [...bar.querySelectorAll('input,select,textarea')].filter(el=>{
@@ -189,6 +189,7 @@ function userRoles(){const allowed=['ADMIN','CONTROL','PROPIETARIO'];const raw=S
 function hasAssignedRole(role){return userRoles().includes(role)}
 function hasUiRole(role){return activeUiRole()===role}
 function canConfigure(){return !!state.user?.CanConfigure&&activeUiRole()==='ADMIN'}
+function canViewSystem(){return !!state.user?.CanSystem&&activeUiRole()==='ADMIN'}
 function preferredUiRole(roles=userRoles()){return roles.includes('ADMIN')?'ADMIN':roles.includes('CONTROL')?'CONTROL':roles[0]||'PROPIETARIO'}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return preferredUiRole(roles)}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
@@ -638,13 +639,15 @@ async function configurationView(initialTab='identity'){
   renderLoading('config');
   try{
     const editable=canConfigure();
+    const systemAccess=canViewSystem();
     if(!editable)initialTab='data';
+    if(initialTab==='system'&&!systemAccess)initialTab=editable?'identity':'data';
     const s=editable?await call('getSettings'):appSettings();
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad, carga inicial de datos y estado técnico del sistema.':'Carga inicial de viviendas y propietarios.'}</div></div></div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${systemAccess?'Identidad, carga inicial de datos y estado técnico del sistema.':editable?'Identidad y carga inicial de viviendas y propietarios.':'Carga inicial de viviendas y propietarios.'}</div></div></div>
       <div class="config-tabs" role="tablist" aria-label="Configuración">
         ${editable?'<button type="button" class="config-tab" data-config-tab="identity">Identidad</button>':''}
         <button type="button" class="config-tab" data-config-tab="data">Datos</button>
-        ${editable?'<button type="button" class="config-tab" data-config-tab="system">Sistema</button>':''}
+        ${systemAccess?'<button type="button" class="config-tab" data-config-tab="system">Sistema</button>':''}
       </div>
       <div id="config-panel"></div>`;
     const panel=$('#config-panel'),tabs=[...document.querySelectorAll('[data-config-tab]')];
@@ -684,7 +687,7 @@ async function configurationView(initialTab='identity'){
     }
 
     async function renderSystem(){
-      if(!editable)return renderData();
+      if(!systemAccess)return editable?renderIdentity():renderData();
       setActive('system');
       panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
       async function loadStatus(){
@@ -864,7 +867,7 @@ async function requests(openId=''){
     $('#main').innerHTML=`<div class="head requests-head"><div><h1>Solicitudes</h1><div class="muted">Bandeja de gestión agrupada por vehículo o matrícula. Expedientes y lista comparten los mismos filtros.</div></div>${exportButtonsHtml('requests-export')}</div><div id="request-detail"></div><div id="request-dossier"></div><div class="request-overview" id="request-overview"><div class="card request-stat-card"><span>Solicitudes abiertas</span><b id="req-stat-open">0</b><small>Solicitudes por resolver</small></div><div class="card request-stat-card"><span>Expedientes abiertos</span><b id="req-stat-dossiers">0</b><small>Vehículos o matrículas con solicitudes abiertas</small></div><div class="card request-stat-card"><span>Viviendas afectadas</span><b id="req-stat-housing">0</b><small>Con solicitudes abiertas</small></div><div class="card request-stat-card"><span>Solicitudes resueltas</span><b id="req-stat-resolved">0</b><small>Aprobadas o rechazadas</small></div></div><div class="request-viewbar"><div class="request-view-tabs"><button type="button" class="secondary" id="request-view-dossiers">Expedientes</button><button type="button" class="secondary" id="request-view-list">Lista de solicitudes</button></div><span class="count" id="req-count"></span></div><div class="filterbar admin-record-filterbar admin-request-filters"><div class="field filter-search"><label>Buscar</label><input id="req-search" class="search" placeholder="Matrícula, vivienda, solicitante o tipo..."></div>${periodFilterFields('req')}<div class="field"><label>Estado</label><select id="req-state"><option value="Abierta" selected>Abiertas</option><option value="">Todas</option><option>Aprobada</option><option>Rechazada</option></select></div><div class="field"><label>Tipo</label><select id="req-type"><option value="">Todos</option><option value="REACTIVACION_VEHICULO">Activación</option><option value="RENOVACION_QR">Renovación QR</option><option value="PERMANENCIA_PROLONGADA">Permanencia prolongada</option></select></div></div><div id="request-dossier-list" class="request-dossier-list"></div><div id="request-flat-list" class="tablebox compact-table admin-record-tablebox hide"><table class="table responsive-data-table admin-record-table admin-request-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="MatriculaHabitual">Matrícula</th><th class="sortable-th" data-sort="Vivienda">Vivienda</th><th class="sortable-th" data-sort="NombreSolicitante">Solicitante</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>Acciones</th></tr></thead><tbody id="req-body"></tbody></table><div id="req-empty" class="empty hide">No hay solicitudes.</div></div><div id="req-pager"></div>`
     bindPeriodVisibility('req');
 
-    const filtered=()=>{const q=$('#req-search').value.trim().toLowerCase(),st=$('#req-state').value,tp=$('#req-type').value,period=$('#req-period').value,from=$('#req-from').value,to=$('#req-to').value,housingId=navPreset?.housingId||'';saveViewUiState('requests',{q,st,tp,period,from,to,page,sortKey,sortDir,viewMode,v:'1.2.13.14-FIX11.25'});const val=(r,k)=>k==='Vivienda'?`Bloque ${r.Bloque}, ${r.Planta} ${r.Apartamento}`:k==='MatriculaHabitual'?requestDossierPlate(r):k==='NombreSolicitante'?(r.NombreSolicitante||r.Usuario||''):k==='Tipo'?requestTypeLabel(r.Tipo):k==='Estado'?requestDisplayState(r):r[k]||'';return rows.filter(r=>(!housingId||r.ID_Vivienda===housingId)&&requestMatchesState(r,st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&[...Object.values(r),requestDossierPlate(r),`Bloque ${r.Bloque||''}, ${r.Planta||''} ${r.Apartamento||''}`,requestTypeLabel(r.Tipo)].join(' ').toLowerCase().includes(q)).sort((a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true,sensitivity:'base'});return sortDir==='asc'?c:-c})};
+    const filtered=()=>{const q=$('#req-search').value.trim().toLowerCase(),st=$('#req-state').value,tp=$('#req-type').value,period=$('#req-period').value,from=$('#req-from').value,to=$('#req-to').value,housingId=navPreset?.housingId||'';saveViewUiState('requests',{q,st,tp,period,from,to,page,sortKey,sortDir,viewMode,v:'1.2.13.14-FIX11.26'});const val=(r,k)=>k==='Vivienda'?`Bloque ${r.Bloque}, ${r.Planta} ${r.Apartamento}`:k==='MatriculaHabitual'?requestDossierPlate(r):k==='NombreSolicitante'?(r.NombreSolicitante||r.Usuario||''):k==='Tipo'?requestTypeLabel(r.Tipo):k==='Estado'?requestDisplayState(r):r[k]||'';return rows.filter(r=>(!housingId||r.ID_Vivienda===housingId)&&requestMatchesState(r,st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&[...Object.values(r),requestDossierPlate(r),`Bloque ${r.Bloque||''}, ${r.Planta||''} ${r.Apartamento||''}`,requestTypeLabel(r.Tipo)].join(' ').toLowerCase().includes(q)).sort((a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true,sensitivity:'base'});return sortDir==='asc'?c:-c})};
 
     const detail=r=>{
       const host=$('#request-detail'),isMoto=r.TipoVehiculo==='Moto',reactivation=r.Tipo==='REACTIVACION_VEHICULO',renewal=r.Tipo==='RENOVACION_QR',longstay=r.Tipo==='PERMANENCIA_PROLONGADA',canApproveReactivation=true;

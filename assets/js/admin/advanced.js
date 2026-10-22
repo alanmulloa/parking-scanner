@@ -196,13 +196,15 @@ async function configurationView(initialTab='identity'){
   renderLoading('config');
   try{
     const editable=canConfigure();
+    const systemAccess=canViewSystem();
     if(!editable)initialTab='data';
+    if(initialTab==='system'&&!systemAccess)initialTab=editable?'identity':'data';
     const s=editable?await call('getSettings'):appSettings();
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad, carga inicial de datos y estado técnico del sistema.':'Carga inicial de viviendas y propietarios.'}</div></div></div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${systemAccess?'Identidad, carga inicial de datos y estado técnico del sistema.':editable?'Identidad y carga inicial de viviendas y propietarios.':'Carga inicial de viviendas y propietarios.'}</div></div></div>
       <div class="config-tabs" role="tablist" aria-label="Configuración">
         ${editable?'<button type="button" class="config-tab" data-config-tab="identity">Identidad</button>':''}
         <button type="button" class="config-tab" data-config-tab="data">Datos</button>
-        ${editable?'<button type="button" class="config-tab" data-config-tab="system">Sistema</button>':''}
+        ${systemAccess?'<button type="button" class="config-tab" data-config-tab="system">Sistema</button>':''}
       </div>
       <div id="config-panel"></div>`;
     const panel=$('#config-panel'),tabs=[...document.querySelectorAll('[data-config-tab]')];
@@ -242,7 +244,7 @@ async function configurationView(initialTab='identity'){
     }
 
     async function renderSystem(){
-      if(!editable)return renderData();
+      if(!systemAccess)return editable?renderIdentity():renderData();
       setActive('system');
       panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
       async function loadStatus(){

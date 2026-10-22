@@ -2,6 +2,7 @@ function userRoles(){const allowed=['ADMIN','CONTROL','PROPIETARIO'];const raw=S
 function hasAssignedRole(role){return userRoles().includes(role)}
 function hasUiRole(role){return activeUiRole()===role}
 function canConfigure(){return !!state.user?.CanConfigure&&activeUiRole()==='ADMIN'}
+function canViewSystem(){return !!state.user?.CanSystem&&activeUiRole()==='ADMIN'}
 function preferredUiRole(roles=userRoles()){return roles.includes('ADMIN')?'ADMIN':roles.includes('CONTROL')?'CONTROL':roles[0]||'PROPIETARIO'}
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return preferredUiRole(roles)}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
