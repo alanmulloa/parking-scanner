@@ -196,20 +196,20 @@ async function configurationView(initialTab='identity'){
   renderLoading('config');
   try{
     const editable=canConfigure();
-    if(!editable)initialTab='system';
+    if(!editable)initialTab='data';
     const s=editable?await call('getSettings'):appSettings();
-    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad, carga inicial de datos y estado técnico del sistema.':'Carga inicial de datos y diagnóstico del sistema.'}</div></div></div>
+    $('#main').innerHTML=`<div class="head"><div><div class="eyebrow">CONFIGURACIÓN</div><h1>Configuración</h1><div class="muted">${editable?'Identidad, carga inicial de datos y estado técnico del sistema.':'Carga inicial de viviendas y propietarios.'}</div></div></div>
       <div class="config-tabs" role="tablist" aria-label="Configuración">
         ${editable?'<button type="button" class="config-tab" data-config-tab="identity">Identidad</button>':''}
         <button type="button" class="config-tab" data-config-tab="data">Datos</button>
-        <button type="button" class="config-tab" data-config-tab="system">Sistema</button>
+        ${editable?'<button type="button" class="config-tab" data-config-tab="system">Sistema</button>':''}
       </div>
       <div id="config-panel"></div>`;
     const panel=$('#config-panel'),tabs=[...document.querySelectorAll('[data-config-tab]')];
     const setActive=tab=>tabs.forEach(b=>b.classList.toggle('active',b.dataset.configTab===tab));
 
     async function renderIdentity(){
-      if(!editable)return renderSystem();
+      if(!editable)return renderData();
       setActive('identity');
       panel.innerHTML=`<form id="configuration-form" class="settings-layout">
         <section class="card settings-main"><h2>Identidad de la comunidad</h2><p class="muted">Datos generales e identidad visual. Los cambios se aplican al login y a la cabecera.</p><div class="form">
@@ -242,6 +242,7 @@ async function configurationView(initialTab='identity'){
     }
 
     async function renderSystem(){
+      if(!editable)return renderData();
       setActive('system');
       panel.innerHTML=`<section class="card system-status-card"><div class="system-status-head"><div><h2>Estado técnico</h2><p class="muted">Comprobación de backend, almacenamiento y configuración. Información de solo lectura.</p></div><button type="button" class="secondary" id="system-refresh">Actualizar estado</button></div><div class="system-loading"><div class="spinner"></div><span>Comprobando sistema…</span></div></section>`;
       async function loadStatus(){
