@@ -12,3 +12,6 @@ site_url = "https://alanmulloa.github.io/parking-scanner/"
 additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = false
+
+[functions.legacy-auth-migrate]
+verify_jwt = false

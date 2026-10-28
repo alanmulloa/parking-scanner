@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.xlsx
+reports/*.json
+!reports/.gitkeep
+!reports/dry-run-real.json
+!reports/apply-staging.json
+!reports/apply-idempotency-pass2.json
+!reports/final-validation.json
+.env

@@ -1,0 +1,238 @@
+{
+  "generated_at": "2026-10-28T20:08:52.119Z",
+  "source_file": "DDBB QR Comunidad.xlsx",
+  "source_sha256": "a365ec50fa366a25ebbff0597ebbc257f8717eedc7cfeadb90cfba01fe99fecb",
+  "community_id": "0068edd8-0a83-4579-a9c1-1a3e099c8512",
+  "community_slug": "parking-comunidad",
+  "overall_data_status": "OK",
+  "auth_end_to_end_status": "OK",
+  "checks": [
+    {
+      "name": "imported_profiles_count",
+      "ok": true,
+      "expected": 77,
+      "actual": 77,
+      "total_profiles_including_test_accounts": 78
+    },
+    {
+      "name": "imported_auth_users_count",
+      "ok": true,
+      "expected": 77,
+      "actual": 77,
+      "total_auth_users_including_test_accounts": 78
+    },
+    {
+      "name": "profile_emails_unique",
+      "ok": true
+    },
+    {
+      "name": "sheet_users_match_profiles_auth_roles",
+      "ok": true,
+      "differences": []
+    },
+    {
+      "name": "imported_community_members_count",
+      "ok": true,
+      "expected": 77,
+      "actual": 77,
+      "total_members_including_test_accounts": 78
+    },
+    {
+      "name": "owner_dwelling_mapping_structural",
+      "ok": true,
+      "pure_owners": 68,
+      "control_owner_exception": 8,
+      "differences": []
+    },
+    {
+      "name": "dwellings_count",
+      "ok": true,
+      "expected": 77,
+      "actual": 77
+    },
+    {
+      "name": "dwellings_exact",
+      "ok": true,
+      "differences": []
+    },
+    {
+      "name": "dwellings_legacy_unique",
+      "ok": true
+    },
+    {
+      "name": "vehicles_count",
+      "ok": true,
+      "expected": 35,
+      "actual": 35
+    },
+    {
+      "name": "vehicles_exact",
+      "ok": true,
+      "differences": []
+    },
+    {
+      "name": "vehicle_plates_unique",
+      "ok": true
+    },
+    {
+      "name": "vehicle_legacy_unique",
+      "ok": true
+    },
+    {
+      "name": "qr_unique",
+      "ok": true
+    },
+    {
+      "name": "slots_unique_per_dwelling",
+      "ok": true
+    },
+    {
+      "name": "motorcycles_rules",
+      "ok": true
+    },
+    {
+      "name": "relations_integrity",
+      "ok": true,
+      "differences": {
+        "vehicles_missing_dwelling": 0,
+        "dwellings_missing_responsible": 0,
+        "profiles_missing_expected_membership": 0,
+        "imported_users_in_wrong_community": 0,
+        "vehicle_cross_community": 0,
+        "dwelling_responsible_cross_community": 0,
+        "periods_missing_vehicle": 0,
+        "followups_missing_incident": 0,
+        "controls_missing_user_or_vehicle": 0
+      }
+    },
+    {
+      "name": "audit_count",
+      "ok": true,
+      "expected": 1170,
+      "actual": 1170
+    },
+    {
+      "name": "audit_exact_and_source",
+      "ok": true,
+      "differences": []
+    },
+    {
+      "name": "audit_legacy_unique",
+      "ok": true
+    },
+    {
+      "name": "audit_unresolved_explained",
+      "ok": true,
+      "expected": 23,
+      "actual": 23
+    },
+    {
+      "name": "no_functional_side_effect_rows",
+      "ok": true,
+      "requests": 0,
+      "incidents": 0,
+      "followups": 0,
+      "qr_controls": 0,
+      "plate_controls": 0
+    },
+    {
+      "name": "settings_count",
+      "ok": true,
+      "expected": 8,
+      "actual": 8
+    },
+    {
+      "name": "live_rls_owner_isolation",
+      "ok": true,
+      "executed": true,
+      "method": "DATABASE_ROLE_IMPERSONATION",
+      "tested_pure_owners": 68,
+      "failures": [],
+      "note": "Validado por migración transaccional 117; aborta ante cualquier conjunto visible distinto."
+    }
+  ],
+  "reconciliation": {
+    "users": {
+      "sheet": 77,
+      "supabase_profiles": 77,
+      "imported_auth_users": 77,
+      "total_profiles_including_test_accounts": 78,
+      "total_members_including_test_accounts": 78,
+      "total_auth_users_including_test_accounts": 78,
+      "differences": 0
+    },
+    "dwellings": {
+      "sheet": 77,
+      "supabase": 77,
+      "differences": 0,
+      "special_values_preserved": [
+        "Porteria",
+        "-",
+        "Ático",
+        "Baja"
+      ]
+    },
+    "vehicles": {
+      "sheet": 35,
+      "supabase": 35,
+      "differences": 0
+    },
+    "audit": {
+      "sheet": 1170,
+      "supabase": 1170,
+      "differences": 0,
+      "unresolved_entity_uuid_explained": 23
+    },
+    "duplicate_emails": 0,
+    "duplicate_plates": 0,
+    "duplicate_qr": 0,
+    "slot_conflicts": 0,
+    "unresolved_relations": 0,
+    "duplicate_legacy_ids": {
+      "users": 0,
+      "dwellings": 0,
+      "vehicles": 0,
+      "audit": 0
+    }
+  },
+  "roles": {
+    "ADMIN": 1,
+    "CONTROL": 8,
+    "PROPIETARIO": 76
+  },
+  "vehicles": {
+    "motorcycles": 4,
+    "with_qr": 31,
+    "slot_1": 20,
+    "slot_2": 11,
+    "without_slot": 4
+  },
+  "live_rls": {
+    "executed": true,
+    "method": "DATABASE_ROLE_IMPERSONATION",
+    "tested_pure_owners": 68,
+    "failures": [],
+    "note": "Validado por migración transaccional 117; aborta ante cualquier conjunto visible distinto."
+  },
+  "auth_validation": {
+    "legacy_algorithm": "SHA256_HEX_UTF8 iterado: salt|password, luego salt|hash; v2, 1000 iteraciones, sin normalizar password",
+    "supabase_native_compatibility": false,
+    "chosen_mechanism": "JIT_FIRST_LOGIN",
+    "synthetic_end_to_end": "OK",
+    "real_existing_account": "OK",
+    "vault_status": {
+      "total": 78,
+      "pending": 76,
+      "migrated_unvalidated": 0,
+      "validated_retained": 2,
+      "purged": 0,
+      "currently_locked": 0
+    },
+    "purge_performed": false
+  },
+  "notes": [
+    "Las 23 referencias históricas de auditoría no resolubles conservan legacy_entity_id y entity_id NULL.",
+    "CONTROL+PROPIETARIO mantiene visibilidad operativa de CONTROL; la exclusividad se aplica a PROPIETARIO puro.",
+    "La prueba con credencial legacy existente completó primer login JIT, logout y segundo login nativo sin cambiar la contraseña."
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "parking-comunidad-sheet-import",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dry-run": "node src/import.mjs --dry-run",
+    "test": "node --test",
+    "verify-jit": "node src/verify-jit.mjs",
+    "verify-jit-interactive": "node src/verify-jit-interactive.mjs",
+    "test-jit-synthetic": "node src/run-jit-synthetic.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

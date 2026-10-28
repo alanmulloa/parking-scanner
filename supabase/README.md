@@ -1,4 +1,4 @@
-# Parking Comunidad - Supabase Migración V1
+# Parking Comunidad - Supabase staging
 
 Proyecto remoto:
 - Project ref: `tefnzjvylcvffnorgzls`
@@ -31,13 +31,15 @@ Esta fase NO conecta el frontend productivo a Supabase. Apps Script + Sheets sig
 - RLS activo en todas las tablas públicas
 - ROOT separado de los roles de comunidad
 
-## Importante
+## Identidades y contraseñas
 
-1. No migrar `PasswordHash` ni `PasswordSalt` de Sheets.
-2. Los usuarios se crearán de nuevo en Supabase Auth durante la fase de migración de identidades.
-3. `legacy_id` conserva los IDs actuales (`USR_`, `VIV_`, `VEH_`, etc.) para trazabilidad.
-4. No incluir nunca `service_role` o secret keys en el repositorio/front.
-5. Desde el momento en que se aplican estas migraciones, cualquier cambio de esquema debe hacerse con una migración nueva; no modificar tablas manualmente desde el Dashboard.
+1. Los 77 usuarios importados ya existen en Supabase Auth y conservan `legacy_id` para trazabilidad.
+2. Hash y salt legacy se almacenan temporalmente en `private.legacy_auth_credentials`, sin permisos para `anon` ni `authenticated`, solo para la migración JIT.
+3. No purgar hash/salt hasta que la política futura de retirada esté aprobada; actualmente permanecen retenidos incluso después de validar dos logins.
+4. No incluir nunca `service_role`, secret keys, contraseñas, hashes ni salts reales en el repositorio o frontend.
+5. Cualquier cambio de esquema debe hacerse con una migración nueva; no modificar tablas manualmente desde el Dashboard.
+
+La migración de datos y el backend JIT están validados en staging. El frontend productivo sigue sin conectarse a Supabase; consultar `MIGRATION_STATUS.md` antes de cualquier corte.
 
 ## Aplicación con CLI (opción manual)
 

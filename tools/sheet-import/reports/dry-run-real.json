@@ -1,0 +1,51 @@
+{
+  "importer_version": "1.0.0",
+  "mode": "DRY_RUN",
+  "source_file": "DDBB QR Comunidad.xlsx",
+  "source_sha256": "9478972861aa9592b4f996b466c06418ff1bea4b79c4846540a4ebc03a414c8c",
+  "valid": true,
+  "counts": {
+    "Usuarios": 77,
+    "Viviendas": 77,
+    "Vehiculos": 35,
+    "PeriodosTemporales": 0,
+    "Solicitudes": 0,
+    "Incidencias": 0,
+    "IncidenciaSeguimiento": 0,
+    "Auditoria": 1164,
+    "ControlQR": 0,
+    "ControlMatricula": 0,
+    "Configuracion": 8
+  },
+  "roles": {
+    "ADMIN": 1,
+    "CONTROL": 8,
+    "PROPIETARIO": 76
+  },
+  "states": {
+    "users": {
+      "Activo": 77
+    },
+    "dwellings": {
+      "Activo": 77
+    },
+    "vehicles": {
+      "Activo": 35
+    }
+  },
+  "diagnostics": {
+    "unresolved_audit_references": 23
+  },
+  "errors": [],
+  "warnings": [
+    "Auditoria: 23 referencias históricas no resuelven; se conservarán solo como legacy_entity_id"
+  ],
+  "credential_profile": {
+    "total": 77,
+    "algorithms": {
+      "PC_SHA256_ITERATED_V2": 77
+    },
+    "hashes_or_salts_exposed_in_report": false
+  },
+  "result": "DRY_RUN_OK"
+}

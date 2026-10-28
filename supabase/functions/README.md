@@ -1,11 +1,7 @@
-# Edge Functions - siguiente fase
+# Edge Functions
 
-Todavía no se despliega ninguna Edge Function.
+`legacy-auth-migrate` implementa la conversión transparente de la contraseña legacy en el primer login. Primero intenta Supabase Auth; solo si falla consulta la credencial temporal mediante RPC de `service_role`, reproduce el SHA-256 iterado del Apps Script y establece la misma contraseña en Auth. Tras la conversión conserva temporalmente hash y salt. El segundo login Supabase marca la credencial como validada y la purga se realiza posteriormente de forma explícita.
 
-La migración v1 solo prepara base, relaciones, restricciones y RLS. Las primeras funciones previstas son:
-
-- `admin-user-password`: alta/reset administrativo de usuario y envío de correo.
-- `vehicle-create`: alta atómica de vehículo con Slot 1 -> Slot 2 -> Desasignado.
-- `incident-document`: generación/exportación del expediente si se retira Google Drive.
+La función está desplegada y validada únicamente en el entorno de prueba `tefnzjvylcvffnorgzls`. `ALLOWED_ORIGIN` está configurado como secreto. Cualquier nuevo despliegue debe seguir `docs/AUTH_JIT_MIGRATION.md` y repetir `deno check`, la prueba sintética y el segundo login nativo.
 
 Nunca guardar `service_role` en GitHub Pages ni en archivos versionados del frontend.

@@ -969,7 +969,574 @@
     };
   }
 
+
+  // POC_TEMPORARIES_SLOTS_V2
+
+  function pocTemporaryLegacy(row) {
+    if (!row) return null;
+
+    return {
+      ID_Periodo: row.id,
+      ID_Temporal: row.id,
+      ID_Vehiculo: row.vehicle_id,
+      MatriculaTemporal: row.temporary_plate,
+      MatriculaTemporalNormalizada:
+        row.normalized_temporary_plate || '',
+      Desde: row.starts_at,
+      Hasta: row.ends_at,
+      Estado: row.state,
+      Observaciones: row.observations || '',
+      FechaAlta: row.created_at || '',
+      UsuarioAlta: row.created_by || ''
+    };
+  }
+
+  async function pocListTemporaryPeriods(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    if (!vehicleId) {
+      throw new Error('No se pudo determinar el vehículo.');
+    }
+
+    const { data, error } = await sb
+      .from('temporary_periods')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .order('starts_at', { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map(pocTemporaryLegacy);
+  }
+
+  async function pocSaveTemporaryPeriod(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    const periodId =
+      payload.ID_Periodo ||
+      payload.ID_Temporal ||
+      payload.periodId ||
+      payload.period_id;
+
+    const temporaryPlate = String(
+      payload.MatriculaTemporal ||
+      payload.temporaryPlate ||
+      payload.temporary_plate ||
+      ''
+    ).trim().toUpperCase();
+
+    const startsAt = String(
+      payload.Desde ||
+      payload.desde ||
+      payload.startsAt ||
+      payload.starts_at ||
+      ''
+    ).trim();
+
+    const endsAt = String(
+      payload.Hasta ||
+      payload.hasta ||
+      payload.endsAt ||
+      payload.ends_at ||
+      ''
+    ).trim();
+
+    const observations = String(
+      payload.Observaciones ||
+      payload.observations ||
+      ''
+    ).trim();
+
+    if (!vehicleId) {
+      throw new Error('No se pudo determinar el vehículo.');
+    }
+
+    if (!temporaryPlate || !startsAt || !endsAt) {
+      throw new Error(
+        'Completa matrícula temporal, desde y hasta.'
+      );
+    }
+
+    if (endsAt < startsAt) {
+      throw new Error(
+        'La fecha hasta no puede ser anterior a la fecha desde.'
+      );
+    }
+
+    const { data: vehicle, error: vehicleError } = await sb
+      .from('vehicles')
+      .select(
+        'id,community_id,state,habitual_plate,' +
+        'normalized_habitual_plate'
+      )
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicleError) throw vehicleError;
+
+    if (!vehicle) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    if (vehicle.state !== 'Activo') {
+      throw new Error(
+        'Solo se pueden crear o modificar períodos mientras ' +
+        'el vehículo está activo.'
+      );
+    }
+
+    if (periodId) {
+      const { data: previous, error: previousError } = await sb
+        .from('temporary_periods')
+        .select('id,vehicle_id,state')
+        .eq('id', periodId)
+        .single();
+
+      if (previousError) throw previousError;
+
+      if (!previous ||
+          previous.vehicle_id !== vehicleId) {
+        throw new Error('Período no válido.');
+      }
+    }
+
+    const row = {
+      community_id: vehicle.community_id,
+      vehicle_id: vehicleId,
+      temporary_plate: temporaryPlate,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      observations,
+      state: payload.Estado || 'Activo'
+    };
+
+    if (periodId) {
+      const { data, error } = await sb
+        .from('temporary_periods')
+        .update(row)
+        .eq('id', periodId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return pocTemporaryLegacy(data);
+    }
+
+    const { data: authData } = await sb.auth.getUser();
+
+    row.created_by = authData?.user?.id || null;
+
+    const { data, error } = await sb
+      .from('temporary_periods')
+      .insert(row)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return pocTemporaryLegacy(data);
+  }
+
+  async function pocExtendTemporaryPeriod(payload = {}) {
+    const periodId =
+      payload.ID_Periodo ||
+      payload.periodId ||
+      payload.period_id;
+
+    const newUntil = String(
+      payload.Hasta ||
+      payload.hasta ||
+      payload.endsAt ||
+      ''
+    ).trim();
+
+    if (!periodId) {
+      throw new Error('Período no encontrado.');
+    }
+
+    const { data: period, error } = await sb
+      .from('temporary_periods')
+      .select('*')
+      .eq('id', periodId)
+      .single();
+
+    if (error) throw error;
+
+    if (!period) {
+      throw new Error('Período no encontrado.');
+    }
+
+    if (period.state === 'Anulado') {
+      throw new Error(
+        'No se puede prorrogar un período anulado.'
+      );
+    }
+
+    if (!newUntil || newUntil <= period.ends_at) {
+      throw new Error(
+        'La nueva fecha debe ser posterior a la fecha final actual.'
+      );
+    }
+
+    const extra = String(payload.Observaciones || '').trim();
+
+    const observations = [
+      period.observations || '',
+      extra
+    ].filter(Boolean).join(' | ');
+
+    return pocSaveTemporaryPeriod({
+      ID_Periodo: period.id,
+      ID_Vehiculo: period.vehicle_id,
+      MatriculaTemporal: period.temporary_plate,
+      Desde: period.starts_at,
+      Hasta: newUntil,
+      Observaciones: observations,
+      Estado: 'Activo'
+    });
+  }
+
+  async function pocDeleteTemporaryPeriod(payload = {}) {
+    const periodId =
+      payload.ID_Periodo ||
+      payload.ID_Temporal ||
+      payload.periodId ||
+      payload.period_id ||
+      payload.id;
+
+    if (!periodId) {
+      throw new Error('Período no encontrado.');
+    }
+
+    const { data, error } = await sb
+      .from('temporary_periods')
+      .update({ state: 'Anulado' })
+      .eq('id', periodId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return pocTemporaryLegacy(data);
+  }
+
+  async function pocAssignVehicleSlot(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    const slot = Number(payload.Slot || payload.slot);
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const { data, error } = await sb.rpc(
+      'assign_vehicle_slot',
+      {
+        p_vehicle_id: vehicleId,
+        p_slot: slot,
+        p_confirm_replace: !!payload.confirmReplace
+      }
+    );
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async function pocReleaseVehicleSlot(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const { data, error } = await sb.rpc(
+      'release_vehicle_slot',
+      {
+        p_vehicle_id: vehicleId
+      }
+    );
+
+    if (error) throw error;
+
+    return data;
+  }
+
+
+  // POC_VEHICLE_STATES_QR_V1
+
+  async function pocVehicleAfterMutation(vehicleId) {
+    const rows = await listVehicles();
+
+    const vehicle = (rows || []).find(
+      v => v.ID_Vehiculo === vehicleId
+    );
+
+    if (!vehicle) {
+      throw new Error(
+        'La operación se completó, pero no se pudo recargar el vehículo.'
+      );
+    }
+
+    return vehicle;
+  }
+
+  async function pocRenewQr(payload = {}) {
+    const vehicleId =
+      payload.id ||
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const { error } = await sb.rpc(
+      'renew_vehicle_qr',
+      {
+        p_vehicle_id: vehicleId
+      }
+    );
+
+    if (error) throw error;
+
+    return pocVehicleAfterMutation(vehicleId);
+  }
+
+  async function pocRevokeQr(payload = {}) {
+    const vehicleId =
+      payload.id ||
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const { error } = await sb.rpc(
+      'revoke_vehicle_qr',
+      {
+        p_vehicle_id: vehicleId
+      }
+    );
+
+    if (error) throw error;
+
+    return pocVehicleAfterMutation(vehicleId);
+  }
+
+  async function pocReactivateVehicle(payload = {}) {
+    const vehicleId =
+      payload.id ||
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const { error } = await sb.rpc(
+      'reactivate_vehicle',
+      {
+        p_vehicle_id: vehicleId
+      }
+    );
+
+    if (error) throw error;
+
+    return pocVehicleAfterMutation(vehicleId);
+  }
+
+
+  // POC_REPLACE_BULK_V1
+
+  async function pocReplaceVehicle(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.id ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    if (!vehicleId) {
+      throw new Error(
+        'Vehículo a reemplazar no encontrado.'
+      );
+    }
+
+    const plate = String(
+      payload.MatriculaHabitual || ''
+    ).trim();
+
+    if (!plate) {
+      throw new Error(
+        'La matrícula del nuevo vehículo es obligatoria.'
+      );
+    }
+
+    const { data, error } = await sb.rpc(
+      'replace_vehicle',
+      {
+        p_vehicle_id: vehicleId,
+        p_habitual_plate: plate,
+        p_type: payload.Tipo || 'Particular',
+        p_make: payload.Marca || '',
+        p_model: payload.Modelo || '',
+        p_observations: payload.Observaciones || ''
+      }
+    );
+
+    if (error) throw error;
+
+    const vehicles = await listVehicles();
+
+    const oldVehicle = vehicles.find(
+      v => v.ID_Vehiculo === data.oldVehicleId
+    );
+
+    const newVehicle = vehicles.find(
+      v => v.ID_Vehiculo === data.newVehicleId
+    );
+
+    if (!newVehicle) {
+      throw new Error(
+        'El reemplazo se realizó pero no se pudo recargar el nuevo vehículo.'
+      );
+    }
+
+    return {
+      oldVehicle,
+      newVehicle
+    };
+  }
+
+  async function pocBulkVehiclePreview(payload = {}) {
+    const ids = Array.isArray(payload.ids)
+      ? payload.ids.filter(Boolean)
+      : [];
+
+    if (!ids.length) {
+      throw new Error(
+        'Selecciona al menos un vehículo.'
+      );
+    }
+
+    const { data, error } = await sb.rpc(
+      'bulk_vehicle_preview',
+      {
+        p_vehicle_ids: ids,
+        p_action: payload.action
+      }
+    );
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async function pocBulkVehicleAction(payload = {}) {
+    const ids = Array.isArray(payload.ids)
+      ? payload.ids.filter(Boolean)
+      : [];
+
+    if (!ids.length) {
+      throw new Error(
+        'Selecciona al menos un vehículo.'
+      );
+    }
+
+    const { data, error } = await sb.rpc(
+      'bulk_vehicle_action',
+      {
+        p_vehicle_ids: ids,
+        p_action: payload.action
+      }
+    );
+
+    if (error) throw error;
+
+    return data;
+  }
+
   async function supabaseAction(action, payload = {}) {
+
+    // ROUTES_REPLACE_BULK_V1
+
+    if (action === 'replaceVehicle') {
+      return pocReplaceVehicle(payload);
+    }
+
+    if (action === 'bulkVehiclePreview') {
+      return pocBulkVehiclePreview(payload);
+    }
+
+    if (action === 'bulkVehicleAction') {
+      return pocBulkVehicleAction(payload);
+    }
+
+
+
+    // ROUTES_VEHICLE_STATES_QR_V1
+
+    if (action === 'renewQr') {
+      return pocRenewQr(payload);
+    }
+
+    if (action === 'revokeQr') {
+      return pocRevokeQr(payload);
+    }
+
+    // Se utilizará al conectar la aprobación de solicitudes.
+    if (action === 'reactivateVehicle') {
+      return pocReactivateVehicle(payload);
+    }
+
+
+
+    // Acciones legacy exactas: tienen prioridad sobre el router genérico.
+    if (action === 'listTemporaryPeriods') {
+      return pocListTemporaryPeriods(payload);
+    }
+
+    if (action === 'saveTemporaryPeriod') {
+      return pocSaveTemporaryPeriod(payload);
+    }
+
+    if (action === 'extendTemporaryPeriod') {
+      return pocExtendTemporaryPeriod(payload);
+    }
+
+    if (action === 'deleteTemporaryPeriod') {
+      return pocDeleteTemporaryPeriod(payload);
+    }
+
+    if (action === 'assignVehicleSlot') {
+      return pocAssignVehicleSlot(payload);
+    }
+
+    if (action === 'releaseVehicleSlot') {
+      return pocReleaseVehicleSlot(payload);
+    }
+
+
     const temporaryAction = String(action || '').toLowerCase();
 
     /*
