@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+  <title>Parking Comunidad · Supabase POC</title>
+
+  <link
+    rel="stylesheet"
+    href="./assets/css/app.1.2.13.14-FIX11.29.css"
+  >
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script>
+    window.INITIAL_PUBLIC_SETTINGS = {
+      NombreOficial: 'Urbanización Flores de Riviera',
+      NombreCorto: 'Parking Comunidad',
+      Descripcion: 'Gestión de acceso y parking de la comunidad'
+    };
+
+    window.INITIAL_TOKEN = '';
+    window.WEB_APP_URL = location.origin + location.pathname;
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script src="./assets/js/supabase-poc-config.js"></script>
+
+  <script src="./assets/js/app.bundle.1.2.13.14-FIX11.29.js?poc=temporales-activo-v2"></script>
+
+  <script src="./assets/js/supabase-poc-adapter.js"></script>
+
+  <script src="./assets/js/app-init.js"></script>
+</body>
+</html>
