@@ -8,7 +8,7 @@ const bridge = read('legacy-apps-script/LegacyBridge.gs');
 const preprod = read('preproduccion.html');
 
 const checks = [
-  ['frontend bridge version', read('assets/js/core.js').includes("2.0.0-preprod.2")],
+  ['frontend bridge version', read('assets/js/core.js').includes("2.0.0-preprod.3")],
   ['preprod cache bust bridge', preprod.includes('system-v2-bridge')],
   ['frontend no contiene bridge secret', !adapter.includes('PARKING_BRIDGE_SECRET') && !advanced.includes('PARKING_BRIDGE_SECRET')],
   ['parking-admin usa secrets server-side', admin.includes("Deno.env.get('LEGACY_BRIDGE_SECRET')") && admin.includes("Deno.env.get('LEGACY_APPS_SCRIPT_URL')")],
@@ -24,6 +24,7 @@ const checks = [
   ['mail actions UI', advanced.includes("data-domain=\"${domain}\"") && advanced.includes("['testWelcome','Probar correo']") && advanced.includes("['processQueue','Procesar ahora']")],
   ['docs actions UI', advanced.includes("['verifyDrive','Verificar Drive']") && advanced.includes("['generateMissing','Generar faltantes']") && advanced.includes("['processQueue','Procesar pendientes']")],
   ['frontend polling de comando', advanced.includes('systemLegacyBridgeCommandStatus') && advanced.includes('Esperando al bridge worker')],
+  ['confirmacion bridge persistente', advanced.includes('legacyBridgeLastResult') && advanced.includes('Completado') && advanced.includes('legacyCommandMessage')],
   ['adapter expone acciones bridge', adapter.includes("case 'systemLegacyBridgeAction'") && adapter.includes("case 'systemLegacyBridgeCommandStatus'")],
   ['bridge no reemplaza doGet', !bridge.includes('function doGet(')],
   ['docs legacy quedan marcados', bridge.includes("source:'LEGACY_SHEET'")]
