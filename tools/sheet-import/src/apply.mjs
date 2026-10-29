@@ -23,13 +23,17 @@ async function mapByLegacy(client, table, communityId) {
 
 async function listAuthUsers(client) {
   const byEmail = new Map();
+  const byId = new Map();
   for (let page = 1; ; page += 1) {
     const response = await client.auth.admin.listUsers({ page, perPage: 1000 });
     const users = assertResult(response, 'listar auth.users')?.users || [];
-    for (const user of users) if (user.email) byEmail.set(user.email.toLowerCase(), user);
+    for (const user of users) {
+      byId.set(user.id, user);
+      if (user.email) byEmail.set(user.email.toLowerCase(), user);
+    }
     if (users.length < 1000) break;
   }
-  return byEmail;
+  return { byEmail, byId };
 }
 
 export function makeServiceClient(url, key) {
@@ -55,9 +59,30 @@ export async function applyModel(client, model) {
 
     await upsertBatches(client, 'community_settings', Object.entries(model.settings).map(([key, value]) => ({ community_id: communityId, key, value })), 'community_id,key', counters.inserts_or_updates);
 
-    const authByEmail = await listAuthUsers(client);
+    const existingProfiles = assertResult(
+      await client.from('profiles').select('user_id,legacy_id,email').not('legacy_id', 'is', null),
+      'listar perfiles existentes'
+    ) || [];
+    const existingProfileByLegacy = new Map(existingProfiles.map((row) => [row.legacy_id, row]));
+    const existingUserByEmail = new Map(existingProfiles.map((row) => [String(row.email).toLowerCase(), row.user_id]));
+    const authUsers = await listAuthUsers(client);
+    const authByEmail = authUsers.byEmail;
     for (const legacyUser of model.users) {
       let authUser = authByEmail.get(legacyUser.email);
+      const existingProfile = existingProfileByLegacy.get(legacyUser.legacy_id);
+      if (!authUser && existingProfile) {
+        authUser = authUsers.byId.get(existingProfile.user_id);
+        if (!authUser) throw new Error(`Perfil sin auth.users para ${legacyUser.legacy_id}`);
+        const updated = assertResult(await client.auth.admin.updateUserById(authUser.id, {
+          email: legacyUser.email,
+          email_confirm: true,
+          user_metadata: { ...(authUser.user_metadata || {}), legacy_id: legacyUser.legacy_id }
+        }), `actualizar email auth ${legacyUser.legacy_id}`);
+        authUser = updated.user;
+        if (existingProfile.email) authByEmail.delete(String(existingProfile.email).toLowerCase());
+        authByEmail.set(legacyUser.email, authUser);
+        authUsers.byId.set(authUser.id, authUser);
+      }
       if (!authUser) {
         const created = assertResult(await client.auth.admin.createUser({
           email: legacyUser.email,
@@ -80,7 +105,10 @@ export async function applyModel(client, model) {
       community_id: communityId, user_id: user.user_id, roles: user.roles.filter((role) => role !== 'ROOT'), state: user.state
     })), 'community_id,user_id', counters.inserts_or_updates);
 
-    const userByEmail = new Map(model.users.map((user) => [user.email, user.user_id]));
+    const userByEmail = new Map([
+      ...existingUserByEmail,
+      ...model.users.map((user) => [user.email, user.user_id])
+    ]);
     const userByLegacy = new Map(model.users.map((user) => [user.legacy_id, user.user_id]));
 
     for (const user of model.users) {
@@ -103,7 +131,7 @@ export async function applyModel(client, model) {
     await upsertBatches(client, 'dwellings', model.dwellings.map((row) => ({
       community_id: communityId, legacy_id: row.legacy_id, block: row.block, floor: row.floor,
       apartment: row.apartment, display_name: row.display_name,
-      responsible_user_id: userByEmail.get(row.responsible_email), state: row.state,
+      responsible_user_id: userByEmail.get(row.responsible_email) || userByEmail.get(row.source_responsible_email), state: row.state,
       observations: row.observations, created_at: row.created_at
     })), 'community_id,legacy_id', counters.inserts_or_updates);
     const dwellingByLegacy = await mapByLegacy(client, 'dwellings', communityId);

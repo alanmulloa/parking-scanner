@@ -124,16 +124,24 @@ export async function readLegacyWorkbook(filePath, options = {}) {
   });
 
   const userEmails = new Set(users.map((row) => row.email));
+  const emailAliases = new Map(
+    Object.entries(options.emailAliases || {}).map(([from, to]) => [lower(from), lower(to)])
+  );
   const userLegacyIds = new Set(users.map((row) => row.legacy_id));
   const dwellings = raw.Viviendas.map((row) => {
     const stateRaw = text(row.Estado);
     if (!KNOWN.dwellingStates.has(stateRaw)) issues.errors.push(`Viviendas/${rowId(row, 'ID_Vivienda')}: estado desconocido ${stateRaw}`);
-    const responsibleEmail = lower(row.Responsable);
+    const sourceResponsibleEmail = lower(row.Responsable);
+    const responsibleEmail = emailAliases.get(sourceResponsibleEmail) || sourceResponsibleEmail;
     if (!userEmails.has(responsibleEmail)) issues.errors.push(`Viviendas/${rowId(row, 'ID_Vivienda')}: responsable no resoluble`);
+    if (sourceResponsibleEmail !== responsibleEmail) {
+      issues.warnings.push(`Viviendas/${rowId(row, 'ID_Vivienda')}: responsable resuelto mediante alias de identidad declarado`);
+    }
     return {
       legacy_id: text(row.ID_Vivienda), block: text(row.Bloque), floor: text(row.Planta), apartment: text(row.Apartamento),
       display_name: [text(row.Bloque), text(row.Planta), text(row.Apartamento)].filter(Boolean).join(' · '),
-      responsible_email: responsibleEmail, state: stateRaw.startsWith('Activa') ? 'Activo' : stateRaw.startsWith('Inactiva') ? 'Inactivo' : stateRaw,
+      responsible_email: responsibleEmail, source_responsible_email: sourceResponsibleEmail,
+      state: stateRaw.startsWith('Activa') ? 'Activo' : stateRaw.startsWith('Inactiva') ? 'Inactivo' : stateRaw,
       observations: text(row.Observaciones), created_at: dateValue(row.FechaAlta, `Viviendas/${rowId(row, 'ID_Vivienda')}/FechaAlta`, issues, { required: true })
     };
   });

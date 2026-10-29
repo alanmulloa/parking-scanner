@@ -15,3 +15,6 @@ enable_signup = false
 
 [functions.legacy-auth-migrate]
 verify_jwt = false
+
+[functions.parking-admin]
+verify_jwt = false

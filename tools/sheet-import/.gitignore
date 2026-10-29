@@ -1,5 +1,6 @@
 node_modules/
 .env
+identity-aliases.local.json
 *.xlsx
 reports/*.json
 !reports/.gitkeep

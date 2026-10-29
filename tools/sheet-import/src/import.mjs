@@ -10,7 +10,7 @@ const toolRoot = resolve(here, '..');
 const defaultFile = '/Users/macbookairm1/Downloads/DDBB QR Comunidad.xlsx';
 
 function argsOf(argv) {
-  const args = { mode: 'DRY_RUN', file: defaultFile, report: null, confirmChecksum: null };
+  const args = { mode: 'DRY_RUN', file: defaultFile, report: null, confirmChecksum: null, identityAliases: null };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--apply') args.mode = 'APPLY';
@@ -18,6 +18,7 @@ function argsOf(argv) {
     else if (value === '--file') args.file = argv[++index];
     else if (value === '--report') args.report = argv[++index];
     else if (value === '--confirm-checksum') args.confirmChecksum = argv[++index];
+    else if (value === '--identity-aliases') args.identityAliases = argv[++index];
     else if (value === '--help') args.help = true;
     else throw new Error(`Argumento desconocido: ${value}`);
   }
@@ -26,8 +27,8 @@ function argsOf(argv) {
 
 function help() {
   return `Uso:
-  node src/import.mjs --dry-run --file "/ruta/DDBB QR Comunidad.xlsx" [--report informe.json]
-  node src/import.mjs --apply --file "/ruta/DDBB QR Comunidad.xlsx" --confirm-checksum <sha256> [--report informe.json]
+  node src/import.mjs --dry-run --file "/ruta/DDBB QR Comunidad.xlsx" [--identity-aliases aliases.json] [--report informe.json]
+  node src/import.mjs --apply --file "/ruta/DDBB QR Comunidad.xlsx" --confirm-checksum <sha256> [--identity-aliases aliases.json] [--report informe.json]
 
 DRY_RUN es el modo predeterminado y no necesita credenciales Supabase.
 APPLY requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el entorno.`;
@@ -39,9 +40,15 @@ if (args.help) {
   process.exit(0);
 }
 
+let emailAliases = {};
+if (args.identityAliases) {
+  const { readFile } = await import('node:fs/promises');
+  emailAliases = JSON.parse(await readFile(resolve(args.identityAliases), 'utf8'));
+}
 const model = await readLegacyWorkbook(resolve(args.file), {
   communitySlug: process.env.COMMUNITY_SLUG,
-  communityLegacyId: process.env.COMMUNITY_LEGACY_ID
+  communityLegacyId: process.env.COMMUNITY_LEGACY_ID,
+  emailAliases
 });
 let report = safeReport(model, args.mode);
 

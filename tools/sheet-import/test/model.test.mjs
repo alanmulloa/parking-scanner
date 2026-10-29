@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { readLegacyWorkbook, safeReport } from '../src/model.mjs';
 
 const workbook = process.env.PARKING_XLSX || '/Users/macbookairm1/Downloads/DDBB QR Comunidad.xlsx';
+const aliases = process.env.PARKING_IDENTITY_ALIASES
+  ? JSON.parse(await readFile(process.env.PARKING_IDENTITY_ALIASES, 'utf8'))
+  : {};
 
 test('the source workbook produces a valid and complete dry-run', async () => {
-  const model = await readLegacyWorkbook(workbook);
+  const model = await readLegacyWorkbook(workbook, { emailAliases: aliases });
   const report = safeReport(model);
   assert.equal(report.valid, true);
   assert.deepEqual(report.counts, {
@@ -16,7 +20,7 @@ test('the source workbook produces a valid and complete dry-run', async () => {
     Solicitudes: 0,
     Incidencias: 0,
     IncidenciaSeguimiento: 0,
-    Auditoria: 1170,
+    Auditoria: 1173,
     ControlQR: 0,
     ControlMatricula: 0,
     Configuracion: 8
@@ -27,8 +31,8 @@ test('the source workbook produces a valid and complete dry-run', async () => {
 });
 
 test('the import plan is deterministic and natural keys are idempotent', async () => {
-  const first = await readLegacyWorkbook(workbook);
-  const second = await readLegacyWorkbook(workbook);
+  const first = await readLegacyWorkbook(workbook, { emailAliases: aliases });
+  const second = await readLegacyWorkbook(workbook, { emailAliases: aliases });
   assert.equal(first.source.sha256, second.source.sha256);
   for (const [name, rows] of Object.entries({
     users: first.users,

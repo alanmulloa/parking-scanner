@@ -15,10 +15,20 @@ const liveRls = args.includes('--live-rls');
 const sqlRlsValidated = Number(valueOf('--rls-sql-validated', '0'));
 const jitSyntheticValidated = args.includes('--jit-synthetic-validated');
 const jitRealValidated = args.includes('--jit-real-validated');
+const identityAliasesPath = valueOf('--identity-aliases', null);
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY');
 const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const model = await readLegacyWorkbook(file, { communitySlug: process.env.COMMUNITY_SLUG, communityLegacyId: process.env.COMMUNITY_LEGACY_ID });
+let emailAliases = {};
+if (identityAliasesPath) {
+  const { readFile } = await import('node:fs/promises');
+  emailAliases = JSON.parse(await readFile(resolve(identityAliasesPath), 'utf8'));
+}
+const model = await readLegacyWorkbook(file, {
+  communitySlug: process.env.COMMUNITY_SLUG,
+  communityLegacyId: process.env.COMMUNITY_LEGACY_ID,
+  emailAliases
+});
 
 async function allRows(table, columns, filter = (query) => query) {
   const rows = [];
