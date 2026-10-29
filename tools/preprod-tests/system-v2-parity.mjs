@@ -7,6 +7,7 @@ const advanced = read('assets/js/admin/advanced.js');
 const adapter = read('assets/js/supabase-final-adapter.js');
 const scanner = read('scanner/scanner.js');
 const migration = read('supabase/migrations/20261029012800_system_v2_maintenance.sql');
+const statusFix = read('supabase/migrations/20261029012900_system_v2_status_corrections.sql');
 const parkingAdmin = read('supabase/functions/parking-admin/index.ts');
 const preprod = read('preproduccion.html');
 
@@ -22,10 +23,12 @@ const checks = [
   ['Sistema tiene mantenimiento ROOT', advanced.includes("call('systemSetMaintenance'")],
   ['Sistema tiene consistencia', advanced.includes("call('consistencyReport'")],
   ['status usa mediciones reales', adapter.includes("timed('Base de datos'") && adapter.includes("parkingAdmin('systemPing'")],
-  ['status backend 128', adapter.includes("Supabase migration 128")],
+  ['status backend 129', adapter.includes("Supabase migration 129")],
   ['estado publico maintenance RPC', migration.includes('public.parking_public_state()')],
   ['set mantenimiento ROOT-only', migration.includes('public.parking_set_maintenance') && migration.includes("Acceso exclusivo ROOT")],
-  ['snapshot sistema 128', migration.includes("'schemaVersion', '20261029012800'")],
+  ['snapshot sistema 129', statusFix.includes("'schemaVersion', '20261029012900'")],
+  ['auditoria legacy usa LEGACY_SHEET', statusFix.includes("source='LEGACY_SHEET'")],
+  ['hora Sistema usa Europe/Madrid', advanced.includes("timeZone:'Europe/Madrid'")],
   ['parking-admin ping ROOT', parkingAdmin.includes("action === 'systemPing'") && parkingAdmin.includes('actorProfile.data.is_root')],
   ['scanner consulta mantenimiento', scanner.includes('/rest/v1/rpc/parking_public_state')],
   ['scanner sin URL personal antigua', !scanner.includes('alanmulloa.github.io/parking-scanner')],

@@ -1356,8 +1356,8 @@
         const totalMs = Math.max(1, Math.round(performance.now() - overallStarted));
         return {
           ok: services.every((item) => item.ok),
-          backendVersion: status.backendVersion || 'Supabase migration 128',
-          schemaVersion: status.schemaVersion || '20261029012800',
+          backendVersion: status.backendVersion || 'Supabase migration 129',
+          schemaVersion: status.schemaVersion || '20261029012900',
           environment: status.environment || 'PREPRODUCCIÓN',
           hosting: 'GitHub Pages',
           repository: 'floresderiviera/parking-comunidad',
