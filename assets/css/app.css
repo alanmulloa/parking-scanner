@@ -1163,3 +1163,169 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
 .legacy-integration-actions{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
 .legacy-integration-actions .legacy-action{font-size:.82rem;padding:.52rem .7rem}
 .legacy-integration-actions .legacy-action:disabled{opacity:.48;cursor:not-allowed}
+
+/* Auditoría desktop */
+.audit-tablebox{
+  width:100%;
+  max-width:none;
+  overflow-x:auto;
+}
+
+.audit-table{
+  width:100%;
+  table-layout:auto;
+}
+
+.audit-table th:first-child,
+.audit-table td:first-child{
+  white-space:nowrap;
+  min-width:145px;
+}
+
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2){
+  min-width:190px;
+}
+
+.audit-table th:nth-child(4),
+.audit-table td:nth-child(4){
+  min-width:220px;
+}
+
+.audit-table th:nth-child(6),
+.audit-table td:nth-child(6),
+.audit-table th:nth-child(7),
+.audit-table td:nth-child(7){
+  min-width:160px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+#audit-sort-date{
+  cursor:pointer;
+  user-select:none;
+}
+
+#audit-sort-date[data-dir="desc"]::after{
+  content:" ↓";
+}
+
+#audit-sort-date[data-dir="asc"]::after{
+  content:" ↑";
+}
+
+/* Inicio propietario - viviendas */
+.owner-home-houses{
+  display:grid;
+  gap:1rem;
+}
+
+.owner-home-house{
+  padding:1.2rem;
+}
+
+.owner-home-house-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:1rem;
+}
+
+.owner-home-house-head h3{
+  margin:0 0 .45rem;
+  font-size:1.15rem;
+}
+
+.owner-home-house-meta{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:.5rem .8rem;
+  color:var(--muted);
+  font-size:.84rem;
+}
+
+.owner-home-house-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.5rem;
+}
+
+.owner-home-house-actions button{
+  padding:.65rem .8rem;
+}
+
+.owner-home-slots{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.8rem;
+  margin-top:1rem;
+}
+
+.owner-home-slot{
+  min-height:82px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:.8rem 1rem;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:.15rem;
+}
+
+.owner-home-slot.occupied{
+  background:#f8fbfb;
+}
+
+.owner-home-slot.free{
+  background:#fafcfc;
+  border-style:dashed;
+}
+
+.owner-home-slot-label{
+  color:var(--muted);
+  font-size:.74rem;
+  font-weight:800;
+  text-transform:uppercase;
+}
+
+.owner-home-slot b{
+  font-size:1rem;
+}
+
+.owner-home-slot small{
+  color:var(--muted);
+}
+
+.owner-home-house-footer{
+  display:flex;
+  flex-wrap:wrap;
+  gap:1rem 1.5rem;
+  padding-top:.85rem;
+  margin-top:.85rem;
+  border-top:1px solid var(--line);
+  color:var(--muted);
+  font-size:.84rem;
+}
+
+.owner-home-house-footer b{
+  color:var(--ink);
+}
+
+@media(max-width:720px){
+  .owner-home-house-head{
+    flex-direction:column;
+  }
+
+  .owner-home-house-actions{
+    width:100%;
+  }
+
+  .owner-home-house-actions button{
+    flex:1 1 140px;
+  }
+
+  .owner-home-slots{
+    grid-template-columns:1fr;
+  }
+}

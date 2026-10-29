@@ -212,6 +212,40 @@ function groupedRowsStable(rows,groupKey,sortFn,groupOrderFn){
   sorted.forEach(r=>{const k=groupKey(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r)});
   let entries=[...groups.entries()];if(groupOrderFn)entries.sort(groupOrderFn);return entries;
 }
+function requestTypeLabel(v){return v==='REACTIVACION_VEHICULO'?'Activación de vehículo':v==='RENOVACION_QR'?'Renovación de QR':v==='PERMANENCIA_PROLONGADA'?'Permanencia prolongada':v}
+const PAGE_SIZE=20;
+function shortDateTime(v){if(!v)return '—';const x=String(v);const d=x.slice(0,10),t=x.length>=16?x.slice(11,16):'';return `${dateEs(d)}${t?' '+t:''}`}
+function recordHousingLabel(r,h=null){if(h)return housingShort(h);if(r&&r.Bloque)return `Bloque ${r.Bloque}, ${r.Planta||''} ${r.Apartamento||''}`.replace(/\s+/g,' ').trim();return r?.ID_Vivienda||'—'}
+function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&['Abierta','Pendiente'].includes(r.Estado));if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Activación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
+function incidentSummaryForVehicle(id){const rows=(state.cache.adminIncidents||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');if(!rows.length)return '<span class="request-chip none">—</span>';const first=rows[0];return `<button type="button" class="request-chip request-chip-btn incident-chip-btn" data-incident-id="${esc(first.ID_Incidencia)}" title="Abrir incidencia">● ${rows.length} pendiente${rows.length===1?'':'s'}</button>`}
+function invalidateClientParkingData(){delete state.cache.adminRequests;delete state.cache.adminIncidents;delete state.cache.vehicles;delete state.cache.ownerHousing;delete state.cache.ownerVehicles;delete state.cache.ownerRequests;delete state.cache.ownerIncidents;delete state.cache.bootstrap}
+function bindRequestLinks(){document.querySelectorAll('.request-chip-btn').forEach(b=>b.onclick=()=>{state.cache.requestFocus=b.dataset.requestId||'';go('requests')})}
+function bindIncidentLinks(){document.querySelectorAll('.incident-chip-btn').forEach(b=>b.onclick=()=>{state.cache.incidentFocus=b.dataset.incidentId||'';go('incidents')})}
+function pagerHtml(id,page,total){const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));return `<div class="pager"><span class="muted">Página ${page} de ${pages} · ${total} registros</span><div class="actions"><button class="secondary" id="${id}-prev" ${page<=1?'disabled':''}>← Anterior</button><button class="secondary" id="${id}-next" ${page>=pages?'disabled':''}>Siguiente →</button></div></div>`}
+
+
+async function temporaryPeriodsPanel(vehicle,backFn){
+  try{
+    const rows=await call('listTemporaryPeriods',{ID_Vehiculo:vehicle.ID_Vehiculo}),today=new Date().toISOString().slice(0,10);
+    const situation=p=>p.Estado==='Anulado'?'Anulado':today<p.Desde?'Próximo':today>p.Hasta?'Histórico':'Vigente';
+    const groups=[['Vigente',rows.filter(p=>situation(p)==='Vigente')],['Próximos',rows.filter(p=>situation(p)==='Próximo')],['Históricos',rows.filter(p=>situation(p)==='Histórico')],['Anulados',rows.filter(p=>situation(p)==='Anulado')]];
+    const renderGroup=([label,list])=>`<section class="card" style="margin-top:1rem"><div class="head"><h2>${label}</h2><span class="muted">${list.length}</span></div>${list.length?`<div class="tablebox"><table class="table"><thead><tr><th>Matrícula</th><th>Desde</th><th>Hasta</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody>${list.map(p=>{const i=rows.indexOf(p);return `<tr><td><b>${esc(p.MatriculaTemporal)}</b></td><td>${esc(dateEs(p.Desde))}</td><td>${esc(dateEs(p.Hasta))}</td><td>${esc(p.Observaciones||'—')}</td><td><div class="actions">${p.Estado!=='Anulado'&&vehicle.Estado==='Activo'?`<button class="secondary tmp-edit" data-i="${i}">Editar</button><button class="secondary tmp-extend" data-i="${i}">Prorrogar</button><button class="danger tmp-delete" data-i="${i}">Anular</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">Sin períodos.</div>'}</section>`;
+    $('#main').innerHTML=`<div class="head"><div><h1>Períodos temporales</h1><div class="muted">${esc(vehicle.MatriculaHabitual)} · ${esc(vehicle.Tipo||'Vehículo')}</div></div><div class="actions"><button class="secondary" id="tmp-back">Volver</button>${exportButtonsHtml('tmp-export')}${vehicle.Estado==='Activo'?'<button id="tmp-new">＋ Nuevo período</button>':''}</div></div><div id="tmp-editor"></div>${groups.map(renderGroup).join('')}`;
+    $('#tmp-back').onclick=backFn;$('#tmp-export-xlsx').onclick=()=>downloadXlsx(`temporales_${String(vehicle.MatriculaHabitual||'vehiculo').replace(/[^A-Za-z0-9]/g,'')}.xlsx`,rows,null,'Temporales').catch(err);$('#tmp-export-csv').onclick=()=>downloadCsv(`temporales_${String(vehicle.MatriculaHabitual||'vehiculo').replace(/[^A-Za-z0-9]/g,'')}.csv`,rows);
+    const openEditor=p=>{const host=$('#tmp-editor');host.innerHTML=`<form class="card form" id="tmp-form"><h2 class="wide">${p?'Editar':'Nuevo'} período temporal</h2><div class="field"><label>Matrícula temporal</label><input name="MatriculaTemporal" value="${esc(p?.MatriculaTemporal||'')}" required></div><div class="field"><label>Desde</label><input type="date" name="Desde" value="${esc(p?.Desde||'')}" required></div><div class="field"><label>Hasta</label><input type="date" name="Hasta" value="${esc(p?.Hasta||'')}" required></div><div class="field wide"><label>Observaciones</label><textarea name="Observaciones">${esc(p?.Observaciones||'')}</textarea></div><div class="wide actions"><button>Guardar</button><button type="button" class="secondary" id="tmp-cancel">Cancelar</button></div></form>`;$('#tmp-cancel').onclick=()=>host.innerHTML='';$('#tmp-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));data.ID_Vehiculo=vehicle.ID_Vehiculo;if(p)data.ID_Periodo=p.ID_Periodo;try{await call('saveTemporaryPeriod',data);invalidateClientParkingData();toast('Período guardado.');temporaryPeriodsPanel(vehicle,backFn)}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})};
+    const extend=p=>{const host=$('#tmp-editor');host.innerHTML=`<form class="card form" id="tmp-extend-form"><h2 class="wide">Prorrogar temporal · ${esc(p.MatriculaTemporal)}</h2><div class="message wide">Vigencia actual: ${esc(dateEs(p.Desde))} - ${esc(dateEs(p.Hasta))}</div><div class="field"><label>Nueva fecha hasta</label><input type="date" name="Hasta" min="${esc(p.Hasta)}" required></div><div class="field wide"><label>Observación (opcional)</label><textarea name="Observaciones" placeholder="Motivo de la prórroga"></textarea></div><div class="wide actions"><button>Confirmar prórroga</button><button type="button" class="secondary" id="tmp-extend-cancel">Cancelar</button></div></form>`;$('#tmp-extend-cancel').onclick=()=>host.innerHTML='';$('#tmp-extend-form').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target));if(!confirm(`Prorrogar ${p.MatriculaTemporal} hasta ${dateEs(data.Hasta)}. ¿Continuar?`))return;const b=e.submitter;busy(b);try{await call('extendTemporaryPeriod',{ID_Periodo:p.ID_Periodo,Hasta:data.Hasta,Observaciones:data.Observaciones});invalidateClientParkingData();toast('Temporal prorrogado.');temporaryPeriodsPanel(vehicle,backFn)}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})};
+    $('#tmp-new')&&($('#tmp-new').onclick=()=>openEditor(null));document.querySelectorAll('.tmp-edit').forEach(b=>b.onclick=()=>openEditor(rows[b.dataset.i]));document.querySelectorAll('.tmp-extend').forEach(b=>b.onclick=()=>extend(rows[b.dataset.i]));document.querySelectorAll('.tmp-delete').forEach(b=>b.onclick=async()=>{const p=rows[b.dataset.i];if(!confirm(`¿Anular el período ${p.MatriculaTemporal} del ${dateEs(p.Desde)} al ${dateEs(p.Hasta)}?`))return;try{await call('deleteTemporaryPeriod',{ID_Periodo:p.ID_Periodo});invalidateClientParkingData();toast('Período anulado.');temporaryPeriodsPanel(vehicle,backFn)}catch(e){err(e)}})
+  }catch(e){err(e)}
+}
+
+
+function qrVehicleIdentityHtml(v){
+  const hasTemporary=temporaryActive(v);
+  if(hasTemporary){
+    return `<div class="message" style="text-align:center"><b>TEMPORAL VIGENTE</b></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaTemporal)}</div><p class="muted" style="text-align:center">Válida hasta ${esc(dateEs(v.TemporalHasta))}</p><div class="details"><div style="text-align:center"><small>Matrícula habitual</small><b style="font-size:1.35rem">${esc(v.MatriculaHabitual||'—')}</b></div></div>`;
+  }
+  return `<div class="details"><div style="text-align:center"><small>Matrícula habitual</small></div></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaHabitual||'—')}</div>${v.Marca||v.Modelo?`<p>${esc(v.Marca)} ${esc(v.Modelo)}</p>`:''}`;
+}
 function userRoles(){const allowed=['ADMIN','CONTROL','PROPIETARIO'];const raw=String(state.user?.Rol||'').toUpperCase().split(/[,;|·]+/).map(x=>x.trim()).filter(Boolean);return [...new Set(raw.filter(x=>allowed.includes(x)))]}
 function hasAssignedRole(role){return userRoles().includes(role)}
 function hasUiRole(role){return activeUiRole()===role}
@@ -375,7 +409,7 @@ function ownerLabel(u){return `${u.Nombre}${u.Email?' — '+u.Email:''}`}
 function dateEs(v){if(!v)return '';const p=String(v).slice(0,10).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v}
 function temporaryActive(v){return !!(v&&v.Estado==='Activo'&&v.PeriodoTemporalActual)}
 function userAssignedHousing(row){const opts=state.cache.formOptions||{},email=String(row?.Email||'').trim().toLowerCase();return (opts.housing||[]).filter(h=>String(h.Responsable||'').trim().toLowerCase()===email).sort((a,b)=>naturalSort(housingShort(a),housingShort(b)))}
-function displayCell(kind,row,col){const opts=state.cache.formOptions||{};if(kind==='users'&&col==='ViviendasAsignadas'){const hs=userAssignedHousing(row);return hs.length?hs.map(housingShort).join(' · '):'—'}if(kind==='housing'&&col==='Vivienda')return housingShort(row);if(kind==='vehicles'&&col==='ID_Vivienda'){const h=(opts.housing||[]).find(x=>x.ID_Vivienda===row.ID_Vivienda);return h?housingShort(h):row.ID_Vivienda}if(kind==='housing'&&col==='Responsable'){const u=(opts.owners||[]).find(x=>x.Email===row.Responsable);return u?ownerLabel(u):row.Responsable}if(kind==='vehicles'&&col==='MatriculaTemporal'){if(row.PeriodoTemporalActual)return row.PeriodoTemporalActual.MatriculaTemporal;if(row.ProximoPeriodoTemporal)return row.ProximoPeriodoTemporal.MatriculaTemporal;return '—'}if(kind==='vehicles'&&col==='VigenciaTemporal'){if(row.PeriodoTemporalActual)return `${dateEs(row.PeriodoTemporalActual.Desde)} → ${dateEs(row.PeriodoTemporalActual.Hasta)}`;if(row.ProximoPeriodoTemporal)return `Desde ${dateEs(row.ProximoPeriodoTemporal.Desde)}`;return '—'}if(kind==='vehicles'&&col==='Clase')return row.Tipo==='Moto'?'Moto':'Vehículo';if(kind==='vehicles'&&col==='QR_Estado'&&row.Tipo==='Moto')return 'No aplica';if(kind==='users'&&col==='Rol')return String(row.Rol||'').split(',').join(' · ');if(kind==='users'&&col==='LastAccessAt')return row.LastAccessAt?shortDateTime(row.LastAccessAt):'—';return row[col]}
+function displayCell(kind,row,col){const opts=state.cache.formOptions||{};if(kind==='users'&&col==='ViviendasAsignadas'){const hs=userAssignedHousing(row);return hs.length?hs.map(housingShort).join(' · '):'—'}if(kind==='housing'&&col==='Vivienda')return housingShort(row);if(kind==='vehicles'&&col==='ID_Vivienda'){const h=(opts.housing||[]).find(x=>x.ID_Vivienda===row.ID_Vivienda);return h?housingShort(h):row.ID_Vivienda}if(kind==='housing'&&col==='Responsable'){const u=(opts.owners||[]).find(x=>String(x.Email||'').toLowerCase()===String(row.Responsable||'').toLowerCase());const name=String(u?.Nombre||row.Propietario||'').trim(),email=String(u?.Email||row.Responsable||'').trim();if(name&&name.toLowerCase()!==email.toLowerCase())return `<b>${esc(name)}</b>${email?`<span class="subtle">${esc(email)}</span>`:''}`;return email||'Sin responsable'}if(kind==='vehicles'&&col==='MatriculaTemporal'){if(row.PeriodoTemporalActual)return row.PeriodoTemporalActual.MatriculaTemporal;if(row.ProximoPeriodoTemporal)return row.ProximoPeriodoTemporal.MatriculaTemporal;return '—'}if(kind==='vehicles'&&col==='VigenciaTemporal'){if(row.PeriodoTemporalActual)return `${dateEs(row.PeriodoTemporalActual.Desde)} → ${dateEs(row.PeriodoTemporalActual.Hasta)}`;if(row.ProximoPeriodoTemporal)return `Desde ${dateEs(row.ProximoPeriodoTemporal.Desde)}`;return '—'}if(kind==='vehicles'&&col==='Clase')return row.Tipo==='Moto'?'Moto':'Vehículo';if(kind==='vehicles'&&col==='QR_Estado'&&row.Tipo==='Moto')return 'No aplica';if(kind==='users'&&col==='Rol')return String(row.Rol||'').split(',').join(' · ');if(kind==='users'&&col==='LastAccessAt')return row.LastAccessAt?shortDateTime(row.LastAccessAt):'—';return row[col]}
 function columnLabel(col){const labels={LastAccessAt:'Último acceso',ViviendasAsignadas:'Viviendas asignadas',ID_Vivienda:'Vivienda',MatriculaHabitual:'Matrícula habitual',MatriculaTemporal:'Matrícula temporal',VigenciaTemporal:'Vigencia temporal',Clase:'Clase',QR_Estado:'Estado QR'};return labels[col]||col}
 function rowSearchText(kind,row){const opts=state.cache.formOptions||{};let parts=Object.values(row||{});if(kind==='users')parts=parts.concat(userAssignedHousing(row).map(h=>housingShort(h)));if(kind==='vehicles'){const h=(opts.housing||[]).find(x=>x.ID_Vivienda===row.ID_Vivienda);if(h)parts=parts.concat([housingLabel(h),h.Propietario||''])}if(kind==='housing')parts.push(housingShort(row));return parts.join(' ').toLowerCase()}
 function filterDefinitions(kind){if(kind==='users')return [['Rol','Rol',['ADMIN','CONTROL','PROPIETARIO']],['Estado','Estado',['Activo','Inactivo']]];if(kind==='housing')return [['Estado','Estado',['Activa','Inactiva']]];if(kind==='vehicles')return [['__Clase','Clase',['Vehículo','Moto']],['__Slot','Slot',['Con slot','Sin slot']],['__SolicitudesPendientes','Solicitudes',['Con abiertas','Sin abiertas']],['__IncidenciasPendientes','Incidencias',['Con abiertas','Sin abiertas']],['Estado','Estado',['Activo','Desasignado','Suspendido','Baja']],['QR_Estado','QR',['Activo','Revocado']],['__Temporal','Temporal',['Vigente','Vence en 7 días']]];return []}
@@ -815,7 +849,6 @@ async function configurationView(initialTab='identity'){
     if(initialTab==='system')await renderSystem();else if(initialTab==='data')await renderData();else await renderIdentity();
   }catch(e){err(e)}
 }
-
 async function control(token=''){
   if(token){
     $('#main').innerHTML=`<section class="hero"><h1>Control de acceso</h1><p>Comprobando el código escaneado.</p></section><div id="control-body"><section class="card loading-state"><div class="spinner"></div><h2>Comprobando QR…</h2><p class="muted">Validando vehículo y autorización de acceso.</p></section></div>`;
@@ -912,40 +945,6 @@ function resultCard(r){
   $('#again').onclick=()=>control();$('#incident-result').onclick=()=>incidentForm(Object.assign({},r,{query:query||validPlate}));
   document.querySelectorAll('.control-view-incident').forEach(b=>b.onclick=()=>incidents(b.dataset.id));
   document.querySelectorAll('.control-follow-incident').forEach(b=>b.onclick=()=>{const i=(r.openIncidents||[]).find(x=>x.ID_Incidencia===b.dataset.id);if(i)controlFollowupForm(r,i)});
-}
-function requestTypeLabel(v){return v==='REACTIVACION_VEHICULO'?'Activación de vehículo':v==='RENOVACION_QR'?'Renovación de QR':v==='PERMANENCIA_PROLONGADA'?'Permanencia prolongada':v}
-const PAGE_SIZE=20;
-function shortDateTime(v){if(!v)return '—';const x=String(v);const d=x.slice(0,10),t=x.length>=16?x.slice(11,16):'';return `${dateEs(d)}${t?' '+t:''}`}
-function recordHousingLabel(r,h=null){if(h)return housingShort(h);if(r&&r.Bloque)return `Bloque ${r.Bloque}, ${r.Planta||''} ${r.Apartamento||''}`.replace(/\s+/g,' ').trim();return r?.ID_Vivienda||'—'}
-function requestSummaryForVehicle(id){const rows=(state.cache.adminRequests||[]).filter(r=>r.ID_Vehiculo===id&&['Abierta','Pendiente'].includes(r.Estado));if(!rows.length)return '<span class="request-chip none">—</span>';const labels=[...new Set(rows.map(r=>r.Tipo==='REACTIVACION_VEHICULO'?'Activación':r.Tipo==='RENOVACION_QR'?'Renovación QR':'Permanencia'))],first=rows[0];return `<button type="button" class="request-chip request-chip-btn" data-request-id="${esc(first.ID_Solicitud)}" title="Abrir solicitud">● ${rows.length} · ${esc(labels.join(' + '))}</button>`}
-function incidentSummaryForVehicle(id){const rows=(state.cache.adminIncidents||[]).filter(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');if(!rows.length)return '<span class="request-chip none">—</span>';const first=rows[0];return `<button type="button" class="request-chip request-chip-btn incident-chip-btn" data-incident-id="${esc(first.ID_Incidencia)}" title="Abrir incidencia">● ${rows.length} pendiente${rows.length===1?'':'s'}</button>`}
-function invalidateClientParkingData(){delete state.cache.adminRequests;delete state.cache.adminIncidents;delete state.cache.vehicles;delete state.cache.ownerHousing;delete state.cache.ownerVehicles;delete state.cache.ownerRequests;delete state.cache.ownerIncidents;delete state.cache.bootstrap}
-function bindRequestLinks(){document.querySelectorAll('.request-chip-btn').forEach(b=>b.onclick=()=>{state.cache.requestFocus=b.dataset.requestId||'';go('requests')})}
-function bindIncidentLinks(){document.querySelectorAll('.incident-chip-btn').forEach(b=>b.onclick=()=>{state.cache.incidentFocus=b.dataset.incidentId||'';go('incidents')})}
-function pagerHtml(id,page,total){const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));return `<div class="pager"><span class="muted">Página ${page} de ${pages} · ${total} registros</span><div class="actions"><button class="secondary" id="${id}-prev" ${page<=1?'disabled':''}>← Anterior</button><button class="secondary" id="${id}-next" ${page>=pages?'disabled':''}>Siguiente →</button></div></div>`}
-
-
-async function temporaryPeriodsPanel(vehicle,backFn){
-  try{
-    const rows=await call('listTemporaryPeriods',{ID_Vehiculo:vehicle.ID_Vehiculo}),today=new Date().toISOString().slice(0,10);
-    const situation=p=>p.Estado==='Anulado'?'Anulado':today<p.Desde?'Próximo':today>p.Hasta?'Histórico':'Vigente';
-    const groups=[['Vigente',rows.filter(p=>situation(p)==='Vigente')],['Próximos',rows.filter(p=>situation(p)==='Próximo')],['Históricos',rows.filter(p=>situation(p)==='Histórico')],['Anulados',rows.filter(p=>situation(p)==='Anulado')]];
-    const renderGroup=([label,list])=>`<section class="card" style="margin-top:1rem"><div class="head"><h2>${label}</h2><span class="muted">${list.length}</span></div>${list.length?`<div class="tablebox"><table class="table"><thead><tr><th>Matrícula</th><th>Desde</th><th>Hasta</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody>${list.map(p=>{const i=rows.indexOf(p);return `<tr><td><b>${esc(p.MatriculaTemporal)}</b></td><td>${esc(dateEs(p.Desde))}</td><td>${esc(dateEs(p.Hasta))}</td><td>${esc(p.Observaciones||'—')}</td><td><div class="actions">${p.Estado!=='Anulado'&&vehicle.Estado==='Activo'?`<button class="secondary tmp-edit" data-i="${i}">Editar</button><button class="secondary tmp-extend" data-i="${i}">Prorrogar</button><button class="danger tmp-delete" data-i="${i}">Anular</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">Sin períodos.</div>'}</section>`;
-    $('#main').innerHTML=`<div class="head"><div><h1>Períodos temporales</h1><div class="muted">${esc(vehicle.MatriculaHabitual)} · ${esc(vehicle.Tipo||'Vehículo')}</div></div><div class="actions"><button class="secondary" id="tmp-back">Volver</button>${exportButtonsHtml('tmp-export')}${vehicle.Estado==='Activo'?'<button id="tmp-new">＋ Nuevo período</button>':''}</div></div><div id="tmp-editor"></div>${groups.map(renderGroup).join('')}`;
-    $('#tmp-back').onclick=backFn;$('#tmp-export-xlsx').onclick=()=>downloadXlsx(`temporales_${String(vehicle.MatriculaHabitual||'vehiculo').replace(/[^A-Za-z0-9]/g,'')}.xlsx`,rows,null,'Temporales').catch(err);$('#tmp-export-csv').onclick=()=>downloadCsv(`temporales_${String(vehicle.MatriculaHabitual||'vehiculo').replace(/[^A-Za-z0-9]/g,'')}.csv`,rows);
-    const openEditor=p=>{const host=$('#tmp-editor');host.innerHTML=`<form class="card form" id="tmp-form"><h2 class="wide">${p?'Editar':'Nuevo'} período temporal</h2><div class="field"><label>Matrícula temporal</label><input name="MatriculaTemporal" value="${esc(p?.MatriculaTemporal||'')}" required></div><div class="field"><label>Desde</label><input type="date" name="Desde" value="${esc(p?.Desde||'')}" required></div><div class="field"><label>Hasta</label><input type="date" name="Hasta" value="${esc(p?.Hasta||'')}" required></div><div class="field wide"><label>Observaciones</label><textarea name="Observaciones">${esc(p?.Observaciones||'')}</textarea></div><div class="wide actions"><button>Guardar</button><button type="button" class="secondary" id="tmp-cancel">Cancelar</button></div></form>`;$('#tmp-cancel').onclick=()=>host.innerHTML='';$('#tmp-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));data.ID_Vehiculo=vehicle.ID_Vehiculo;if(p)data.ID_Periodo=p.ID_Periodo;try{await call('saveTemporaryPeriod',data);invalidateClientParkingData();toast('Período guardado.');temporaryPeriodsPanel(vehicle,backFn)}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})};
-    const extend=p=>{const host=$('#tmp-editor');host.innerHTML=`<form class="card form" id="tmp-extend-form"><h2 class="wide">Prorrogar temporal · ${esc(p.MatriculaTemporal)}</h2><div class="message wide">Vigencia actual: ${esc(dateEs(p.Desde))} - ${esc(dateEs(p.Hasta))}</div><div class="field"><label>Nueva fecha hasta</label><input type="date" name="Hasta" min="${esc(p.Hasta)}" required></div><div class="field wide"><label>Observación (opcional)</label><textarea name="Observaciones" placeholder="Motivo de la prórroga"></textarea></div><div class="wide actions"><button>Confirmar prórroga</button><button type="button" class="secondary" id="tmp-extend-cancel">Cancelar</button></div></form>`;$('#tmp-extend-cancel').onclick=()=>host.innerHTML='';$('#tmp-extend-form').onsubmit=async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target));if(!confirm(`Prorrogar ${p.MatriculaTemporal} hasta ${dateEs(data.Hasta)}. ¿Continuar?`))return;const b=e.submitter;busy(b);try{await call('extendTemporaryPeriod',{ID_Periodo:p.ID_Periodo,Hasta:data.Hasta,Observaciones:data.Observaciones});invalidateClientParkingData();toast('Temporal prorrogado.');temporaryPeriodsPanel(vehicle,backFn)}catch(x){toast(x.message,true);busy(b,false)}};host.scrollIntoView({behavior:'smooth'})};
-    $('#tmp-new')&&($('#tmp-new').onclick=()=>openEditor(null));document.querySelectorAll('.tmp-edit').forEach(b=>b.onclick=()=>openEditor(rows[b.dataset.i]));document.querySelectorAll('.tmp-extend').forEach(b=>b.onclick=()=>extend(rows[b.dataset.i]));document.querySelectorAll('.tmp-delete').forEach(b=>b.onclick=async()=>{const p=rows[b.dataset.i];if(!confirm(`¿Anular el período ${p.MatriculaTemporal} del ${dateEs(p.Desde)} al ${dateEs(p.Hasta)}?`))return;try{await call('deleteTemporaryPeriod',{ID_Periodo:p.ID_Periodo});invalidateClientParkingData();toast('Período anulado.');temporaryPeriodsPanel(vehicle,backFn)}catch(e){err(e)}})
-  }catch(e){err(e)}
-}
-
-
-function qrVehicleIdentityHtml(v){
-  const hasTemporary=temporaryActive(v);
-  if(hasTemporary){
-    return `<div class="message" style="text-align:center"><b>TEMPORAL VIGENTE</b></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaTemporal)}</div><p class="muted" style="text-align:center">Válida hasta ${esc(dateEs(v.TemporalHasta))}</p><div class="details"><div style="text-align:center"><small>Matrícula habitual</small><b style="font-size:1.35rem">${esc(v.MatriculaHabitual||'—')}</b></div></div>`;
-  }
-  return `<div class="details"><div style="text-align:center"><small>Matrícula habitual</small></div></div><div class="plate" style="font-size:2.5rem">${esc(v.MatriculaHabitual||'—')}</div>${v.Marca||v.Modelo?`<p>${esc(v.Marca)} ${esc(v.Modelo)}</p>`:''}`;
 }
 function requestDossierPlate(row){return String(row?.MatriculaHabitual||row?.MatriculaOrigen||'SIN MATRÍCULA').trim()||'SIN MATRÍCULA'}
 function requestDossierKey(row){row=row||{};if(row.ID_Vehiculo)return `vehicle:${row.ID_Vehiculo}`;const rawPlate=requestDossierPlate(row),plate=rawPlate==='SIN MATRÍCULA'?'':normalizePlateClient(rawPlate);if(plate)return `plate:${plate}`;if(row.ID_Vivienda)return `housing:${row.ID_Vivienda}`;return `request:${row.ID_Solicitud||'unknown'}`}
@@ -1155,7 +1154,7 @@ function auditPresetRange(preset){
 }
 async function audit(){
   try{
-    const rows=(await call('listAudit')).reverse(),entities=[...new Set(rows.map(r=>r.Entidad).filter(Boolean))].sort(),actions=[...new Set(rows.map(r=>r.Accion).filter(Boolean))].sort(),users=[...new Map(rows.filter(r=>r.Usuario).map(r=>[r.Usuario,{email:r.Usuario,name:r.UsuarioNombre||r.Usuario}])).values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
+    const rows=await call('listAudit'),entities=[...new Set(rows.map(r=>r.Entidad).filter(Boolean))].sort(),actions=[...new Set(rows.map(r=>r.Accion).filter(Boolean))].sort(),users=[...new Map(rows.filter(r=>r.Usuario).map(r=>[r.Usuario,{email:r.Usuario,name:r.UsuarioNombre||r.Usuario}])).values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
     $('#main').innerHTML=`<div class="head"><h1>Auditoría</h1>${exportButtonsHtml('audit-export')}</div>
       <div class="filterbar">
         <div class="field"><label>Período</label><select id="audit-period"><option value="30" selected>Últimos 30 días</option><option value="today">Hoy</option><option value="7">Últimos 7 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="all">Todo</option><option value="custom">Personalizado</option></select></div>
@@ -1167,12 +1166,12 @@ async function audit(){
         <div class="field"><label>Acción</label><select id="audit-action"><option value="">Todas</option>${actions.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
         <button type="button" class="secondary" id="audit-clear">Limpiar</button><span class="count" id="audit-count"></span>
       </div>
-      <div class="tablebox"><table class="table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody id="audit-body"></tbody></table><div id="audit-empty" class="empty hide">No hay registros para los filtros seleccionados.</div></div>`;
+      <div class="tablebox audit-tablebox"><table class="table audit-table"><thead><tr><th class="sortable-th" id="audit-sort-date" data-dir="desc">Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead><tbody id="audit-body"></tbody></table><div id="audit-empty" class="empty hide">No hay registros para los filtros seleccionados.</div></div>`;
     const period=$('#audit-period'),from=$('#audit-from'),to=$('#audit-to');
     const applyPreset=()=>{if(period.value==='custom')return;const [a,b]=auditPresetRange(period.value);from.value=a;to.value=b;render()};
     const filteredRows=()=>{const q=$('#audit-search').value.trim().toLowerCase(),entity=$('#audit-entity').value,action=$('#audit-action').value,user=$('#audit-user').value,a=from.value,b=to.value;return rows.filter(r=>{const d=auditDateOnly(r.FechaHora);return (!a||d>=a)&&(!b||d<=b)&&(!entity||r.Entidad===entity)&&(!action||r.Accion===action)&&(!user||r.Usuario===user)&&Object.values(r).join(' ').toLowerCase().includes(q)})};
-    const render=()=>{const filtered=filteredRows();$('#audit-count').textContent=`Mostrando ${filtered.length} de ${rows.length}`;$('#audit-body').innerHTML=filtered.map(r=>`<tr><td>${esc(shortDateTime(r.FechaHora))}</td><td><b>${esc(r.UsuarioNombre||r.Usuario)}</b>${r.UsuarioNombre&&r.Usuario?`<span class="subtle">${esc(r.Usuario)}</span>`:''}</td><td>${esc(r.Accion)}</td><td>${esc(r.Entidad)} · ${esc(r.ID_Entidad)}</td><td>${esc(r.Campo)}</td><td>${auditValue(r.ValorAnterior,r.ValorAnteriorNombre)}</td><td>${auditValue(r.ValorNuevo,r.ValorNuevoNombre)}</td></tr>`).join('');$('#audit-empty').classList.toggle('hide',!!filtered.length)};
-    period.onchange=applyPreset;from.onchange=()=>{period.value='custom';render()};to.onchange=()=>{period.value='custom';render()};['#audit-search','#audit-user','#audit-entity','#audit-action'].forEach(id=>{const el=$(id);el[el.tagName==='INPUT'?'oninput':'onchange']=render});
+    let auditSortDir='desc';const render=()=>{const filtered=[...filteredRows()].sort((a,b)=>{const av=new Date(a.FechaHora||0).getTime(),bv=new Date(b.FechaHora||0).getTime();return auditSortDir==='asc'?av-bv:bv-av});$('#audit-count').textContent=`Mostrando ${filtered.length} de ${rows.length}`;$('#audit-body').innerHTML=filtered.map(r=>`<tr><td>${esc(shortDateTime(r.FechaHora))}</td><td><b>${esc(r.UsuarioNombre||r.Usuario)}</b>${r.UsuarioNombre&&r.Usuario?`<span class="subtle">${esc(r.Usuario)}</span>`:''}</td><td>${esc(r.Accion)}</td><td>${esc(r.Entidad)} · ${esc(r.ID_Entidad)}</td><td>${esc(r.Campo)}</td><td>${auditValue(r.ValorAnterior,r.ValorAnteriorNombre)}</td><td>${auditValue(r.ValorNuevo,r.ValorNuevoNombre)}</td></tr>`).join('');$('#audit-empty').classList.toggle('hide',!!filtered.length)};
+    const sortDate=$('#audit-sort-date');if(sortDate){sortDate.onclick=()=>{auditSortDir=auditSortDir==='desc'?'asc':'desc';sortDate.dataset.dir=auditSortDir;render()}};period.onchange=applyPreset;from.onchange=()=>{period.value='custom';render()};to.onchange=()=>{period.value='custom';render()};['#audit-search','#audit-user','#audit-entity','#audit-action'].forEach(id=>{const el=$(id);el[el.tagName==='INPUT'?'oninput':'onchange']=render});
     $('#audit-clear').onclick=()=>{$('#audit-search').value='';$('#audit-user').value='';$('#audit-entity').value='';$('#audit-action').value='';period.value='30';applyPreset()};
     $('#audit-export-xlsx').onclick=()=>{const filtered=filteredRows();if(!filtered.length){toast('No hay registros para exportar.',true);return}const suffix=[from.value||'inicio',to.value||'hoy'].join('_'),cols=['FechaHora','UsuarioNombre','Usuario','Accion','Entidad','ID_Entidad','Campo','ValorAnterior','ValorNuevo','Observaciones'];downloadXlsx(`auditoria_${suffix}.xlsx`,filtered,cols,'Auditoria').catch(err)};$('#audit-export-csv').onclick=()=>{const filtered=filteredRows();if(!filtered.length){toast('No hay registros para exportar.',true);return}const suffix=[from.value||'inicio',to.value||'hoy'].join('_');downloadCsv(`auditoria_${suffix}.csv`,filtered,['FechaHora','UsuarioNombre','Usuario','Accion','Entidad','ID_Entidad','Campo','ValorAnterior','ValorNuevo','Observaciones'])};
     applyPreset();
@@ -1238,7 +1237,7 @@ async function ownerIncidents(){try{const {hs,incs}=await ownerData(),map=ownerH
 // 1.2.11.4 - UX propietario alineada con ADMIN
 async function ownerHousing(){try{const {hs,vs}=await ownerData();hs.sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));const rows=hs.map(h=>{const cars=vs.filter(v=>v.ID_Vivienda===h.ID_Vivienda&&v.Tipo!=='Moto'),motos=vs.filter(v=>v.ID_Vivienda===h.ID_Vivienda&&v.Tipo==='Moto'),slots=cars.filter(v=>v.Estado==='Activo'&&['1','2'].includes(String(v.Slot||''))).length;return {h,cars,motos,slots}});$('#main').innerHTML=`<div class="head"><h1>Mis viviendas</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="oh-search" class="search" placeholder="Buscar vivienda..."></div><span class="count" id="oh-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th>Vivienda</th><th>Estado</th><th>Slots</th><th>Vehículos</th><th>Motos</th><th>Acciones</th></tr></thead><tbody id="oh-body"></tbody></table></div>`;const render=()=>{const q=$('#oh-search').value.trim().toLowerCase(),shown=rows.filter(x=>housingShort(x.h).toLowerCase().includes(q));$('#oh-count').textContent=`Mostrando ${shown.length} de ${rows.length}`;$('#oh-body').innerHTML=shown.map(x=>`<tr><td data-label="Vivienda"><b>${esc(housingShort(x.h))}</b></td><td data-label="Estado">${esc(x.h.Estado||'Activa')}</td><td data-label="Slots">${x.slots}/2 ocupados · ${Math.max(0,2-x.slots)} libres</td><td data-label="Vehículos">${x.cars.length}</td><td data-label="Motos">${x.motos.length}</td><td data-label="Acciones">${actionMenuHtml(`<button class="secondary owner-housing-vehicles" data-id="${esc(x.h.ID_Vivienda)}">Ver vehículos</button>${x.h.Estado==='Activa'?`<button class="secondary owner-housing-add" data-id="${esc(x.h.ID_Vivienda)}">Añadir vehículo</button>`:''}`)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No tienes viviendas asignadas.</td></tr>';document.querySelectorAll('.owner-housing-vehicles').forEach(b=>b.onclick=()=>{state.cache.ownerHousingFilter=b.dataset.id;go('ownerVehicles')});document.querySelectorAll('.owner-housing-add').forEach(b=>b.onclick=()=>ownerAddVehicle(b.dataset.id))};$('#oh-search').oninput=render;render()}catch(e){err(e)}}
 
-async function ownerVehicles(){try{const {hs,vs,reqs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerVehiclesTable');const activeH=state.cache.ownerHousingFilter||'';state.cache.ownerHousingFilter='';const vehiclePreset=state.cache.ownerVehiclePreset||{};delete state.cache.ownerVehiclePreset;const pendingReq=id=>reqs.some(r=>r.ID_Vehiculo===id&&r.Estado==='Abierta'),pendingInc=id=>incs.some(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');const houses=[...hs].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));$('#main').innerHTML=`<div class="head"><h1>Mis vehículos</h1><button id="ov-add-top">＋ Añadir vehículo</button></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="ov-search" class="search" placeholder="Matrícula, temporal o vivienda..."></div>${houses.length>1?`<div class="field"><label>Vivienda</label><select id="ov-house"><option value="">Todas</option>${houses.map(h=>`<option value="${esc(h.ID_Vivienda)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`:''}<div class="field"><label>Clase</label><select id="ov-class"><option value="">Todos</option><option>Vehículo</option><option>Moto</option></select></div><div class="field"><label>Slot</label><select id="ov-slot"><option value="">Todos</option><option>Con slot</option><option>Sin slot</option></select></div><div class="field"><label>Solicitudes</label><select id="ov-req"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><div class="field"><label>Incidencias</label><select id="ov-inc"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><button type="button" class="secondary" id="ov-clear">Limpiar</button><span class="count" id="ov-count"></span></div><div id="owner-editor"></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th>Matrícula habitual</th><th>Matrícula temporal</th><th>Vigencia temporal</th><th>Vivienda</th><th>Slot</th><th>Clase</th><th>Estado</th><th>QR</th><th>Solicitudes</th><th>Incidencias</th><th>Acciones</th></tr></thead><tbody id="ov-body"></tbody></table></div>`;const houseSel=$('#ov-house');if(houseSel)houseSel.value=activeH||ui.house||'';$('#ov-search').value=ui.q||'';$('#ov-class').value=vehiclePreset.vehicleClass||ui.cl||'';$('#ov-slot').value=vehiclePreset.slot||ui.slot||'';$('#ov-req').value=ui.req||'';$('#ov-inc').value=ui.inc||'';const actions=(v,i)=>{const hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),canQr=v.Tipo!=='Moto'&&hasSlot&&v.QR_Estado==='Activo',renew=v.Tipo!=='Moto'&&v.Estado==='Activo'&&hasSlot&&v.QR_Estado==='Revocado';return actionMenuHtml(`<button class="secondary owner-edit" data-i="${i}">Editar</button><button class="secondary owner-periods" data-i="${i}">Temporales</button>${canQr?`<button class="secondary owner-qr" data-i="${i}">QR</button>`:''}${renew?`<button class="secondary owner-renew" data-i="${i}">Solicitar renovación QR</button>`:''}${v.Tipo!=='Moto'&&['Activo','Desasignado'].includes(v.Estado)?`<button class="secondary owner-slot" data-i="${i}">${hasSlot?'Cambiar slot':'Asignar slot'}</button>${hasSlot?`<button class="secondary owner-release-slot" data-i="${i}">Liberar slot</button>`:''}`:''}${v.Estado==='Activo'?`<button class="secondary owner-replace" data-i="${i}">Reemplazar</button><button class="secondary owner-longstay" data-i="${i}">Avisar permanencia</button><button class="danger owner-low" data-i="${i}">Dar de baja</button>`:['Suspendido','Baja'].includes(v.Estado)?`<button class="secondary owner-reactivate" data-i="${i}">Solicitar activación</button>`:''}`)};const render=()=>{const q=$('#ov-search').value.trim().toLowerCase(),house=houseSel?.value||'',cl=$('#ov-class').value,slot=$('#ov-slot').value,rq=$('#ov-req').value,ic=$('#ov-inc').value;saveViewUiState('ownerVehiclesTable',{q,house,cl,slot,req:rq,inc:ic,v:'1.2.12.2'});const rows=[...vs].sort((a,b)=>naturalSort(housingShort(hm[a.ID_Vivienda]),housingShort(hm[b.ID_Vivienda]))||naturalSort(a.MatriculaHabitual,b.MatriculaHabitual)).filter(v=>{const cls=v.Tipo==='Moto'?'Moto':'Vehículo',hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),blob=[v.MatriculaHabitual,v.PeriodoTemporalActual?.MatriculaTemporal,housingShort(hm[v.ID_Vivienda])].join(' ').toLowerCase();return blob.includes(q)&&(!house||v.ID_Vivienda===house)&&(!cl||cls===cl)&&(!slot||(slot==='Con slot'?hasSlot:!hasSlot))&&(!rq||(rq==='Con abiertas'?pendingReq(v.ID_Vehiculo):!pendingReq(v.ID_Vehiculo)))&&(!ic||(ic==='Con abiertas'?pendingInc(v.ID_Vehiculo):!pendingInc(v.ID_Vehiculo)))});$('#ov-count').textContent=`Mostrando ${rows.length} de ${vs.length}`;$('#ov-body').innerHTML=rows.map(v=>{const i=vs.indexOf(v),tmp=v.PeriodoTemporalActual,hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||''));return `<tr><td data-label="Matrícula habitual"><b>${esc(v.MatriculaHabitual||'—')}</b></td><td data-label="Matrícula temporal">${tmp?`<b class="temp-active">${esc(tmp.MatriculaTemporal)}</b>`:'—'}</td><td data-label="Vigencia temporal">${tmp?`${esc(dateEs(tmp.Desde))} → ${esc(dateEs(tmp.Hasta))}`:'—'}</td><td data-label="Vivienda">${esc(housingShort(hm[v.ID_Vivienda]))}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?'Slot '+v.Slot:'Sin slot')}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado"><span class="status ${v.Estado==='Activo'?'':'bad'}">${esc(v.Estado)}</span></td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?(v.QR_Estado||'—'):'—')}</td><td data-label="Solicitudes">${pendingReq(v.ID_Vehiculo)?'<span class="request-chip">Abierta</span>':'—'}</td><td data-label="Incidencias">${pendingInc(v.ID_Vehiculo)?'<span class="request-chip">Abierta</span>':'—'}</td><td data-label="Acciones">${actions(v,i)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No hay vehículos que coincidan con los filtros.</td></tr>';bindOwnerVehicleActions(vs)};$('#ov-add-top').onclick=()=>{if(houses.length===1)ownerAddVehicle(houses[0].ID_Vivienda);else if(houseSel&&houseSel.value)ownerAddVehicle(houseSel.value);else toast('Selecciona una vivienda para añadir el vehículo.',true)};['ov-search'].forEach(id=>$(`#${id}`).oninput=render);['ov-house','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=render});$('#ov-clear').onclick=()=>{['ov-search','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.value=''});if(houseSel)houseSel.value='';render()};render()}catch(e){err(e)}}
+async function ownerVehicles(){try{const {hs,vs,reqs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerVehiclesTable');const activeH=state.cache.ownerHousingFilter||'';state.cache.ownerHousingFilter='';const vehiclePreset=state.cache.ownerVehiclePreset||{};delete state.cache.ownerVehiclePreset;const pendingReq=id=>reqs.some(r=>r.ID_Vehiculo===id&&r.Estado==='Abierta'),pendingInc=id=>incs.some(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada');const houses=[...hs].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));$('#main').innerHTML=`<div class="head"><h1>Mis vehículos</h1><button id="ov-add-top">＋ Añadir vehículo</button></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="ov-search" class="search" placeholder="Matrícula, temporal o vivienda..."></div>${houses.length>1?`<div class="field"><label>Vivienda</label><select id="ov-house"><option value="">Todas</option>${houses.map(h=>`<option value="${esc(h.ID_Vivienda)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`:''}<div class="field"><label>Clase</label><select id="ov-class"><option value="">Todos</option><option>Vehículo</option><option>Moto</option></select></div><div class="field"><label>Slot</label><select id="ov-slot"><option value="">Todos</option><option>Con slot</option><option>Sin slot</option></select></div><div class="field"><label>Solicitudes</label><select id="ov-req"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><div class="field"><label>Incidencias</label><select id="ov-inc"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><button type="button" class="secondary" id="ov-clear">Limpiar</button><span class="count" id="ov-count"></span></div><div id="owner-editor"></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th>Matrícula habitual</th><th>Matrícula temporal</th><th>Vigencia temporal</th><th>Vivienda</th><th>Slot</th><th>Clase</th><th>Estado</th><th>QR</th><th>Solicitudes</th><th>Incidencias</th><th>Acciones</th></tr></thead><tbody id="ov-body"></tbody></table></div>`;const houseSel=$('#ov-house');if(houseSel)houseSel.value=activeH||ui.house||'';const addAfterNav=state.cache.ownerAddVehicleAfterNav||'';delete state.cache.ownerAddVehicleAfterNav;$('#ov-search').value=ui.q||'';$('#ov-class').value=vehiclePreset.vehicleClass||ui.cl||'';$('#ov-slot').value=vehiclePreset.slot||ui.slot||'';$('#ov-req').value=ui.req||'';$('#ov-inc').value=ui.inc||'';const actions=(v,i)=>{const hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),canQr=v.Tipo!=='Moto'&&hasSlot&&v.QR_Estado==='Activo',renew=v.Tipo!=='Moto'&&v.Estado==='Activo'&&hasSlot&&v.QR_Estado==='Revocado';return actionMenuHtml(`<button class="secondary owner-edit" data-i="${i}">Editar</button><button class="secondary owner-periods" data-i="${i}">Temporales</button>${canQr?`<button class="secondary owner-qr" data-i="${i}">QR</button>`:''}${renew?`<button class="secondary owner-renew" data-i="${i}">Solicitar renovación QR</button>`:''}${v.Tipo!=='Moto'&&['Activo','Desasignado'].includes(v.Estado)?`<button class="secondary owner-slot" data-i="${i}">${hasSlot?'Cambiar slot':'Asignar slot'}</button>${hasSlot?`<button class="secondary owner-release-slot" data-i="${i}">Liberar slot</button>`:''}`:''}${v.Estado==='Activo'?`<button class="secondary owner-replace" data-i="${i}">Reemplazar</button><button class="secondary owner-longstay" data-i="${i}">Avisar permanencia</button><button class="danger owner-low" data-i="${i}">Dar de baja</button>`:['Suspendido','Baja'].includes(v.Estado)?`<button class="secondary owner-reactivate" data-i="${i}">Solicitar activación</button>`:''}`)};const render=()=>{const q=$('#ov-search').value.trim().toLowerCase(),house=houseSel?.value||'',cl=$('#ov-class').value,slot=$('#ov-slot').value,rq=$('#ov-req').value,ic=$('#ov-inc').value;saveViewUiState('ownerVehiclesTable',{q,house,cl,slot,req:rq,inc:ic,v:'1.2.12.2'});const rows=[...vs].sort((a,b)=>naturalSort(housingShort(hm[a.ID_Vivienda]),housingShort(hm[b.ID_Vivienda]))||naturalSort(a.MatriculaHabitual,b.MatriculaHabitual)).filter(v=>{const cls=v.Tipo==='Moto'?'Moto':'Vehículo',hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),blob=[v.MatriculaHabitual,v.PeriodoTemporalActual?.MatriculaTemporal,housingShort(hm[v.ID_Vivienda])].join(' ').toLowerCase();return blob.includes(q)&&(!house||v.ID_Vivienda===house)&&(!cl||cls===cl)&&(!slot||(slot==='Con slot'?hasSlot:!hasSlot))&&(!rq||(rq==='Con abiertas'?pendingReq(v.ID_Vehiculo):!pendingReq(v.ID_Vehiculo)))&&(!ic||(ic==='Con abiertas'?pendingInc(v.ID_Vehiculo):!pendingInc(v.ID_Vehiculo)))});$('#ov-count').textContent=`Mostrando ${rows.length} de ${vs.length}`;$('#ov-body').innerHTML=rows.map(v=>{const i=vs.indexOf(v),tmp=v.PeriodoTemporalActual,hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||''));return `<tr><td data-label="Matrícula habitual"><b>${esc(v.MatriculaHabitual||'—')}</b></td><td data-label="Matrícula temporal">${tmp?`<b class="temp-active">${esc(tmp.MatriculaTemporal)}</b>`:'—'}</td><td data-label="Vigencia temporal">${tmp?`${esc(dateEs(tmp.Desde))} → ${esc(dateEs(tmp.Hasta))}`:'—'}</td><td data-label="Vivienda">${esc(housingShort(hm[v.ID_Vivienda]))}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?'Slot '+v.Slot:'Sin slot')}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado"><span class="status ${v.Estado==='Activo'?'':'bad'}">${esc(v.Estado)}</span></td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?(v.QR_Estado||'—'):'—')}</td><td data-label="Solicitudes">${pendingReq(v.ID_Vehiculo)?'<span class="request-chip">Abierta</span>':'—'}</td><td data-label="Incidencias">${pendingInc(v.ID_Vehiculo)?'<span class="request-chip">Abierta</span>':'—'}</td><td data-label="Acciones">${actions(v,i)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No hay vehículos que coincidan con los filtros.</td></tr>';bindOwnerVehicleActions(vs)};$('#ov-add-top').onclick=()=>{if(houses.length===1)ownerAddVehicle(houses[0].ID_Vivienda);else if(houseSel&&houseSel.value)ownerAddVehicle(houseSel.value);else toast('Selecciona una vivienda para añadir el vehículo.',true)};['ov-search'].forEach(id=>$(`#${id}`).oninput=render);['ov-house','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=render});$('#ov-clear').onclick=()=>{['ov-search','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.value=''});if(houseSel)houseSel.value='';render()};render();if(addAfterNav)ownerAddVehicle(addAfterNav)}catch(e){err(e)}}
 
 async function ownerIncidents(){try{const {hs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerIncidentsTable'),fresh=ui.v==='1.2.12.2';let sortKey=ui.sortKey||'FechaHora',sortDir=ui.sortDir||'desc';const types=[...new Set(incs.map(r=>r.Tipo).filter(Boolean))].sort();$('#main').innerHTML=`<div class="head"><h1>Mis incidencias</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="oi-search" class="search" placeholder="Matrícula, vivienda, tipo o descripción..."></div>${periodFilterFields('oi')}<div class="field"><label>Estado</label><select id="oi-state"><option value="Abierta">Abiertas</option><option value="">Todas</option><option>Cerrada</option></select></div><div class="field"><label>Tipo</label><select id="oi-type"><option value="">Todos</option>${types.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Agrupar por</label><select id="oi-group"><option value="none">Sin agrupar</option><option value="plate">Matrícula</option><option value="housing">Vivienda</option></select></div><span class="count" id="oi-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="plate">Matrícula</th><th class="sortable-th" data-sort="housing">Vivienda</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>ITV</th><th>Detalle</th></tr></thead><tbody id="oi-body"></tbody></table></div>`;$('#oi-search').value=ui.q||'';$('#oi-state').value=fresh?(ui.st??'Abierta'):'Abierta';$('#oi-type').value=ui.tp||'';$('#oi-period').value=ui.period||'';$('#oi-from').value=ui.from||'';$('#oi-to').value=ui.to||'';$('#oi-group').value=ui.group||'none';bindPeriodVisibility('oi');const plate=r=>r.MatriculaObservada||r.MatriculaHabitualOrigen||r.MatriculaHabitualVehiculo||'SIN MATRÍCULA',house=r=>recordHousingLabel(r,hm[r.ID_Vivienda]);const val=(r,k)=>k==='plate'?plate(r):k==='housing'?house(r):r[k]||'';const render=()=>{const q=$('#oi-search').value.trim().toLowerCase(),st=$('#oi-state').value,tp=$('#oi-type').value,period=$('#oi-period').value,from=$('#oi-from').value,to=$('#oi-to').value,group=$('#oi-group').value;saveViewUiState('ownerIncidentsTable',{q,st,tp,period,from,to,group,sortKey,sortDir,v:'1.2.12.2'});const rows=incs.filter(r=>(!st||r.Estado===st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&[...Object.values(r),house(r)].join(' ').toLowerCase().includes(q)).sort((a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true});return sortDir==='asc'?c:-c});$('#oi-count').textContent=`${rows.length} incidencia${rows.length===1?'':'s'}`;let last='';$('#oi-body').innerHTML=rows.map(r=>{const key=group==='plate'?plate(r):group==='housing'?house(r):'',gh=group!=='none'&&key!==last?(last=key,`<tr class="table-group-row"><td colspan="7"><b>${esc(key)}</b> · ${rows.filter(x=>(group==='plate'?plate(x):house(x))===key).length} incidencia(s)</td></tr>`):'';return gh+`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Matrícula"><b>${esc(plate(r))}</b></td><td data-label="Vivienda">${esc(house(r))}</td><td data-label="Tipo">${esc(r.Tipo)}</td><td data-label="Estado"><span class="status ${r.Estado==='Cerrada'?'':'bad'}">${esc(r.Estado||'Abierta')}</span></td><td data-label="Seguimiento"><b>${esc(r.Prioridad||'Normal')}</b><br><span class="subtle">${esc(r.Intentos||1)} intento(s)</span></td><td data-label="Detalle">${r.Descripcion?esc(r.Descripcion):'—'}${r.Foto?`<br><a href="${esc(r.Foto)}" target="_blank" rel="noopener">Ver fotografía</a>`:''}${r.Estado==='Cerrada'?`<div class="message owner-resolution"><b>Resolución:</b> ${esc(r.AccionCierre||'Sin actuación')}<br><b>Comentario:</b> ${esc(r.ComentarioCierre||'—')}</div>`:''}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No tienes incidencias con estos filtros.</td></tr>'};$('#oi-search').oninput=render;['oi-state','oi-type','oi-period','oi-from','oi-to','oi-group'].forEach(id=>$(`#${id}`).onchange=render);document.querySelectorAll('.sortable-th').forEach(th=>{th.dataset.dir=th.dataset.sort===sortKey?sortDir:'';th.onclick=()=>{const k=th.dataset.sort;sortDir=sortKey===k&&sortDir==='asc'?'desc':'asc';sortKey=k;document.querySelectorAll('.sortable-th').forEach(x=>x.dataset.dir=x.dataset.sort===sortKey?sortDir:'');render()}});render()}catch(e){err(e)}}
 
@@ -1249,61 +1248,283 @@ async function ownerRequests(){try{const {hs,reqs}=await ownerData(),ui=viewUiSt
 async function ownerHome(){try{const {hs,vs,reqs,incs}=await ownerData(),pendingReq=reqs.filter(r=>r.Estado==='Abierta'),openInc=incs.filter(r=>r.Estado!=='Cerrada'),withSlot=vs.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||''))),motos=vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto'),temporals=vs.filter(v=>v.PeriodoTemporalActual);$('#main').innerHTML=`<section class="hero"><h1>Inicio</h1><p>Resumen de tus viviendas, vehículos y gestiones.</p></section><div class="summary-grid"><button class="summary-card clickable ohome" data-view="ownerHousing"><b>${hs.length}</b><span>Viviendas</span><small>Ver viviendas asociadas</small></button><button class="summary-card clickable ohome" data-view="ownerVehicles"><b>${vs.length}</b><span>Vehículos</span><small>${withSlot.length} con slot · ${motos.length} motos</small></button><button class="summary-card clickable ohome ${pendingReq.length?'alert':''}" data-view="ownerRequests" data-filter="pending"><b>${pendingReq.length}</b><span>Solicitudes abiertas</span><small>Abrir abiertas</small></button><button class="summary-card clickable ohome ${openInc.length?'alert':''}" data-view="ownerIncidents" data-filter="open"><b>${openInc.length}</b><span>Incidencias abiertas</span><small>Abrir incidencias</small></button><button class="summary-card clickable ohome" data-view="ownerVehicles" data-filter="temporary"><b>${temporals.length}</b><span>Temporales vigentes</span><small>Ver vehículos</small></button></div>`;document.querySelectorAll('.ohome').forEach(b=>b.onclick=()=>{if(b.dataset.filter)state.cache.ownerNavPreset={view:b.dataset.view,filter:b.dataset.filter};go(b.dataset.view)})}catch(e){err(e)}}
 
 function ownerVehicleActionBindings(vs){bindOwnerVehicleActions(vs);document.querySelectorAll('.owner-req-link').forEach(b=>b.onclick=()=>{state.cache.ownerNavPreset={view:'ownerRequests',filter:'pending',plate:b.dataset.plate};go('ownerRequests')});document.querySelectorAll('.owner-inc-link').forEach(b=>b.onclick=()=>{state.cache.ownerNavPreset={view:'ownerIncidents',filter:'open',plate:b.dataset.plate};go('ownerIncidents')})}
-async function ownerVehicles(){try{const {hs,vs,reqs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerVehiclesTable'),preset=state.cache.ownerNavPreset?.view==='ownerVehicles'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;const activeH=state.cache.ownerHousingFilter||'';state.cache.ownerHousingFilter='';const vehiclePreset=state.cache.ownerVehiclePreset||{};delete state.cache.ownerVehiclePreset;const pendingReq=id=>reqs.some(r=>r.ID_Vehiculo===id&&r.Estado==='Abierta'),pendingInc=id=>incs.some(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada'),houses=[...hs].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));$('#main').innerHTML=`<div class="head"><h1>Mis vehículos</h1><button id="ov-add-top">＋ Añadir vehículo</button></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="ov-search" class="search" placeholder="Matrícula, temporal o vivienda..."></div>${houses.length>1?`<div class="field"><label>Vivienda</label><select id="ov-house"><option value="">Todas</option>${houses.map(h=>`<option value="${esc(h.ID_Vivienda)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`:''}<div class="field"><label>Clase</label><select id="ov-class"><option value="">Todos</option><option>Vehículo</option><option>Moto</option></select></div><div class="field"><label>Slot</label><select id="ov-slot"><option value="">Todos</option><option>Con slot</option><option>Sin slot</option></select></div><div class="field"><label>Solicitudes</label><select id="ov-req"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><div class="field"><label>Incidencias</label><select id="ov-inc"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><button type="button" class="secondary" id="ov-clear">Limpiar</button><span class="count" id="ov-count"></span></div><div id="owner-editor"></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th>Matrícula habitual</th><th>Matrícula temporal</th><th>Vigencia temporal</th><th>Vivienda</th><th>Slot</th><th>Clase</th><th>Estado</th><th>QR</th><th>Solicitudes</th><th>Incidencias</th><th>Acciones</th></tr></thead><tbody id="ov-body"></tbody></table></div>`;const houseSel=$('#ov-house');if(houseSel)houseSel.value=activeH||ui.house||'';$('#ov-search').value=ui.q||'';$('#ov-class').value=vehiclePreset.vehicleClass||ui.cl||'';$('#ov-slot').value=vehiclePreset.slot||ui.slot||'';$('#ov-req').value=ui.req||'';$('#ov-inc').value=ui.inc||'';if(preset?.filter==='temporary')$('#ov-search').value='';const actions=(v,i)=>{const hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),canQr=v.Tipo!=='Moto'&&hasSlot&&v.QR_Estado==='Activo',renew=v.Tipo!=='Moto'&&v.Estado==='Activo'&&hasSlot&&v.QR_Estado==='Revocado';return actionMenuHtml(`<button class="secondary owner-edit" data-i="${i}">Editar</button><button class="secondary owner-periods" data-i="${i}">Temporales</button>${canQr?`<button class="secondary owner-qr" data-i="${i}">QR</button>`:''}${renew?`<button class="secondary owner-renew" data-i="${i}">Solicitar renovación QR</button>`:''}${v.Tipo!=='Moto'&&['Activo','Desasignado'].includes(v.Estado)?`<button class="secondary owner-slot" data-i="${i}">${hasSlot?'Cambiar slot':'Asignar slot'}</button>${hasSlot?`<button class="secondary owner-release-slot" data-i="${i}">Liberar slot</button>`:''}`:''}${v.Estado==='Activo'?`<button class="secondary owner-replace" data-i="${i}">Reemplazar</button><button class="secondary owner-longstay" data-i="${i}">Avisar permanencia</button><button class="danger owner-low" data-i="${i}">Dar de baja</button>`:['Suspendido','Baja'].includes(v.Estado)?`<button class="secondary owner-reactivate" data-i="${i}">Solicitar activación</button>`:''}`)};const render=()=>{const q=$('#ov-search').value.trim().toLowerCase(),house=houseSel?.value||'',cl=$('#ov-class').value,slot=$('#ov-slot').value,rq=$('#ov-req').value,ic=$('#ov-inc').value;saveViewUiState('ownerVehiclesTable',{q,house,cl,slot,req:rq,inc:ic,v:'1.2.12.2'});const rows=[...vs].sort((a,b)=>naturalSort(housingShort(hm[a.ID_Vivienda]),housingShort(hm[b.ID_Vivienda]))||naturalSort(a.MatriculaHabitual,b.MatriculaHabitual)).filter(v=>{const cls=v.Tipo==='Moto'?'Moto':'Vehículo',hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),blob=[v.MatriculaHabitual,v.PeriodoTemporalActual?.MatriculaTemporal,housingShort(hm[v.ID_Vivienda])].join(' ').toLowerCase();return blob.includes(q)&&(!house||v.ID_Vivienda===house)&&(!cl||cls===cl)&&(!slot||(slot==='Con slot'?hasSlot:!hasSlot))&&(!rq||(rq==='Con abiertas'?pendingReq(v.ID_Vehiculo):!pendingReq(v.ID_Vehiculo)))&&(!ic||(ic==='Con abiertas'?pendingInc(v.ID_Vehiculo):!pendingInc(v.ID_Vehiculo)))&&(!preset?.filter||preset.filter!=='temporary'||!!v.PeriodoTemporalActual)});$('#ov-count').textContent=`Mostrando ${rows.length} de ${vs.length}`;$('#ov-body').innerHTML=rows.map(v=>{const i=vs.indexOf(v),tmp=v.PeriodoTemporalActual,hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),plate=v.MatriculaHabitual||'';return `<tr><td data-label="Matrícula habitual"><b>${esc(plate||'—')}</b></td><td data-label="Matrícula temporal">${tmp?`<b class="temp-active">${esc(tmp.MatriculaTemporal)}</b>`:'—'}</td><td data-label="Vigencia temporal">${tmp?`${esc(dateEs(tmp.Desde))} → ${esc(dateEs(tmp.Hasta))}`:'—'}</td><td data-label="Vivienda">${esc(housingShort(hm[v.ID_Vivienda]))}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?'Slot '+v.Slot:'Sin slot')}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado"><span class="status ${v.Estado==='Activo'?'':'bad'}">${esc(v.Estado)}</span></td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?(v.QR_Estado||'—'):'—')}</td><td data-label="Solicitudes">${pendingReq(v.ID_Vehiculo)?`<button class="link-chip owner-req-link" data-plate="${esc(plate)}">Abierta</button>`:'—'}</td><td data-label="Incidencias">${pendingInc(v.ID_Vehiculo)?`<button class="link-chip owner-inc-link" data-plate="${esc(plate)}">Pendiente</button>`:'—'}</td><td data-label="Acciones">${actions(v,i)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No hay vehículos que coincidan con los filtros.</td></tr>';ownerVehicleActionBindings(vs)};$('#ov-add-top').onclick=()=>{if(houses.length===1)ownerAddVehicle(houses[0].ID_Vivienda);else if(houseSel&&houseSel.value)ownerAddVehicle(houseSel.value);else toast('Selecciona una vivienda para añadir el vehículo.',true)};$('#ov-search').oninput=render;['ov-house','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=render});$('#ov-clear').onclick=()=>{['ov-search','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.value=''});if(houseSel)houseSel.value='';render()};render()}catch(e){err(e)}}
+async function ownerVehicles(){try{const {hs,vs,reqs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerVehiclesTable'),preset=state.cache.ownerNavPreset?.view==='ownerVehicles'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;const activeH=state.cache.ownerHousingFilter||'';state.cache.ownerHousingFilter='';const vehiclePreset=state.cache.ownerVehiclePreset||{};delete state.cache.ownerVehiclePreset;const pendingReq=id=>reqs.some(r=>r.ID_Vehiculo===id&&r.Estado==='Abierta'),pendingInc=id=>incs.some(r=>r.ID_Vehiculo===id&&r.Estado!=='Cerrada'),houses=[...hs].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));$('#main').innerHTML=`<div class="head"><h1>Mis vehículos</h1><button id="ov-add-top">＋ Añadir vehículo</button></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="ov-search" class="search" placeholder="Matrícula, temporal o vivienda..."></div>${houses.length>1?`<div class="field"><label>Vivienda</label><select id="ov-house"><option value="">Todas</option>${houses.map(h=>`<option value="${esc(h.ID_Vivienda)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`:''}<div class="field"><label>Clase</label><select id="ov-class"><option value="">Todos</option><option>Vehículo</option><option>Moto</option></select></div><div class="field"><label>Slot</label><select id="ov-slot"><option value="">Todos</option><option>Con slot</option><option>Sin slot</option></select></div><div class="field"><label>Solicitudes</label><select id="ov-req"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><div class="field"><label>Incidencias</label><select id="ov-inc"><option value="">Todas</option><option>Con abiertas</option><option>Sin abiertas</option></select></div><button type="button" class="secondary" id="ov-clear">Limpiar</button><span class="count" id="ov-count"></span></div><div id="owner-editor"></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th>Matrícula habitual</th><th>Matrícula temporal</th><th>Vigencia temporal</th><th>Vivienda</th><th>Slot</th><th>Clase</th><th>Estado</th><th>QR</th><th>Solicitudes</th><th>Incidencias</th><th>Acciones</th></tr></thead><tbody id="ov-body"></tbody></table></div>`;const houseSel=$('#ov-house');if(houseSel)houseSel.value=activeH||ui.house||'';const addAfterNav=state.cache.ownerAddVehicleAfterNav||'';delete state.cache.ownerAddVehicleAfterNav;$('#ov-search').value=ui.q||'';$('#ov-class').value=vehiclePreset.vehicleClass||ui.cl||'';$('#ov-slot').value=vehiclePreset.slot||ui.slot||'';$('#ov-req').value=ui.req||'';$('#ov-inc').value=ui.inc||'';if(preset?.filter==='temporary')$('#ov-search').value='';const actions=(v,i)=>{const hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),canQr=v.Tipo!=='Moto'&&hasSlot&&v.QR_Estado==='Activo',renew=v.Tipo!=='Moto'&&v.Estado==='Activo'&&hasSlot&&v.QR_Estado==='Revocado';return actionMenuHtml(`<button class="secondary owner-edit" data-i="${i}">Editar</button><button class="secondary owner-periods" data-i="${i}">Temporales</button>${canQr?`<button class="secondary owner-qr" data-i="${i}">QR</button>`:''}${renew?`<button class="secondary owner-renew" data-i="${i}">Solicitar renovación QR</button>`:''}${v.Tipo!=='Moto'&&['Activo','Desasignado'].includes(v.Estado)?`<button class="secondary owner-slot" data-i="${i}">${hasSlot?'Cambiar slot':'Asignar slot'}</button>${hasSlot?`<button class="secondary owner-release-slot" data-i="${i}">Liberar slot</button>`:''}`:''}${v.Estado==='Activo'?`<button class="secondary owner-replace" data-i="${i}">Reemplazar</button><button class="secondary owner-longstay" data-i="${i}">Avisar permanencia</button><button class="danger owner-low" data-i="${i}">Dar de baja</button>`:['Suspendido','Baja'].includes(v.Estado)?`<button class="secondary owner-reactivate" data-i="${i}">Solicitar activación</button>`:''}`)};const render=()=>{const q=$('#ov-search').value.trim().toLowerCase(),house=houseSel?.value||'',cl=$('#ov-class').value,slot=$('#ov-slot').value,rq=$('#ov-req').value,ic=$('#ov-inc').value;saveViewUiState('ownerVehiclesTable',{q,house,cl,slot,req:rq,inc:ic,v:'1.2.12.2'});const rows=[...vs].sort((a,b)=>naturalSort(housingShort(hm[a.ID_Vivienda]),housingShort(hm[b.ID_Vivienda]))||naturalSort(a.MatriculaHabitual,b.MatriculaHabitual)).filter(v=>{const cls=v.Tipo==='Moto'?'Moto':'Vehículo',hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),blob=[v.MatriculaHabitual,v.PeriodoTemporalActual?.MatriculaTemporal,housingShort(hm[v.ID_Vivienda])].join(' ').toLowerCase();return blob.includes(q)&&(!house||v.ID_Vivienda===house)&&(!cl||cls===cl)&&(!slot||(slot==='Con slot'?hasSlot:!hasSlot))&&(!rq||(rq==='Con abiertas'?pendingReq(v.ID_Vehiculo):!pendingReq(v.ID_Vehiculo)))&&(!ic||(ic==='Con abiertas'?pendingInc(v.ID_Vehiculo):!pendingInc(v.ID_Vehiculo)))&&(!preset?.filter||preset.filter!=='temporary'||!!v.PeriodoTemporalActual)});$('#ov-count').textContent=`Mostrando ${rows.length} de ${vs.length}`;$('#ov-body').innerHTML=rows.map(v=>{const i=vs.indexOf(v),tmp=v.PeriodoTemporalActual,hasSlot=v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')),plate=v.MatriculaHabitual||'';return `<tr><td data-label="Matrícula habitual"><b>${esc(plate||'—')}</b></td><td data-label="Matrícula temporal">${tmp?`<b class="temp-active">${esc(tmp.MatriculaTemporal)}</b>`:'—'}</td><td data-label="Vigencia temporal">${tmp?`${esc(dateEs(tmp.Desde))} → ${esc(dateEs(tmp.Hasta))}`:'—'}</td><td data-label="Vivienda">${esc(housingShort(hm[v.ID_Vivienda]))}</td><td data-label="Slot">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?'Slot '+v.Slot:'Sin slot')}</td><td data-label="Clase">${v.Tipo==='Moto'?'Moto':'Vehículo'}</td><td data-label="Estado"><span class="status ${v.Estado==='Activo'?'':'bad'}">${esc(v.Estado)}</span></td><td data-label="QR">${esc(v.Tipo==='Moto'?'No aplica':hasSlot?(v.QR_Estado||'—'):'—')}</td><td data-label="Solicitudes">${pendingReq(v.ID_Vehiculo)?`<button class="link-chip owner-req-link" data-plate="${esc(plate)}">Abierta</button>`:'—'}</td><td data-label="Incidencias">${pendingInc(v.ID_Vehiculo)?`<button class="link-chip owner-inc-link" data-plate="${esc(plate)}">Pendiente</button>`:'—'}</td><td data-label="Acciones">${actions(v,i)}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No hay vehículos que coincidan con los filtros.</td></tr>';ownerVehicleActionBindings(vs)};$('#ov-add-top').onclick=()=>{if(houses.length===1)ownerAddVehicle(houses[0].ID_Vivienda);else if(houseSel&&houseSel.value)ownerAddVehicle(houseSel.value);else toast('Selecciona una vivienda para añadir el vehículo.',true)};$('#ov-search').oninput=render;['ov-house','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=render});$('#ov-clear').onclick=()=>{['ov-search','ov-class','ov-slot','ov-req','ov-inc'].forEach(id=>{const el=$(`#${id}`);if(el)el.value=''});if(houseSel)houseSel.value='';render()};render();if(addAfterNav)ownerAddVehicle(addAfterNav)}catch(e){err(e)}}
 
 async function ownerIncidents(){try{const {hs,incs}=await ownerData(),hm=Object.fromEntries(hs.map(h=>[h.ID_Vivienda,h])),ui=viewUiState('ownerIncidentsTable'),preset=state.cache.ownerNavPreset?.view==='ownerIncidents'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;let sortKey=ui.sortKey||'FechaHora',sortDir=ui.sortDir||'desc';const types=[...new Set(incs.map(r=>r.Tipo).filter(Boolean))].sort();$('#main').innerHTML=`<div class="head"><h1>Mis incidencias</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="oi-search" class="search" placeholder="Matrícula, vivienda, tipo o descripción..."></div>${periodFilterFields('oi')}<div class="field"><label>Estado</label><select id="oi-state"><option value="Abierta">Abiertas</option><option value="">Todas</option><option>Cerrada</option></select></div><div class="field"><label>Tipo</label><select id="oi-type"><option value="">Todos</option>${types.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Agrupar por</label><select id="oi-group"><option value="none">Sin agrupar</option><option value="plate">Matrícula</option><option value="housing">Vivienda</option><option value="type">Tipo</option></select></div><span class="count" id="oi-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="plate">Matrícula</th><th class="sortable-th" data-sort="housing">Vivienda</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>Seguimiento</th><th>Detalle</th><th>Resolución</th></tr></thead><tbody id="oi-body"></tbody></table></div>`;$('#oi-search').value=preset?.plate||ui.q||'';$('#oi-state').value=preset?.filter==='open'?'Abierta':(ui.st===undefined?'Abierta':ui.st);$('#oi-type').value=ui.tp||'';$('#oi-period').value=ui.period||'';$('#oi-from').value=ui.from||'';$('#oi-to').value=ui.to||'';$('#oi-group').value=ui.group||'none';bindPeriodVisibility('oi');const plate=r=>r.MatriculaObservada||r.MatriculaHabitualOrigen||r.MatriculaHabitualVehiculo||'SIN MATRÍCULA',house=r=>recordHousingLabel(r,hm[r.ID_Vivienda]),val=(r,k)=>k==='plate'?plate(r):k==='housing'?house(r):r[k]||'',cmp=(a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true});return sortDir==='asc'?c:-c};const rowHtml=r=>`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Matrícula"><b>${esc(plate(r))}</b></td><td data-label="Vivienda">${esc(house(r))}</td><td data-label="Tipo">${esc(r.Tipo)}</td><td data-label="Estado"><span class="status ${r.Estado==='Cerrada'?'':'bad'}">${esc(r.Estado||'Abierta')}</span></td><td data-label="Seguimiento"><b>${esc(r.Prioridad||'Normal')}</b><br><span class="subtle">${esc(r.Intentos||1)} intento(s)</span></td><td data-label="Detalle" class="detail-text">${esc(r.Descripcion||'—')}${r.Foto?`<br><a href="${esc(r.Foto)}" target="_blank" rel="noopener">Ver fotografía</a>`:''}</td><td data-label="Resolución" class="resolution-cell">${r.Estado==='Cerrada'?`<div class="message owner-resolution"><b>Acción realizada:</b> ${esc(r.AccionCierre||'—')}<br><b>Comentario:</b> ${esc(r.ComentarioCierre||'—')}<br><span class="subtle">Cerrada por ${esc(r.NombreUsuarioCierre||r.UsuarioCierre||'—')} · ${esc(shortDateTime(r.FechaCierre))}</span></div>`:'<span class="muted">Abierta</span>'}</td></tr>`;const render=()=>{const q=$('#oi-search').value.trim().toLowerCase(),st=$('#oi-state').value,tp=$('#oi-type').value,period=$('#oi-period').value,from=$('#oi-from').value,to=$('#oi-to').value,group=$('#oi-group').value;saveViewUiState('ownerIncidentsTable',{q,st,tp,period,from,to,group,sortKey,sortDir,v:'1.2.12.2'});const rows=incs.filter(r=>(!st||r.Estado===st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&[...Object.values(r),house(r)].join(' ').toLowerCase().includes(q));$('#oi-count').textContent=`${rows.length} incidencia${rows.length===1?'':'s'}`;if(group==='none')$('#oi-body').innerHTML=[...rows].sort(cmp).map(rowHtml).join('')||'<tr><td colspan="8" class="empty">No tienes incidencias con estos filtros.</td></tr>';else{const keyFn=group==='plate'?plate:group==='housing'?house:r=>r.Tipo||'Sin tipo',entries=groupedRowsStable(rows,keyFn,cmp,(a,b)=>b[1].length-a[1].length||naturalSort(a[0],b[0]));$('#oi-body').innerHTML=entries.map(([key,list])=>`<tr class="table-group-row"><td colspan="8"><b>${esc(key)}</b> · ${list.length} incidencia(s)</td></tr>${list.map(rowHtml).join('')}`).join('')||'<tr><td colspan="8" class="empty">No tienes incidencias con estos filtros.</td></tr>'}};$('#oi-search').oninput=render;['oi-state','oi-type','oi-period','oi-from','oi-to','oi-group'].forEach(id=>$(`#${id}`).onchange=render);document.querySelectorAll('.sortable-th').forEach(th=>{th.dataset.dir=th.dataset.sort===sortKey?sortDir:'';th.onclick=()=>{const k=th.dataset.sort;sortDir=sortKey===k&&sortDir==='asc'?'desc':'asc';sortKey=k;document.querySelectorAll('.sortable-th').forEach(x=>x.dataset.dir=x.dataset.sort===sortKey?sortDir:'');render()}});render()}catch(e){err(e)}}
 
 async function ownerRequests(){try{const {reqs}=await ownerData(),ui=viewUiState('ownerRequestsTable'),preset=state.cache.ownerNavPreset?.view==='ownerRequests'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;let sortKey=ui.sortKey||'FechaHora',sortDir=ui.sortDir||'desc';$('#main').innerHTML=`<div class="head"><h1>Mis solicitudes</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="or-search" class="search" placeholder="Matrícula, vivienda o tipo..."></div>${periodFilterFields('or')}<div class="field"><label>Estado</label><select id="or-state"><option value="Abierta">Abiertas</option><option value="">Todas</option><option>Aprobada</option><option>Rechazada</option></select></div><div class="field"><label>Tipo</label><select id="or-type"><option value="">Todos</option><option value="REACTIVACION_VEHICULO">Activación</option><option value="RENOVACION_QR">Renovación QR</option><option value="PERMANENCIA_PROLONGADA">Permanencia prolongada</option></select></div><div class="field"><label>Agrupar por</label><select id="or-group"><option value="none">Sin agrupar</option><option value="plate">Matrícula</option><option value="housing">Vivienda</option><option value="type">Tipo</option></select></div><span class="count" id="or-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="plate">Matrícula</th><th class="sortable-th" data-sort="housing">Vivienda</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>Resolución</th></tr></thead><tbody id="or-body"></tbody></table></div>`;$('#or-search').value=preset?.plate||ui.q||'';$('#or-state').value=preset?.filter==='pending'?'Abierta':(ui.st===undefined?'Abierta':ui.st);$('#or-type').value=ui.tp||'';$('#or-period').value=ui.period||'';$('#or-from').value=ui.from||'';$('#or-to').value=ui.to||'';$('#or-group').value=ui.group||'none';bindPeriodVisibility('or');const plate=r=>r.MatriculaHabitual||r.MatriculaOrigen||'SIN MATRÍCULA',house=r=>`Bloque ${r.Bloque}, ${r.Planta} ${r.Apartamento}`,val=(r,k)=>k==='plate'?plate(r):k==='housing'?house(r):k==='Tipo'?requestTypeLabel(r.Tipo):r[k]||'',cmp=(a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true});return sortDir==='asc'?c:-c},rowHtml=r=>`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Matrícula"><b>${esc(plate(r))}</b></td><td data-label="Vivienda">${esc(house(r))}</td><td data-label="Tipo">${esc(requestTypeLabel(r.Tipo))}</td><td data-label="Estado"><span class="status ${r.Estado==='Abierta'?'bad':''}">${esc(r.Estado)}</span></td><td data-label="Resolución" class="resolution-cell">${r.Estado==='Abierta'?'<span class="muted">Abierta</span>':`<div class="message owner-resolution"><b>Resolución:</b> ${esc(r.Estado)}<br><b>Comentario:</b> ${esc(r.ObservacionesResolucion||'—')}<br><span class="subtle">${esc(r.Estado==='Aprobada'?'Aprobada':'Rechazada')} por ${esc(r.NombreResolucion||r.UsuarioResolucion||'—')} · ${esc(shortDateTime(r.FechaResolucion))}</span></div>`}</td></tr>`;const render=()=>{const q=$('#or-search').value.trim().toLowerCase(),st=$('#or-state').value,tp=$('#or-type').value,period=$('#or-period').value,from=$('#or-from').value,to=$('#or-to').value,group=$('#or-group').value;saveViewUiState('ownerRequestsTable',{q,st,tp,period,from,to,group,sortKey,sortDir,v:'1.2.12.2'});const rows=reqs.filter(r=>(!st||r.Estado===st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&Object.values(r).join(' ').toLowerCase().includes(q));$('#or-count').textContent=`${rows.length} solicitud${rows.length===1?'':'es'}`;if(group==='none')$('#or-body').innerHTML=[...rows].sort(cmp).map(rowHtml).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>';else{const keyFn=group==='plate'?plate:group==='housing'?house:r=>requestTypeLabel(r.Tipo),entries=groupedRowsStable(rows,keyFn,cmp,(a,b)=>naturalSort(a[0],b[0]));$('#or-body').innerHTML=entries.map(([key,list])=>`<tr class="table-group-row"><td colspan="6"><b>${esc(key)}</b> · ${list.length} solicitud(es)</td></tr>${list.map(rowHtml).join('')}`).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>'}};$('#or-search').oninput=render;['or-state','or-type','or-period','or-from','or-to','or-group'].forEach(id=>$(`#${id}`).onchange=render);document.querySelectorAll('.sortable-th').forEach(th=>{th.dataset.dir=th.dataset.sort===sortKey?sortDir:'';th.onclick=()=>{const k=th.dataset.sort;sortDir=sortKey===k&&sortDir==='asc'?'desc':'asc';sortKey=k;document.querySelectorAll('.sortable-th').forEach(x=>x.dataset.dir=x.dataset.sort===sortKey?sortDir:'');render()}});render()}catch(e){err(e)}}
 
 
-// PREPROD - Inicio propietario con alcance propio (no replica Resumen ADMIN)
+// 1.2.12.2 - Inicio propietario alineado visualmente con Resumen ADMIN
 async function ownerHome(){
   try{
-    const {hs,vs,reqs,incs}=await ownerData(true);
-    const active=vs.filter(v=>v.Estado==='Activo');
-    const withSlot=active.filter(v=>v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')));
-    const motos=active.filter(v=>v.Tipo==='Moto');
-    const unassigned=vs.filter(v=>['Desasignado','SinPlaza'].includes(String(v.Estado||'')));
-    const suspended=vs.filter(v=>v.Estado==='Suspendido');
-    const temporals=vs.filter(v=>v.PeriodoTemporalActual);
+    const {hs,vs,reqs,incs}=await ownerData();
+
+    const houses=[...hs].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));
+
+    const activeCars=vs.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto');
+    const withSlot=activeCars.filter(v=>['1','2'].includes(String(v.Slot||'')));
+    const motos=vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto');
+
     const pendingReq=reqs.filter(r=>r.Estado==='Abierta');
     const openInc=incs.filter(r=>(r.Estado||'Abierta')!=='Cerrada');
+    const longstay=reqs.filter(r=>r.Tipo==='PERMANENCIA_PROLONGADA'&&r.Estado==='Aprobada');
+
     const available=Math.max(0,hs.length*2-withSlot.length);
-    const houseRows=hs.slice().sort((a,b)=>housingShort(a).localeCompare(housingShort(b),'es',{numeric:true})).map(h=>{
+
+    const card=(value,label,detail='',action='',alert=false)=>`
+      <article
+        class="summary-card ${action?'clickable':''} ${alert?'alert':''}"
+        ${action?`data-owner-summary="${action}"`:''}>
+        <b>${esc(value)}</b>
+        <span>${esc(label)}</span>
+        ${detail?`<small>${esc(detail)}</small>`:''}
+      </article>`;
+
+    const houseCards=houses.map(h=>{
       const own=vs.filter(v=>v.ID_Vivienda===h.ID_Vivienda);
-      const occupied=own.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||''))).length;
-      return `<button class="owner-list-row clickable owner-home-house" data-house="${esc(h.ID_Vivienda)}"><div class="owner-list-main"><div class="owner-list-title">${esc(housingShort(h))}</div><div class="owner-list-meta"><span>${occupied}/2 slots ocupados</span><span>${Math.max(0,2-occupied)} libres</span><span>${own.length} vehículo${own.length===1?'':'s'}</span></div></div><span>Ver</span></button>`;
+
+      const cars=own.filter(v=>v.Tipo!=='Moto');
+      const activeMotos=own.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto');
+
+      const slot1=cars.find(v=>
+        v.Estado==='Activo'&&String(v.Slot||'')==='1'
+      );
+
+      const slot2=cars.find(v=>
+        v.Estado==='Activo'&&String(v.Slot||'')==='2'
+      );
+
+      const occupied=[slot1,slot2].filter(Boolean).length;
+      const free=Math.max(0,2-occupied);
+
+      const slotHtml=(n,v)=>`
+        <div class="owner-home-slot ${v?'occupied':'free'}">
+          <span class="owner-home-slot-label">Slot ${n}</span>
+          ${
+            v
+              ? `<b>${esc(v.MatriculaHabitual||'Sin matrícula')}</b>
+                 <small>${esc([v.Marca,v.Modelo].filter(Boolean).join(' ')||'Vehículo activo')}</small>`
+              : `<b>Libre</b>
+                 <small>Disponible para asignar</small>`
+          }
+        </div>`;
+
+      return `
+        <article class="card owner-home-house">
+          <div class="owner-home-house-head">
+            <div>
+              <h3>${esc(housingShort(h))}</h3>
+              <div class="owner-home-house-meta">
+                <span class="status ${h.Estado==='Activa'?'':'bad'}">${esc(h.Estado||'Activa')}</span>
+                <span>${occupied}/2 slots ocupados</span>
+                <span>${free} libre${free===1?'':'s'}</span>
+              </div>
+            </div>
+
+            <div class="owner-home-house-actions">
+              <button
+                class="secondary owner-home-house-vehicles"
+                data-id="${esc(h.ID_Vivienda)}">
+                Ver vehículos
+              </button>
+
+              ${
+                h.Estado==='Activa'
+                  ? `<button
+                       class="owner-home-house-add"
+                       data-id="${esc(h.ID_Vivienda)}">
+                       ＋ Añadir vehículo
+                     </button>`
+                  : ''
+              }
+            </div>
+          </div>
+
+          <div class="owner-home-slots">
+            ${slotHtml(1,slot1)}
+            ${slotHtml(2,slot2)}
+          </div>
+
+          <div class="owner-home-house-footer">
+            <span>
+              <b>${cars.length}</b>
+              vehículo${cars.length===1?'':'s'} registrado${cars.length===1?'':'s'}
+            </span>
+
+            <span>
+              <b>${activeMotos.length}</b>
+              moto${activeMotos.length===1?'':'s'} activa${activeMotos.length===1?'':'s'}
+            </span>
+          </div>
+        </article>`;
     }).join('');
-    const card=(value,label,detail,action,alert=false)=>`<button class="summary-card clickable owner-home-card ${alert?'alert':''}" data-owner-summary="${action}"><b>${esc(value)}</b><span>${esc(label)}</span><small>${esc(detail)}</small></button>`;
 
-    $('#main').innerHTML=`<section class="hero owner-home-hero"><h1>Inicio</h1><p>Tu parking: viviendas, vehículos y gestiones asociadas a tu usuario.</p></section>
-      <section class="summary-section"><div class="head"><h2>Mis vehículos</h2></div><div class="summary-grid owner-home-grid">
-        ${card(vs.length,'Vehículos registrados',`${withSlot.length} con slot · ${available} slots libres`,'vehicles')}
-        ${card(unassigned.length,'Sin plaza','Vehículos pendientes de slot','unassigned',unassigned.length>0)}
-        ${card(temporals.length,'Temporales vigentes','Matrículas temporales activas','temporary',temporals.length>0)}
-        ${card(suspended.length,'Suspendidos',`${motos.length} moto${motos.length===1?'':'s'} activa${motos.length===1?'':'s'}`,'suspended',suspended.length>0)}
-      </div></section>
-      <section class="summary-section"><div class="head"><h2>Mis gestiones</h2></div><div class="summary-grid owner-home-grid">
-        ${card(pendingReq.length,'Solicitudes abiertas',`${reqs.length} solicitudes asociadas`,'requests',pendingReq.length>0)}
-        ${card(openInc.length,'Incidencias abiertas',`${incs.length} incidencias asociadas`,'incidents',openInc.length>0)}
-      </div></section>
-      <section class="owner-dashboard-list"><div class="head"><h2>Mis viviendas</h2></div><div class="owner-list flat-list">${houseRows||'<div class="card empty">No tienes viviendas asociadas.</div>'}</div></section>`;
+    $('#main').innerHTML=`
+      <section class="hero">
+        <h1>Inicio</h1>
+        <p>Resumen de tus viviendas, vehículos y gestiones.</p>
+      </section>
 
-    document.querySelectorAll('[data-owner-summary]').forEach(el=>el.onclick=()=>{
-      const a=el.dataset.ownerSummary;
-      if(a==='vehicles'){delete state.cache.ownerHousingFilter;delete state.cache.ownerVehiclePreset;go('ownerVehicles');return}
-      if(a==='unassigned'){state.cache.ownerVehiclePreset={state:'Desasignado'};go('ownerVehicles');return}
-      if(a==='temporary'){state.cache.ownerVehiclePreset={temporary:'Vigente'};go('ownerVehicles');return}
-      if(a==='suspended'){state.cache.ownerVehiclePreset={state:'Suspendido'};go('ownerVehicles');return}
-      if(a==='requests'){state.cache.ownerNavPreset={view:'ownerRequests',filter:'pending'};go('ownerRequests');return}
-      if(a==='incidents'){state.cache.ownerNavPreset={view:'ownerIncidents',filter:'open'};go('ownerIncidents')}
+      <section class="summary-section">
+        <div class="head">
+          <h2>Estado general</h2>
+        </div>
+
+        <div class="summary-grid">
+          ${card(
+            hs.length,
+            hs.length===1?'Vivienda asociada':'Viviendas asociadas',
+            'Ver viviendas',
+            'housing'
+          )}
+
+          ${card(
+            vs.length,
+            'Vehículos registrados',
+            `${withSlot.length} con slot · ${motos.length} moto${motos.length===1?'':'s'}`,
+            'vehicles'
+          )}
+
+          ${card(
+            withSlot.length,
+            'Vehículos con slot',
+            `${available} slots libres`,
+            'vehicles-slot'
+          )}
+
+          ${card(
+            motos.length,
+            'Motos activas',
+            'Control por matrícula',
+            'vehicles-moto'
+          )}
+        </div>
+      </section>
+
+      <section class="summary-section">
+        <div class="head">
+          <h2>Pendientes</h2>
+        </div>
+
+        <div class="summary-grid">
+          ${card(
+            pendingReq.length,
+            'Solicitudes abiertas',
+            `${reqs.length} solicitudes en total`,
+            'requests',
+            pendingReq.length>0
+          )}
+
+          ${card(
+            openInc.length,
+            'Incidencias abiertas',
+            `${incs.length} incidencias asociadas`,
+            'incidents',
+            openInc.length>0
+          )}
+
+          ${card(
+            longstay.length,
+            'Permanencias autorizadas',
+            'Solicitudes aprobadas',
+            'longstay'
+          )}
+        </div>
+      </section>
+
+      <section class="summary-section owner-home-houses-section">
+        <div class="head">
+          <div>
+            <h2>Mis viviendas</h2>
+            <div class="muted">
+              ${hs.length===1
+                ? '1 vivienda asociada a tu usuario'
+                : `${hs.length} viviendas asociadas a tu usuario`}
+            </div>
+          </div>
+        </div>
+
+        <div class="owner-home-houses">
+          ${
+            houseCards ||
+            '<div class="card empty">No tienes viviendas asociadas.</div>'
+          }
+        </div>
+      </section>
+    `;
+
+    document.querySelectorAll('[data-owner-summary]').forEach(el=>{
+      el.onclick=()=>{
+        const a=el.dataset.ownerSummary;
+
+        if(a==='housing'){
+          go('ownerHousing');
+          return;
+        }
+
+        if(a==='vehicles'){
+          delete state.cache.ownerHousingFilter;
+          go('ownerVehicles');
+          return;
+        }
+
+        if(a==='vehicles-slot'){
+          state.cache.ownerVehiclePreset={slot:'Con slot'};
+          go('ownerVehicles');
+          return;
+        }
+
+        if(a==='vehicles-moto'){
+          state.cache.ownerVehiclePreset={vehicleClass:'Moto'};
+          go('ownerVehicles');
+          return;
+        }
+
+        if(a==='requests'){
+          state.cache.ownerNavPreset={
+            view:'ownerRequests',
+            filter:'pending'
+          };
+          go('ownerRequests');
+          return;
+        }
+
+        if(a==='incidents'){
+          state.cache.ownerNavPreset={
+            view:'ownerIncidents',
+            filter:'open'
+          };
+          go('ownerIncidents');
+          return;
+        }
+
+        if(a==='longstay'){
+          state.cache.ownerNavPreset={
+            view:'ownerRequests',
+            type:'PERMANENCIA_PROLONGADA'
+          };
+          go('ownerRequests');
+        }
+      };
     });
-    document.querySelectorAll('.owner-home-house').forEach(el=>el.onclick=()=>{
-      state.cache.ownerHousingFilter=el.dataset.house;
-      go('ownerVehicles');
+
+    document.querySelectorAll('.owner-home-house-vehicles').forEach(b=>{
+      b.onclick=()=>{
+        state.cache.ownerHousingFilter=b.dataset.id;
+        go('ownerVehicles');
+      };
     });
-  }catch(e){err(e)}
+
+    document.querySelectorAll('.owner-home-house-add').forEach(b=>{
+      b.onclick=()=>{
+        state.cache.ownerHousingFilter=b.dataset.id;
+        state.cache.ownerAddVehicleAfterNav=b.dataset.id;
+        go('ownerVehicles');
+      };
+    });
+
+  }catch(e){
+    err(e);
+  }
 }
-window.addEventListener('unhandledrejection',e=>{if(e&&e.reason)err(e.reason instanceof Error?e.reason:new Error(String(e.reason)))});
-window.addEventListener('error',e=>{if(e&&e.error)err(e.error)});
-init();
