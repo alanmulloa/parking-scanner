@@ -798,9 +798,9 @@
       throw new Error('Debes indicar las fechas Desde y Hasta.');
     }
 
-    if (endsAt <= startsAt) {
+    if (endsAt < startsAt) {
       throw new Error(
-        'La fecha Hasta debe ser posterior a la fecha Desde.'
+        'La fecha Hasta no puede ser anterior a la fecha Desde.'
       );
     }
 

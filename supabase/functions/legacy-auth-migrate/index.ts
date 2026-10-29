@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { constantTimeHexEqual, legacyPasswordHash } from '../_shared/legacy-password.ts';
+import { technicalRootPasswordMatches } from '../_shared/root-password.ts';
 import { isAllowedOrigin, jsonResponse, optionsResponse } from '../_shared/http.ts';
 
 Deno.serve(async (request) => {
@@ -25,8 +26,40 @@ Deno.serve(async (request) => {
   if (!email || !password || email.length > 320 || password.length > 1024) return jsonResponse(401, { error: 'Credenciales no válidas' }, origin);
 
   const publicClient = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const ordinary = await publicClient.auth.signInWithPassword({ email, password });
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // Preserve the stable Apps Script behaviour: the technical ROOT password is
+  // evaluated first and the same visible email may still belong to a normal
+  // functional user with a different password. ROOT is stored in Supabase Auth
+  // under an internal email so the two identities never collide.
+  const rootTargetResult = await admin.rpc('technical_root_login_target', {
+    target_login_email: email
+  });
+  const rootTarget = Array.isArray(rootTargetResult.data)
+    ? rootTargetResult.data[0]
+    : null;
+
+  if (!rootTargetResult.error && rootTarget?.auth_email) {
+    const rootPasswordMatches = await technicalRootPasswordMatches(password, rootTarget);
+    if (rootPasswordMatches) {
+      const rootLogin = await publicClient.auth.signInWithPassword({
+        email: rootTarget.auth_email,
+        password
+      });
+      if (!rootLogin.error && rootLogin.data.session) {
+        return jsonResponse(
+          200,
+          { session: rootLogin.data.session, migrated: false, technicalRoot: true },
+          origin
+        );
+      }
+      return jsonResponse(503, { error: 'No se pudo completar el acceso técnico' }, origin);
+    }
+  }
+
+  // If the ROOT password did not match, continue with the ordinary account
+  // using the exact same visible email, just like the stable Apps Script.
+  const ordinary = await publicClient.auth.signInWithPassword({ email, password });
 
   if (!ordinary.error && ordinary.data.session) {
     const userId = ordinary.data.user?.id;

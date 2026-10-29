@@ -4,8 +4,14 @@ const fallback=document.getElementById('fallback');
 const back=document.getElementById('back');
 const returnUrl=new URLSearchParams(location.search).get('return')||'';
 function show(msg,bad=false){status.textContent=msg;status.className='message'+(bad?' bad':'')}
-function validParkingUrl(text){
-  try{const u=new URL(text);return u.protocol==='https:'&&u.searchParams.has('q')}catch(e){return false}
+function parkingToken(text){
+  try{const u=new URL(text);return u.protocol==='https:'?(u.searchParams.get('q')||''):''}catch(e){return ''}
+}
+function validParkingUrl(text){return !!parkingToken(text)}
+function scanTarget(text){
+  const token=parkingToken(text);if(!token)return '';
+  if(!returnUrl)return text;
+  try{const target=new URL(returnUrl,location.href);target.searchParams.set('q',token);return target.href}catch(e){return returnUrl+(returnUrl.includes('?')?'&':'?')+'q='+encodeURIComponent(token)}
 }
 async function stop(){if(scanner){try{await scanner.stop()}catch(e){}try{scanner.clear()}catch(e){}scanner=null}}
 async function start(){
@@ -17,7 +23,7 @@ async function start(){
     await scanner.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*.72);return{width:s,height:s}},aspectRatio:1.333},async text=>{
       if(done)return;
       if(!validParkingUrl(text)){show('El QR leído no contiene un enlace válido.',true);return}
-      done=true;navigator.vibrate?.(100);show('QR detectado. Volviendo…');await stop();window.location.href=text;
+      done=true;navigator.vibrate?.(100);show('QR detectado. Volviendo…');await stop();window.location.href=scanTarget(text);
     },()=>{});
     show('Apunta al QR y mantenlo dentro del recuadro.');
   }catch(e){
