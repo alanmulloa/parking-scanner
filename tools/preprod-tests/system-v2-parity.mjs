@@ -12,14 +12,14 @@ const parkingAdmin = read('supabase/functions/parking-admin/index.ts');
 const preprod = read('preproduccion.html');
 
 const checks = [
-  ['frontend version preprod v2', core.includes("APP_FRONTEND_VERSION='2.0.0-preprod.1'")],
+  ['frontend version preprod v2', core.includes("APP_FRONTEND_VERSION='2.0.0-preprod.2'")],
   ['favicon dinamico', core.includes("dataset.parkingFavicon='1'") && core.includes("apple-touch-icon")],
   ['pantalla mantenimiento', core.includes('renderMaintenanceScreen') && core.includes('Acceso técnico ROOT')],
   ['init consulta estado publico', nav.includes("server('getPublicAppState')")],
   ['Sistema ya no muestra Hojas', !advanced.includes('<span>Hojas</span>')],
   ['Sistema ya no ofrece Benchmark Sheets', !advanced.includes('Benchmark Sheets')],
-  ['Sistema muestra correo heredado', advanced.includes("integrationCard('Correo'") && advanced.includes('Worker de correos')],
-  ['Sistema muestra Drive/Docs heredado', advanced.includes("integrationCard('Google Drive / Docs'") && advanced.includes('Generar documentos faltantes')],
+  ['Sistema muestra correo heredado', advanced.includes("integrationCard('Correo'") && advanced.includes('Worker correo')],
+  ['Sistema muestra Drive/Docs heredado', advanced.includes("integrationCard('Google Drive / Docs'") && advanced.includes("['generateMissing','Generar faltantes']")],
   ['Sistema tiene mantenimiento ROOT', advanced.includes("call('systemSetMaintenance'")],
   ['Sistema tiene consistencia', advanced.includes("call('consistencyReport'")],
   ['status usa mediciones reales', adapter.includes("timed('Base de datos'") && adapter.includes("parkingAdmin('systemPing'")],

@@ -75,6 +75,34 @@ function rolesWithOwner(roles: string[]) {
   return normalizedRoles(out.join(','));
 }
 
+
+function hex(bytes: ArrayBuffer) {
+  return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function legacyBridgeRequest(action: string, payload: Record<string, unknown> = {}) {
+  const endpoint = String(Deno.env.get('LEGACY_APPS_SCRIPT_URL') || '').trim();
+  const secret = String(Deno.env.get('LEGACY_BRIDGE_SECRET') || '').trim();
+  if (!endpoint || !secret) throw new Error('Bridge Apps Script no configurado. Faltan LEGACY_APPS_SCRIPT_URL / LEGACY_BRIDGE_SECRET.');
+  const ts = Math.floor(Date.now() / 1000);
+  const nonce = crypto.randomUUID();
+  const payloadJson = JSON.stringify(payload || {});
+  const message = [String(ts), nonce, action, payloadJson].join('\n');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ts, nonce, action, payloadJson, signature }),
+    redirect: 'follow'
+  });
+  const textBody = await response.text();
+  let body: AnyRow = {};
+  try { body = JSON.parse(textBody || '{}'); } catch { throw new Error(`Bridge Apps Script devolvió una respuesta no válida (${response.status}).`); }
+  if (!response.ok || body.ok === false || Number(body.status || 200) >= 400) throw new Error(String(body.error || `Bridge Apps Script respondió ${response.status}.`));
+  return body.data ?? body;
+}
+
 async function ownerImportSnapshot(service: any, communityId: string) {
   const [housingResult, profilesResult, membersResult] = await Promise.all([
     service.from('dwellings').select('id,legacy_id,block,floor,apartment,display_name,responsible_user_id,state,observations').eq('community_id', communityId),
@@ -253,6 +281,37 @@ Deno.serve(async (request) => {
     if (action === 'systemPing') {
       if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
       return jsonResponse(200, { ok: true, checkedAt: new Date().toISOString(), service: 'parking-admin' }, origin);
+    }
+    if (action === 'legacyBridgeStatus') {
+      if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
+      const bridge = await legacyBridgeRequest('status', {});
+      return jsonResponse(200, { ok: true, bridge }, origin);
+    }
+    if (action === 'legacyBridgeCommand') {
+      if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
+      const domain = String(payload.domain || '');
+      const command = String(payload.command || '');
+      if (!['mail', 'documents'].includes(domain) || !command) throw new Error('Comando bridge no válido.');
+      const queued = await legacyBridgeRequest('command.enqueue', { domain, command, args: payloadObject(payload.args), requestedBy: actorAuditEmail });
+      await service.from('audit_log').insert({
+        community_id: actorCommunityId,
+        actor_user_id: actorId,
+        user_id: actorId,
+        actor_email: actorAuditEmail,
+        action: 'LEGACY_BRIDGE_COMMAND',
+        entity: domain === 'mail' ? 'CORREO' : 'DOCUMENTOS',
+        entity_id: String(queued?.id || ''),
+        observations: `Comando heredado solicitado desde Sistema: ${domain}.${command}`,
+        source: 'APPLICATION'
+      });
+      return jsonResponse(200, { ok: true, command: queued }, origin);
+    }
+    if (action === 'legacyBridgeCommandStatus') {
+      if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
+      const id = String(payload.id || '');
+      if (!id) throw new Error('ID de comando no indicado.');
+      const status = await legacyBridgeRequest('command.status', { id });
+      return jsonResponse(200, { ok: true, command: status }, origin);
     }
     if (action === 'previewOwnerImport' || action === 'applyOwnerImport') {
       const rows = Array.isArray(payload.rows) ? payload.rows as AnyRow[] : [];
