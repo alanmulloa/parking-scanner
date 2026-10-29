@@ -1165,39 +1165,51 @@ async function ownerIncidents(){try{const {hs,incs}=await ownerData(),hm=Object.
 async function ownerRequests(){try{const {reqs}=await ownerData(),ui=viewUiState('ownerRequestsTable'),preset=state.cache.ownerNavPreset?.view==='ownerRequests'?state.cache.ownerNavPreset:null;delete state.cache.ownerNavPreset;let sortKey=ui.sortKey||'FechaHora',sortDir=ui.sortDir||'desc';$('#main').innerHTML=`<div class="head"><h1>Mis solicitudes</h1></div><div class="filterbar"><div class="field filter-search"><label>Buscar</label><input id="or-search" class="search" placeholder="Matrícula, vivienda o tipo..."></div>${periodFilterFields('or')}<div class="field"><label>Estado</label><select id="or-state"><option value="Abierta">Abiertas</option><option value="">Todas</option><option>Aprobada</option><option>Rechazada</option></select></div><div class="field"><label>Tipo</label><select id="or-type"><option value="">Todos</option><option value="REACTIVACION_VEHICULO">Activación</option><option value="RENOVACION_QR">Renovación QR</option><option value="PERMANENCIA_PROLONGADA">Permanencia prolongada</option></select></div><div class="field"><label>Agrupar por</label><select id="or-group"><option value="none">Sin agrupar</option><option value="plate">Matrícula</option><option value="housing">Vivienda</option><option value="type">Tipo</option></select></div><span class="count" id="or-count"></span></div><div class="tablebox compact-table owner-admin-like"><table class="table responsive-data-table"><thead><tr><th class="sortable-th" data-sort="FechaHora">Fecha</th><th class="sortable-th" data-sort="plate">Matrícula</th><th class="sortable-th" data-sort="housing">Vivienda</th><th class="sortable-th" data-sort="Tipo">Tipo</th><th class="sortable-th" data-sort="Estado">Estado</th><th>Resolución</th></tr></thead><tbody id="or-body"></tbody></table></div>`;$('#or-search').value=preset?.plate||ui.q||'';$('#or-state').value=preset?.filter==='pending'?'Abierta':(ui.st===undefined?'Abierta':ui.st);$('#or-type').value=ui.tp||'';$('#or-period').value=ui.period||'';$('#or-from').value=ui.from||'';$('#or-to').value=ui.to||'';$('#or-group').value=ui.group||'none';bindPeriodVisibility('or');const plate=r=>r.MatriculaHabitual||r.MatriculaOrigen||'SIN MATRÍCULA',house=r=>`Bloque ${r.Bloque}, ${r.Planta} ${r.Apartamento}`,val=(r,k)=>k==='plate'?plate(r):k==='housing'?house(r):k==='Tipo'?requestTypeLabel(r.Tipo):r[k]||'',cmp=(a,b)=>{const c=String(val(a,sortKey)).localeCompare(String(val(b,sortKey)),'es',{numeric:true});return sortDir==='asc'?c:-c},rowHtml=r=>`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Matrícula"><b>${esc(plate(r))}</b></td><td data-label="Vivienda">${esc(house(r))}</td><td data-label="Tipo">${esc(requestTypeLabel(r.Tipo))}</td><td data-label="Estado"><span class="status ${r.Estado==='Abierta'?'bad':''}">${esc(r.Estado)}</span></td><td data-label="Resolución" class="resolution-cell">${r.Estado==='Abierta'?'<span class="muted">Abierta</span>':`<div class="message owner-resolution"><b>Resolución:</b> ${esc(r.Estado)}<br><b>Comentario:</b> ${esc(r.ObservacionesResolucion||'—')}<br><span class="subtle">${esc(r.Estado==='Aprobada'?'Aprobada':'Rechazada')} por ${esc(r.NombreResolucion||r.UsuarioResolucion||'—')} · ${esc(shortDateTime(r.FechaResolucion))}</span></div>`}</td></tr>`;const render=()=>{const q=$('#or-search').value.trim().toLowerCase(),st=$('#or-state').value,tp=$('#or-type').value,period=$('#or-period').value,from=$('#or-from').value,to=$('#or-to').value,group=$('#or-group').value;saveViewUiState('ownerRequestsTable',{q,st,tp,period,from,to,group,sortKey,sortDir,v:'1.2.12.2'});const rows=reqs.filter(r=>(!st||r.Estado===st)&&(!tp||r.Tipo===tp)&&periodMatches(r.FechaHora,period,from,to)&&Object.values(r).join(' ').toLowerCase().includes(q));$('#or-count').textContent=`${rows.length} solicitud${rows.length===1?'':'es'}`;if(group==='none')$('#or-body').innerHTML=[...rows].sort(cmp).map(rowHtml).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>';else{const keyFn=group==='plate'?plate:group==='housing'?house:r=>requestTypeLabel(r.Tipo),entries=groupedRowsStable(rows,keyFn,cmp,(a,b)=>naturalSort(a[0],b[0]));$('#or-body').innerHTML=entries.map(([key,list])=>`<tr class="table-group-row"><td colspan="6"><b>${esc(key)}</b> · ${list.length} solicitud(es)</td></tr>${list.map(rowHtml).join('')}`).join('')||'<tr><td colspan="6" class="empty">No tienes solicitudes con estos filtros.</td></tr>'}};$('#or-search').oninput=render;['or-state','or-type','or-period','or-from','or-to','or-group'].forEach(id=>$(`#${id}`).onchange=render);document.querySelectorAll('.sortable-th').forEach(th=>{th.dataset.dir=th.dataset.sort===sortKey?sortDir:'';th.onclick=()=>{const k=th.dataset.sort;sortDir=sortKey===k&&sortDir==='asc'?'desc':'asc';sortKey=k;document.querySelectorAll('.sortable-th').forEach(x=>x.dataset.dir=x.dataset.sort===sortKey?sortDir:'');render()}});render()}catch(e){err(e)}}
 
 
-// 1.2.12.2 - Inicio propietario alineado visualmente con Resumen ADMIN
+// PREPROD - Inicio propietario con alcance propio (no replica Resumen ADMIN)
 async function ownerHome(){
   try{
-    const {hs,vs,reqs,incs}=await ownerData();
-    const activeCars=vs.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto');
-    const withSlot=activeCars.filter(v=>['1','2'].includes(String(v.Slot||'')));
-    const motos=vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto');
+    const {hs,vs,reqs,incs}=await ownerData(true);
+    const active=vs.filter(v=>v.Estado==='Activo');
+    const withSlot=active.filter(v=>v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||'')));
+    const motos=active.filter(v=>v.Tipo==='Moto');
+    const unassigned=vs.filter(v=>['Desasignado','SinPlaza'].includes(String(v.Estado||'')));
+    const suspended=vs.filter(v=>v.Estado==='Suspendido');
+    const temporals=vs.filter(v=>v.PeriodoTemporalActual);
     const pendingReq=reqs.filter(r=>r.Estado==='Abierta');
     const openInc=incs.filter(r=>(r.Estado||'Abierta')!=='Cerrada');
-    const longstay=reqs.filter(r=>r.Tipo==='PERMANENCIA_PROLONGADA'&&r.Estado==='Aprobada');
     const available=Math.max(0,hs.length*2-withSlot.length);
-    const card=(value,label,detail='',action='',alert=false)=>`<article class="summary-card ${action?'clickable':''} ${alert?'alert':''}" ${action?`data-owner-summary="${action}"`:''}><b>${esc(value)}</b><span>${esc(label)}</span>${detail?`<small>${esc(detail)}</small>`:''}</article>`;
-    $('#main').innerHTML=`<section class="hero"><h1>Inicio</h1><p>Resumen de tus viviendas, vehículos y gestiones.</p></section>
-      <section class="summary-section"><div class="head"><h2>Estado general</h2></div><div class="summary-grid">
-        ${card(hs.length,hs.length===1?'Vivienda asociada':'Viviendas asociadas','Ver viviendas','housing')}
-        ${card(vs.length,'Vehículos registrados',`${withSlot.length} con slot · ${motos.length} moto${motos.length===1?'':'s'}`,'vehicles')}
-        ${card(withSlot.length,'Vehículos con slot',`${available} slots libres`,'vehicles-slot')}
-        ${card(motos.length,'Motos activas','Control por matrícula','vehicles-moto')}
+    const houseRows=hs.slice().sort((a,b)=>housingShort(a).localeCompare(housingShort(b),'es',{numeric:true})).map(h=>{
+      const own=vs.filter(v=>v.ID_Vivienda===h.ID_Vivienda);
+      const occupied=own.filter(v=>v.Estado==='Activo'&&v.Tipo!=='Moto'&&['1','2'].includes(String(v.Slot||''))).length;
+      return `<button class="owner-list-row clickable owner-home-house" data-house="${esc(h.ID_Vivienda)}"><div class="owner-list-main"><div class="owner-list-title">${esc(housingShort(h))}</div><div class="owner-list-meta"><span>${occupied}/2 slots ocupados</span><span>${Math.max(0,2-occupied)} libres</span><span>${own.length} vehículo${own.length===1?'':'s'}</span></div></div><span>Ver</span></button>`;
+    }).join('');
+    const card=(value,label,detail,action,alert=false)=>`<button class="summary-card clickable owner-home-card ${alert?'alert':''}" data-owner-summary="${action}"><b>${esc(value)}</b><span>${esc(label)}</span><small>${esc(detail)}</small></button>`;
+
+    $('#main').innerHTML=`<section class="hero owner-home-hero"><h1>Inicio</h1><p>Tu parking: viviendas, vehículos y gestiones asociadas a tu usuario.</p></section>
+      <section class="summary-section"><div class="head"><h2>Mis vehículos</h2></div><div class="summary-grid owner-home-grid">
+        ${card(vs.length,'Vehículos registrados',`${withSlot.length} con slot · ${available} slots libres`,'vehicles')}
+        ${card(unassigned.length,'Sin plaza','Vehículos pendientes de slot','unassigned',unassigned.length>0)}
+        ${card(temporals.length,'Temporales vigentes','Matrículas temporales activas','temporary',temporals.length>0)}
+        ${card(suspended.length,'Suspendidos',`${motos.length} moto${motos.length===1?'':'s'} activa${motos.length===1?'':'s'}`,'suspended',suspended.length>0)}
       </div></section>
-      <section class="summary-section"><div class="head"><h2>Pendientes</h2></div><div class="summary-grid">
-        ${card(pendingReq.length,'Solicitudes abiertas',`${reqs.length} solicitudes en total`,'requests',pendingReq.length>0)}
+      <section class="summary-section"><div class="head"><h2>Mis gestiones</h2></div><div class="summary-grid owner-home-grid">
+        ${card(pendingReq.length,'Solicitudes abiertas',`${reqs.length} solicitudes asociadas`,'requests',pendingReq.length>0)}
         ${card(openInc.length,'Incidencias abiertas',`${incs.length} incidencias asociadas`,'incidents',openInc.length>0)}
-        ${card(longstay.length,'Permanencias autorizadas','Solicitudes aprobadas','longstay')}
-      </div></section>`;
+      </div></section>
+      <section class="owner-dashboard-list"><div class="head"><h2>Mis viviendas</h2></div><div class="owner-list flat-list">${houseRows||'<div class="card empty">No tienes viviendas asociadas.</div>'}</div></section>`;
+
     document.querySelectorAll('[data-owner-summary]').forEach(el=>el.onclick=()=>{
       const a=el.dataset.ownerSummary;
-      if(a==='housing'){go('ownerHousing');return}
-      if(a==='vehicles'){delete state.cache.ownerHousingFilter;go('ownerVehicles');return}
-      if(a==='vehicles-slot'){state.cache.ownerVehiclePreset={slot:'Con slot'};go('ownerVehicles');return}
-      if(a==='vehicles-moto'){state.cache.ownerVehiclePreset={vehicleClass:'Moto'};go('ownerVehicles');return}
+      if(a==='vehicles'){delete state.cache.ownerHousingFilter;delete state.cache.ownerVehiclePreset;go('ownerVehicles');return}
+      if(a==='unassigned'){state.cache.ownerVehiclePreset={state:'Desasignado'};go('ownerVehicles');return}
+      if(a==='temporary'){state.cache.ownerVehiclePreset={temporary:'Vigente'};go('ownerVehicles');return}
+      if(a==='suspended'){state.cache.ownerVehiclePreset={state:'Suspendido'};go('ownerVehicles');return}
       if(a==='requests'){state.cache.ownerNavPreset={view:'ownerRequests',filter:'pending'};go('ownerRequests');return}
-      if(a==='incidents'){state.cache.ownerNavPreset={view:'ownerIncidents',filter:'open'};go('ownerIncidents');return}
-      if(a==='longstay'){state.cache.ownerNavPreset={view:'ownerRequests',type:'PERMANENCIA_PROLONGADA'};go('ownerRequests')}
+      if(a==='incidents'){state.cache.ownerNavPreset={view:'ownerIncidents',filter:'open'};go('ownerIncidents')}
+    });
+    document.querySelectorAll('.owner-home-house').forEach(el=>el.onclick=()=>{
+      state.cache.ownerHousingFilter=el.dataset.house;
+      go('ownerVehicles');
     });
   }catch(e){err(e)}
 }

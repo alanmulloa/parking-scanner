@@ -1092,8 +1092,41 @@
     };
   }
 
+  async function ownerScopeUserId() {
+    const boot = await appBootstrap();
+    if (!boot.user.IsRoot) return boot.user.ID_Usuario;
+
+    const visibleEmail = String(boot.user.Email || '').trim().toLowerCase();
+    if (!visibleEmail) return '';
+
+    const result = await sb
+      .from('profiles')
+      .select('user_id,email,is_root')
+      .eq('is_root', false)
+      .ilike('email', visibleEmail)
+      .limit(1);
+    const rows = unwrap(result) || [];
+    return rows[0]?.user_id || '';
+  }
+
   async function ownerBundle() {
-    const [housing, vehicles, requests, incidents] = await Promise.all([listHousing(), listVehicles(), listRequests(), listIncidents()]);
+    const ownerUserId = await ownerScopeUserId();
+    if (!ownerUserId) return { housing: [], vehicles: [], requests: [], incidents: [] };
+
+    const [allHousing, allVehicles, allRequests, allIncidents] = await Promise.all([
+      listHousing(), listVehicles(), listRequests(), listIncidents()
+    ]);
+
+    // Filtrado explícito: no confiar en que RLS reduzca el dataset cuando la
+    // misma sesión también posee ADMIN/ROOT. Al entrar en contexto PROPIETARIO
+    // solo se muestran entidades de sus viviendas.
+    const housing = allHousing.filter((row) => row.ResponsableUserId === ownerUserId);
+    const housingIds = new Set(housing.map((row) => row.ID_Vivienda));
+    const vehicles = allVehicles.filter((row) => housingIds.has(row.ID_Vivienda));
+    const vehicleIds = new Set(vehicles.map((row) => row.ID_Vehiculo));
+    const requests = allRequests.filter((row) => housingIds.has(row.ID_Vivienda) || vehicleIds.has(row.ID_Vehiculo));
+    const incidents = allIncidents.filter((row) => housingIds.has(row.ID_Vivienda) || vehicleIds.has(row.ID_Vehiculo));
+
     return { housing, vehicles, requests, incidents };
   }
 

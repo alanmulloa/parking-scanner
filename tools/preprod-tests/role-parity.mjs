@@ -7,7 +7,10 @@ const checks = [
   ['housingDetail tiene guard admin/root', adapter.includes('No tienes permisos para consultar el detalle de viviendas.')],
   ['vehicleHistory tiene guard admin/root', adapter.includes('No tienes permisos para consultar el historial completo del vehículo.')],
   ['CanSystem solo ROOT', adapter.includes('CanSystem: !!profile.is_root')],
-  ['CanConfigure ROOT o ADMIN', adapter.includes("CanConfigure: !!profile.is_root || roles.includes('ADMIN')")]
+  ['CanConfigure ROOT o ADMIN', adapter.includes("CanConfigure: !!profile.is_root || roles.includes('ADMIN')")],
+  ['ownerBundle filtra viviendas por responsable', adapter.includes('row.ResponsableUserId === ownerUserId')],
+  ['ownerBundle filtra vehiculos por viviendas propias', adapter.includes('housingIds.has(row.ID_Vivienda)')],
+  ['ROOT resuelve propietario normal por email visible', adapter.includes(".eq('is_root', false)") && adapter.includes(".ilike('email', visibleEmail)")]
 ];
 let failed = 0;
 for (const [label, ok] of checks) {
@@ -15,4 +18,5 @@ for (const [label, ok] of checks) {
   if (!ok) failed += 1;
 }
 if (failed) process.exit(1);
+
 console.log('Role parity static tests: OK');
