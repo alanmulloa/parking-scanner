@@ -33,6 +33,25 @@ async function start(){
   }finally{starting=false}
 }
 fallback.addEventListener('click',start);
-back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href='https://alanmulloa.github.io/parking-scanner/'}});
+back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href=new URL('../preproduccion.html',location.href).href}});
 window.addEventListener('pagehide',()=>{stop()});
-window.addEventListener('load',()=>{setTimeout(start,150)});
+async function publicState(){
+  try{
+    const cfg=window.SUPABASE_POC_CONFIG;if(!cfg?.url||!cfg?.publishableKey)return null;
+    const response=await fetch(`${cfg.url}/rest/v1/rpc/parking_public_state`,{method:'POST',headers:{apikey:cfg.publishableKey,authorization:`Bearer ${cfg.publishableKey}`,'content-type':'application/json'},body:'{}',cache:'no-store'});
+    if(!response.ok)return null;return await response.json();
+  }catch(_e){return null}
+}
+async function bootScanner(){
+  const state=await publicState();
+  const settings=state?.settings||{},logo=String(settings.LogoUrl||'').trim();
+  if(settings.NombreOficial)document.title=`Escanear QR · ${settings.NombreOficial}`;
+  if(logo){let icon=document.querySelector('link[rel="icon"]');if(!icon){icon=document.createElement('link');icon.rel='icon';document.head.appendChild(icon)}icon.href=logo}
+  if(state?.maintenance?.enabled){
+    done=true;show(state.maintenance.message||'Sistema temporalmente en mantenimiento.',true);
+    document.getElementById('reader').style.display='none';fallback.style.display='none';
+    return;
+  }
+  setTimeout(start,150);
+}
+window.addEventListener('load',bootScanner);

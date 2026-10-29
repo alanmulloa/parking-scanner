@@ -250,6 +250,10 @@ Deno.serve(async (request) => {
   const payload = payloadObject(input.payload);
 
   try {
+    if (action === 'systemPing') {
+      if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
+      return jsonResponse(200, { ok: true, checkedAt: new Date().toISOString(), service: 'parking-admin' }, origin);
+    }
     if (action === 'previewOwnerImport' || action === 'applyOwnerImport') {
       const rows = Array.isArray(payload.rows) ? payload.rows as AnyRow[] : [];
       if (!rows.length) throw new Error('El archivo no contiene filas para importar.');

@@ -8,6 +8,8 @@
   const CACHE_MS = 15000;
   const cache = new Map();
   let bootstrapCache = null;
+  let publicStateCache = null;
+  let publicStateCachedAt = 0;
 
   const cached = async (key, loader, ttl = CACHE_MS) => {
     const hit = cache.get(key);
@@ -67,6 +69,45 @@
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || 'No se pudo completar la operación administrativa.');
     return body;
+  }
+
+  async function publicAppState(force = false) {
+    if (!force && publicStateCache && Date.now() - publicStateCachedAt < 5000) return publicStateCache;
+    try {
+      const data = unwrap(await sb.rpc('parking_public_state')) || {};
+      publicStateCache = data;
+      publicStateCachedAt = Date.now();
+      return data;
+    } catch (_) {
+      return { maintenance: { enabled: false, message: '' }, settings: window.INITIAL_PUBLIC_SETTINGS || {} };
+    }
+  }
+
+  function perfLevel(ms) {
+    if (ms > 1800) return 'slow';
+    if (ms > 800) return 'warn';
+    return 'good';
+  }
+
+  async function timed(label, loader) {
+    const started = performance.now();
+    try {
+      const value = await loader();
+      const ms = Math.max(1, Math.round(performance.now() - started));
+      return { label, ok: true, ms, level: perfLevel(ms), value };
+    } catch (error) {
+      const ms = Math.max(1, Math.round(performance.now() - started));
+      return { label, ok: false, ms, level: 'slow', error };
+    }
+  }
+
+  async function edgeOptions(functionName) {
+    const response = await fetch(`${window.SUPABASE_POC_CONFIG.url}/functions/v1/${functionName}`, {
+      method: 'OPTIONS',
+      cache: 'no-store'
+    });
+    if (!response.ok && response.status !== 204) throw new Error(`${functionName}: HTTP ${response.status}`);
+    return true;
   }
 
   async function appBootstrap(force = false) {
@@ -1196,6 +1237,13 @@
   }
 
   async function action(name, payload = {}) {
+    if (name !== 'bootstrap' && !name.startsWith('system')) {
+      const publicState = await publicAppState();
+      if (publicState?.maintenance?.enabled) {
+        const boot = await appBootstrap();
+        if (!boot.user.IsRoot) throw new Error(publicState.maintenance.message || 'Sistema temporalmente en mantenimiento.');
+      }
+    }
     switch (name) {
       case 'bootstrap': return appBootstrap();
       case 'dashboard': return dashboard();
@@ -1285,28 +1333,82 @@
         return true;
       }
       case 'systemStatus': {
-        const status = unwrap(await sb.rpc('root_system_status'));
-        return { ok: true, backendVersion: 'Supabase migration 122', environment: 'staging', timeZone: 'Europe/Madrid', checkedAt: status.checkedAt, sheetCount: 0, services: [{ label: 'Base de datos', ok: true, detail: 'Supabase disponible', ms: 0, level: 'good' }, { label: 'RLS / sesión', ok: true, detail: 'Sesión ROOT verificada', ms: 0, level: 'good' }], performance: { totalMs: 0 }, counts: status };
-      }
-      case 'systemRoundTripPing': return { serverMs: 0, checkedAt: new Date().toISOString() };
-      case 'systemDiagnostics': {
-        const started = performance.now();
-        const diagnostics = unwrap(await sb.rpc('root_system_diagnostics'));
-        const totalMs = Math.round(performance.now() - started);
+        const overallStarted = performance.now();
+        const [database, auth, adminEdge, legacyEdge] = await Promise.all([
+          timed('Base de datos', async () => unwrap(await sb.rpc('root_system_status'))),
+          timed('Auth / RLS', async () => {
+            const user = await sessionUser();
+            const boot = await appBootstrap(true);
+            if (!boot.user.IsRoot || !user?.id) throw new Error('La sesión ROOT no pudo verificarse.');
+            return boot;
+          }),
+          timed('parking-admin', async () => parkingAdmin('systemPing', {})),
+          timed('legacy-auth-migrate', async () => edgeOptions('legacy-auth-migrate'))
+        ]);
+        if (!database.ok) throw database.error;
+        const status = database.value || {};
+        const services = [
+          { label: 'Base de datos', ok: database.ok, detail: database.ok ? 'PostgreSQL / Supabase disponible' : String(database.error?.message || 'No disponible'), ms: database.ms, level: database.level },
+          { label: 'Auth / RLS', ok: auth.ok, detail: auth.ok ? 'Sesión ROOT y políticas verificadas' : String(auth.error?.message || 'No disponible'), ms: auth.ms, level: auth.level },
+          { label: 'Edge · parking-admin', ok: adminEdge.ok, detail: adminEdge.ok ? 'Función autenticada disponible' : String(adminEdge.error?.message || 'No disponible'), ms: adminEdge.ms, level: adminEdge.level },
+          { label: 'Edge · legacy-auth-migrate', ok: legacyEdge.ok, detail: legacyEdge.ok ? 'Endpoint disponible' : String(legacyEdge.error?.message || 'No disponible'), ms: legacyEdge.ms, level: legacyEdge.level }
+        ];
+        const totalMs = Math.max(1, Math.round(performance.now() - overallStarted));
         return {
-          checkedAt: diagnostics.checkedAt || new Date().toISOString(),
-          totalMs,
-          level: 'good',
-          tests: [
-            { label: 'Base de datos', detail: 'RPC disponible', ok: true, ms: totalMs, level: 'good' },
-            { label: 'RLS', detail: `${Number(diagnostics.rlsEnabledTables || 0)} tablas con RLS`, ok: true, ms: 0, level: 'good' },
-            { label: 'Esquema', detail: diagnostics.schemaVersion || 'Supabase', ok: true, ms: 0, level: 'good' }
-          ]
+          ok: services.every((item) => item.ok),
+          backendVersion: status.backendVersion || 'Supabase migration 128',
+          schemaVersion: status.schemaVersion || '20261029012800',
+          environment: status.environment || 'PREPRODUCCIÓN',
+          hosting: 'GitHub Pages',
+          repository: 'floresderiviera/parking-comunidad',
+          timeZone: 'Europe/Madrid',
+          checkedAt: status.checkedAt || new Date().toISOString(),
+          services,
+          performance: { totalMs },
+          counts: status,
+          maintenance: status.maintenance || { enabled: false, message: '' },
+          integrations: status.integrations || {}
         };
+      }
+      case 'systemSetMaintenance': {
+        const result = unwrap(await sb.rpc('parking_set_maintenance', {
+          p_enabled: !!payload.enabled,
+          p_message: String(payload.message || '')
+        }));
+        publicStateCache = result;
+        publicStateCachedAt = Date.now();
+        invalidate();
+        return result;
+      }
+      case 'systemRoundTripPing': {
+        const ping = await timed('Ping', async () => unwrap(await sb.rpc('parking_system_ping')));
+        if (!ping.ok) throw ping.error;
+        return { serverMs: ping.ms, checkedAt: ping.value?.checkedAt || new Date().toISOString() };
+      }
+      case 'systemDiagnostics': {
+        const mode = String(payload.mode || 'quick');
+        const started = performance.now();
+        const tests = [];
+        const database = await timed('Base de datos', async () => unwrap(await sb.rpc('root_system_diagnostics')));
+        tests.push({ label: database.label, detail: database.ok ? `Esquema ${database.value?.schemaVersion || 'Supabase'}` : String(database.error?.message || 'Error'), ok: database.ok, ms: database.ms, level: database.level });
+        const auth = await timed('Auth / RLS', async () => { const boot = await appBootstrap(true); if (!boot.user.IsRoot) throw new Error('ROOT no verificado'); return boot; });
+        tests.push({ label: auth.label, detail: auth.ok ? 'Sesión ROOT y bootstrap correctos' : String(auth.error?.message || 'Error'), ok: auth.ok, ms: auth.ms, level: auth.level });
+        const admin = await timed('Edge · parking-admin', async () => parkingAdmin('systemPing', {}));
+        tests.push({ label: admin.label, detail: admin.ok ? 'Disponible' : String(admin.error?.message || 'Error'), ok: admin.ok, ms: admin.ms, level: admin.level });
+        const legacy = await timed('Edge · legacy-auth-migrate', async () => edgeOptions('legacy-auth-migrate'));
+        tests.push({ label: legacy.label, detail: legacy.ok ? 'Endpoint disponible' : String(legacy.error?.message || 'Error'), ok: legacy.ok, ms: legacy.ms, level: legacy.level });
+        if (mode === 'full') {
+          const consistency = await timed('Consistencia', async () => consistencyReport());
+          const issues = consistency.ok ? Number(consistency.value?.errors || 0) + Number(consistency.value?.warnings || 0) : null;
+          tests.push({ label: consistency.label, detail: consistency.ok ? `${issues ?? 0} observaciones detectadas` : String(consistency.error?.message || 'Error'), ok: consistency.ok, ms: consistency.ms, level: consistency.level });
+        }
+        const totalMs = Math.max(1, Math.round(performance.now() - started));
+        const ok = tests.every((test) => test.ok);
+        return { checkedAt: new Date().toISOString(), totalMs, level: ok ? perfLevel(totalMs) : 'slow', tests };
       }
       case 'systemPerformanceHistory': return { health: [], history: [] };
       case 'systemRecordClientPerformance': return { ok: true };
-      case 'systemSheetsRealBenchmark': return { checkedAt: new Date().toISOString(), totalMs: 0, level: 'good', rows: [], note: 'No aplica en la arquitectura Supabase; Google Sheets ya no es el backend de preproducción.' };
+      case 'systemSheetsRealBenchmark': throw new Error('Google Sheets ya no es el backend de la aplicación. Las integraciones heredadas de correo y documentos se controlan por separado.');
       case 'managerData': {
         if (payload.kind === 'users') return { rows: await listUsers(), options: await formOptions() };
         const result = await previousServer('api', 'supabase-session', name, payload);
@@ -1355,6 +1457,7 @@
     if (fn === 'getPublicParkingSettings') {
       try { return unwrap(await sb.rpc('parking_public_settings')) || window.INITIAL_PUBLIC_SETTINGS || {}; } catch (_) { return window.INITIAL_PUBLIC_SETTINGS || {}; }
     }
+    if (fn === 'getPublicAppState') return publicAppState(true);
     if (fn === 'api') return action(args[1], args[2] || {});
     return previousServer(fn, ...args);
   };

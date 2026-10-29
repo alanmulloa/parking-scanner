@@ -7,12 +7,33 @@ function preferredUiRole(roles=userRoles()){return roles.includes('ADMIN')?'ADMI
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return preferredUiRole(roles)}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','config','profile'];const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){applyParkingSettings(appSettings());if(!state.token)return login();try{const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);state.activeRole=activeUiRole();shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(e){login(e.message)}}
+async function init(){
+  applyParkingSettings(appSettings());
+  let publicState={};
+  try{
+    publicState=await server('getPublicAppState');
+    if(publicState?.settings){
+      state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings:Object.assign({},appSettings(),publicState.settings)});
+      applyParkingSettings(state.cache.bootstrap.settings);
+    }
+  }catch(_e){}
+  if(!state.token){
+    if(publicState?.maintenance?.enabled)return renderMaintenanceScreen(publicState);
+    return login();
+  }
+  try{
+    const data=await call('bootstrap');state.user=data.user;state.cache.bootstrap=data;applyParkingSettings(data.settings);
+    if(publicState?.maintenance?.enabled&&!state.user?.IsRoot)return renderMaintenanceScreen(publicState);
+    state.activeRole=activeUiRole();shell();
+    if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();control(INITIAL_TOKEN)}
+    else go(restoredStartView());
+  }catch(e){login(e.message)}
+}
 function login(message=''){
   const renderLogin=()=>{
     const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
     $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
-    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}let publicState={};try{publicState=await server('getPublicAppState')}catch(_e){}if(publicState?.maintenance?.enabled&&!state.user?.IsRoot){renderMaintenanceScreen(publicState);return}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
   if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
