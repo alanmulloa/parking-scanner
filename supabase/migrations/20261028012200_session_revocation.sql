@@ -3,7 +3,7 @@ begin;
 alter table public.profiles
   add column if not exists auth_invalid_before timestamptz not null default '1970-01-01 00:00:00+00';
 
-create or replace function private.session_is_current(target_user uuid default (select auth.uid()))
+create or replace function private.session_is_current(target_user uuid)
 returns boolean
 language sql
 stable
@@ -17,8 +17,20 @@ as $$
   );
 $$;
 
+create or replace function private.session_is_current()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select private.session_is_current((select auth.uid()));
+$$;
+
 revoke all on function private.session_is_current(uuid) from public, anon;
+revoke all on function private.session_is_current() from public, anon;
 grant execute on function private.session_is_current(uuid) to authenticated, service_role;
+grant execute on function private.session_is_current() to authenticated, service_role;
 
 create or replace function private.is_root()
 returns boolean
