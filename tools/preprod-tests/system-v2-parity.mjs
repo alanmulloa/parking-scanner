@@ -12,7 +12,7 @@ const parkingAdmin = read('supabase/functions/parking-admin/index.ts');
 const preprod = read('preproduccion.html');
 
 const checks = [
-  ['frontend version preprod v2', core.includes("APP_FRONTEND_VERSION='2.0.0-preprod.3'")],
+  ['frontend version preprod v2', core.includes("APP_FRONTEND_VERSION='2.0.0-preprod.4'")],
   ['favicon dinamico', core.includes("dataset.parkingFavicon='1'") && core.includes("apple-touch-icon")],
   ['pantalla mantenimiento', core.includes('renderMaintenanceScreen') && core.includes('Acceso técnico ROOT')],
   ['init consulta estado publico', nav.includes("server('getPublicAppState')")],

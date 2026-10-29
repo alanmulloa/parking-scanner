@@ -1334,7 +1334,7 @@
       }
       case 'systemStatus': {
         const overallStarted = performance.now();
-        const [database, auth, adminEdge, legacyEdge, legacyBridge] = await Promise.all([
+        const [database, auth, adminEdge, legacyEdge] = await Promise.all([
           timed('Base de datos', async () => unwrap(await sb.rpc('root_system_status'))),
           timed('Auth / RLS', async () => {
             const user = await sessionUser();
@@ -1343,8 +1343,7 @@
             return boot;
           }),
           timed('parking-admin', async () => parkingAdmin('systemPing', {})),
-          timed('legacy-auth-migrate', async () => edgeOptions('legacy-auth-migrate')),
-          timed('Bridge Apps Script', async () => parkingAdmin('legacyBridgeStatus', {}))
+          timed('legacy-auth-migrate', async () => edgeOptions('legacy-auth-migrate'))
         ]);
         if (!database.ok) throw database.error;
         const status = database.value || {};
@@ -1352,12 +1351,11 @@
           { label: 'Base de datos', ok: database.ok, detail: database.ok ? 'PostgreSQL / Supabase disponible' : String(database.error?.message || 'No disponible'), ms: database.ms, level: database.level },
           { label: 'Auth / RLS', ok: auth.ok, detail: auth.ok ? 'Sesión ROOT y políticas verificadas' : String(auth.error?.message || 'No disponible'), ms: auth.ms, level: auth.level },
           { label: 'Edge · parking-admin', ok: adminEdge.ok, detail: adminEdge.ok ? 'Función autenticada disponible' : String(adminEdge.error?.message || 'No disponible'), ms: adminEdge.ms, level: adminEdge.level },
-          { label: 'Edge · legacy-auth-migrate', ok: legacyEdge.ok, detail: legacyEdge.ok ? 'Endpoint disponible' : String(legacyEdge.error?.message || 'No disponible'), ms: legacyEdge.ms, level: legacyEdge.level },
-          { label: 'Bridge · Apps Script', ok: legacyBridge.ok, detail: legacyBridge.ok ? 'Bridge firmado disponible' : String(legacyBridge.error?.message || 'No configurado'), ms: legacyBridge.ms, level: legacyBridge.ok ? legacyBridge.level : 'warn', optional: true }
+          { label: 'Edge · legacy-auth-migrate', ok: legacyEdge.ok, detail: legacyEdge.ok ? 'Endpoint disponible' : String(legacyEdge.error?.message || 'No disponible'), ms: legacyEdge.ms, level: legacyEdge.level }
         ];
         const totalMs = Math.max(1, Math.round(performance.now() - overallStarted));
         return {
-          ok: services.filter((item) => !item.optional).every((item) => item.ok),
+          ok: services.every((item) => item.ok),
           backendVersion: status.backendVersion || 'Supabase migration 129',
           schemaVersion: status.schemaVersion || '20261029012900',
           environment: status.environment || 'PREPRODUCCIÓN',
@@ -1369,7 +1367,7 @@
           performance: { totalMs },
           counts: status,
           maintenance: status.maintenance || { enabled: false, message: '' },
-          integrations: legacyBridge.ok ? (legacyBridge.value?.bridge || {}) : Object.assign({}, status.integrations || {}, { bridgeError: String(legacyBridge.error?.message || 'Bridge Apps Script no configurado') })
+          integrations: status.integrations || {}
         };
       }
       case 'systemSetMaintenance': {

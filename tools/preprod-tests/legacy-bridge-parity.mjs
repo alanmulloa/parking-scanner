@@ -8,7 +8,7 @@ const bridge = read('legacy-apps-script/LegacyBridge.gs');
 const preprod = read('preproduccion.html');
 
 const checks = [
-  ['frontend bridge version', read('assets/js/core.js').includes("2.0.0-preprod.3")],
+  ['frontend bridge version', read('assets/js/core.js').includes("2.0.0-preprod.4")],
   ['preprod cache bust bridge', preprod.includes('system-v2-bridge')],
   ['frontend no contiene bridge secret', !adapter.includes('PARKING_BRIDGE_SECRET') && !advanced.includes('PARKING_BRIDGE_SECRET')],
   ['parking-admin usa secrets server-side', admin.includes("Deno.env.get('LEGACY_BRIDGE_SECRET')") && admin.includes("Deno.env.get('LEGACY_APPS_SCRIPT_URL')")],
@@ -25,6 +25,9 @@ const checks = [
   ['docs actions UI', advanced.includes("['verifyDrive','Verificar Drive']") && advanced.includes("['generateMissing','Generar faltantes']") && advanced.includes("['processQueue','Procesar pendientes']")],
   ['frontend polling de comando', advanced.includes('systemLegacyBridgeCommandStatus') && advanced.includes('Esperando al bridge worker')],
   ['confirmacion bridge persistente', advanced.includes('legacyBridgeLastResult') && advanced.includes('Completado') && advanced.includes('legacyCommandMessage')],
+  ['consultas bridge directas', advanced.includes('DIRECT_LEGACY_COMMANDS') && advanced.includes('mail:senderMode') && advanced.includes('mail:emailStatus') && advanced.includes('documents:driveStatus')],
+  ['bridge se refresca asincrono', advanced.includes('refreshBridgeStatus') && advanced.includes("call('systemLegacyBridgeStatus')") && advanced.includes('Comprobando en segundo plano')],
+  ['systemStatus no bloquea por Apps Script', !adapter.slice(adapter.indexOf("case 'systemStatus'"), adapter.indexOf("case 'systemSetMaintenance'")).includes('legacyBridgeStatus')],
   ['adapter expone acciones bridge', adapter.includes("case 'systemLegacyBridgeAction'") && adapter.includes("case 'systemLegacyBridgeCommandStatus'")],
   ['bridge no reemplaza doGet', !bridge.includes('function doGet(')],
   ['docs legacy quedan marcados', bridge.includes("source:'LEGACY_SHEET'")]
