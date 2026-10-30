@@ -1433,3 +1433,46 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     overflow-wrap:anywhere;
   }
 }
+
+/* Auditoría · paginación */
+.audit-pager{
+  margin-top:.75rem;
+  padding:.65rem .2rem;
+}
+
+.audit-page-size-label{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  color:var(--muted);
+  font-size:.82rem;
+  font-weight:700;
+}
+
+.audit-page-size-label select{
+  border:1px solid #cbd8da;
+  background:#fff;
+  border-radius:9px;
+  padding:.5rem .7rem;
+  color:var(--ink);
+  font:inherit;
+}
+
+.audit-pager button:disabled{
+  cursor:default;
+  opacity:.45;
+}
+
+@media(max-width:720px){
+  .audit-pager{
+    align-items:stretch;
+  }
+
+  .audit-pager .actions{
+    width:100%;
+  }
+
+  .audit-pager .actions button{
+    flex:1 1 120px;
+  }
+}
