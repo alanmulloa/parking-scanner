@@ -25,7 +25,7 @@ const ctx = {
   window: {
     parkingSupabase: fakeSb,
     PARKING_PREPROD_TEST_HOOKS: true,
-    SUPABASE_POC_CONFIG: { url: 'https://example.supabase.co', publishableKey: 'anon' }
+    SUPABASE_CONFIG: { url: 'https://example.supabase.co', publishableKey: 'anon' }
   },
   server: async () => null,
   defaultViewForRole: () => 'login'

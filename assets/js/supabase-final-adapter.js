@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const cfg = window.SUPABASE_POC_CONFIG;
+  const cfg = window.SUPABASE_CONFIG;
 
   if (
     !cfg?.url ||
@@ -83,11 +83,11 @@
     const accessToken = sessionData?.session?.access_token;
     if (sessionError || !accessToken) throw new Error('La sesión ha caducado. Vuelve a iniciar sesión.');
 
-    const response = await fetch(`${window.SUPABASE_POC_CONFIG.url}/functions/v1/parking-admin`, {
+    const response = await fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/parking-admin`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        apikey: window.SUPABASE_POC_CONFIG.publishableKey,
+        apikey: window.SUPABASE_CONFIG.publishableKey,
         authorization: `Bearer ${accessToken}`
       },
       body: JSON.stringify({ action, payload }),
@@ -129,7 +129,7 @@
   }
 
   async function edgeOptions(functionName) {
-    const response = await fetch(`${window.SUPABASE_POC_CONFIG.url}/functions/v1/${functionName}`, {
+    const response = await fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/${functionName}`, {
       method: 'OPTIONS',
       cache: 'no-store'
     });
@@ -2147,9 +2147,9 @@
   }
 
   async function login(email, password) {
-    const response = await fetch(`${window.SUPABASE_POC_CONFIG.url}/functions/v1/legacy-auth-migrate`, {
+    const response = await fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/legacy-auth-migrate`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', apikey: window.SUPABASE_POC_CONFIG.publishableKey },
+      headers: { 'content-type': 'application/json', apikey: window.SUPABASE_CONFIG.publishableKey },
       body: JSON.stringify({ email, password }),
       cache: 'no-store'
     });
