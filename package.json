@@ -1,0 +1,29 @@
+{
+  "name": "parking-comunidad",
+  "version": "1.0.0",
+  "description": "La migración Sheet → Supabase está documentada en:",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "node tools/preprod-tests/system-v2-parity.mjs && node tools/preprod-tests/legacy-bridge-parity.mjs && node tools/preprod-tests/password-delivery-parity.mjs",
+    "test:smoke:pre": "playwright test tools/preprod-tests/smoke-pre.spec.js",
+    "test:pre": "npm run test && npm run test:smoke:pre"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/floresderiviera/parking-comunidad.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/floresderiviera/parking-comunidad/issues"
+  },
+  "homepage": "https://github.com/floresderiviera/parking-comunidad#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}
