@@ -1476,3 +1476,20 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     flex:1 1 120px;
   }
 }
+
+/* Filtros móviles · Incidencias / Solicitudes */
+.mobile-filter-toggle-wrap{
+  display:none;
+}
+
+@media(max-width:720px){
+  body:has(#mobile-nav) .mobile-filter-toggle-wrap{
+    display:flex;
+    margin:0 0 .65rem;
+  }
+
+  body:has(#mobile-nav) .mobile-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+}
