@@ -1,0 +1,35 @@
+name: Smoke Pages
+
+on:
+  workflow_run:
+    workflows:
+      - "Deploy Parking Comunidad"
+    types:
+      - completed
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout production
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Wait for GitHub Pages propagation
+        run: sleep 20
+
+      - name: Run public PRO/PRE smoke test
+        run: node tools/smoke-pages.mjs
