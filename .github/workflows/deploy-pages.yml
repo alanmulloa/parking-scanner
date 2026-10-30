@@ -1,0 +1,105 @@
+name: Deploy Parking Comunidad
+
+on:
+  push:
+    branches:
+      - main
+      - supabase-poc
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: parking-comunidad-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout production
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          path: main-src
+
+      - name: Checkout preproduction
+        uses: actions/checkout@v6
+        with:
+          ref: supabase-poc
+          path: pre-src
+
+      - name: Validate preproduction
+        working-directory: pre-src
+        run: |
+          set -e
+
+          for f in tools/preprod-tests/*.mjs; do
+            echo "===== $f ====="
+            node "$f"
+          done
+
+          node --check assets/js/app.bundle.js
+          node --check assets/js/core.js
+
+      - name: Build Pages artifact
+        run: |
+          set -e
+
+          mkdir -p _site
+
+          # PRODUCCION: siempre sale de main.
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='preproduccion.html' \
+            --exclude='assets/js/app.bundle.preprod.js' \
+            main-src/ _site/
+
+          # PREPRODUCCION: siempre sale de supabase-poc.
+          mkdir -p _site/preproduccion
+
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            pre-src/ _site/preproduccion/
+
+          # La entrada pública de PRE es preproduccion.html.
+          cp pre-src/preproduccion.html _site/preproduccion/index.html
+
+          # Verificaciones mínimas del artefacto.
+          test -f _site/index.html
+          test -f _site/preproduccion/index.html
+          test -f _site/assets/js/app.bundle.js
+          test -f _site/preproduccion/assets/js/app.bundle.js
+
+          echo "=== PRODUCCION ==="
+          grep -E 'title>|app\.bundle' _site/index.html
+
+          echo "=== PREPRODUCCION ==="
+          grep -E 'title>|app\.bundle' _site/preproduccion/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
