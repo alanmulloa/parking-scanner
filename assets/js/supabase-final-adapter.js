@@ -1549,10 +1549,10 @@
         invalidate();
         return data;
       }
-      case 'adminSetPassword':
-        return parkingAdmin('setPassword', { id: payload.id || payload.ID_Usuario, password: payload.password });
-      case 'adminGeneratePassword':
-        return parkingAdmin('generatePassword', { id: payload.id || payload.ID_Usuario });
+      case 'adminGenerateTemporaryPassword':
+        return parkingAdmin('generateTemporaryPassword', {
+          id: payload.id || payload.ID_Usuario
+        });
       case 'closeUserSessions':
         return parkingAdmin('closeSessions', { id: payload.id || payload.ID_Usuario });
       case 'updateProfile': {

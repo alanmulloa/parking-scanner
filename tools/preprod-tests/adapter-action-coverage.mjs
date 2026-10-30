@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-const bundle = fs.readFileSync(new URL('../../assets/js/app.bundle.1.2.13.14-FIX11.29.js', import.meta.url), 'utf8');
+const bundle = fs.readFileSync(new URL('../../assets/js/app.bundle.js', import.meta.url), 'utf8');
 const poc = fs.readFileSync(new URL('../../assets/js/supabase-poc-adapter.js', import.meta.url), 'utf8');
 const finalAdapter = fs.readFileSync(new URL('../../assets/js/supabase-final-adapter.js', import.meta.url), 'utf8');
 

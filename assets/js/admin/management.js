@@ -174,11 +174,100 @@ async function housingVehicles(h){
   }catch(e){err(e)}
 }
 function passwordEditor(user){
-  $('#editor').innerHTML=`<div class="card"><div class="head"><div><h2>Contraseña de ${esc(user.Nombre||user.Email)}</h2><p class="muted">Cualquier contraseña asignada por Administración se envía automáticamente a <b>${esc(user.Email)}</b>. Si el usuario cambia su propia contraseña desde Perfil, no se envía correo.</p></div></div><div class="actions"><button type="button" id="password-auto">Generar nueva contraseña y enviar</button></div></div><form class="card form" id="password-form" style="margin-top:1rem"><h2 class="wide">Asignación manual</h2><div class="field wide"><label>Nueva contraseña</label><input name="password" type="password" minlength="8" autocomplete="new-password" required><span class="muted" style="font-size:.8rem">Mínimo 8 caracteres, con al menos una letra y un número.</span></div><div class="wide actions"><button>Guardar y enviar por correo</button><button type="button" class="secondary" id="password-cancel">Cancelar</button></div></form>`;
+  $('#editor').innerHTML=`
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Acceso de ${esc(user.Nombre||user.Email)}</h2>
+          <p class="muted">
+            Genera una contraseña temporal para comunicarla al propietario.
+            Se mostrará una sola vez y no quedará guardada en el sistema.
+          </p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="password-auto">
+          Generar contraseña temporal
+        </button>
+        <button type="button" class="secondary" id="password-cancel">
+          Cancelar
+        </button>
+      </div>
+
+      <div id="temporary-password-result" style="margin-top:1rem"></div>
+    </div>
+  `;
+
   $('#password-cancel').onclick=()=>$('#editor').innerHTML='';
-  $('#password-auto').onclick=async e=>{if(!confirm(`¿Generar una nueva contraseña para ${user.Email}?\n\nLa contraseña actual dejará de ser válida y la nueva se enviará por correo.`))return;const b=e.currentTarget;busy(b);try{const out=await call('adminGeneratePassword',{id:user.ID_Usuario});toast(out?.emailQueued?'Nueva contraseña generada. El correo quedó en cola.':'Nueva contraseña generada, pero el correo no pudo quedar en cola.',!out?.emailQueued);$('#editor').innerHTML=''}catch(x){toast(x.message,true);busy(b,false)}};
-  $('#password-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await call('adminSetPassword',{id:user.ID_Usuario,password:new FormData(e.target).get('password')});toast(out?.emailQueued?'Contraseña actualizada. El correo quedó en cola.':'Contraseña actualizada, pero el correo no pudo quedar en cola.',!out?.emailQueued);$('#editor').innerHTML=''}catch(x){toast(x.message,true);busy(b,false)}};
-  $('#editor').scrollIntoView({behavior:'smooth'})
+
+  $('#password-auto').onclick=async e=>{
+    if(!confirm(
+      `¿Generar una nueva contraseña temporal para ${user.Email}?\n\n`+
+      `La contraseña actual dejará de ser válida.`
+    )) return;
+
+    const b=e.currentTarget;
+    busy(b);
+
+    try{
+      const out=await call('adminGenerateTemporaryPassword',{
+        id:user.ID_Usuario
+      });
+
+      const password=out?.temporaryPassword||'';
+
+      if(!password)
+        throw new Error('No se recibió la contraseña temporal.');
+
+      const box=$('#temporary-password-result');
+
+      box.innerHTML=`
+        <div class="message">
+          <b>Contraseña temporal generada</b>
+          <p class="muted">
+            Copiala ahora. No volverá a mostrarse.
+          </p>
+
+          <div style="
+            display:flex;
+            gap:.6rem;
+            align-items:center;
+            margin-top:.7rem
+          ">
+            <code style="
+              font-size:1.25rem;
+              padding:.6rem .8rem;
+              background:#f4f6f5;
+              border-radius:.5rem;
+              letter-spacing:.06em
+            ">${esc(password)}</code>
+
+            <button
+              type="button"
+              class="secondary"
+              id="copy-temporary-password"
+            >
+              Copiar
+            </button>
+          </div>
+        </div>
+      `;
+
+      $('#copy-temporary-password').onclick=async()=>{
+        await navigator.clipboard.writeText(password);
+        toast('Contraseña copiada.');
+      };
+
+      toast('Contraseña temporal generada.');
+    }catch(x){
+      toast(x.message,true);
+    }finally{
+      busy(b,false);
+    }
+  };
+
+  $('#editor').scrollIntoView({behavior:'smooth'});
 }
 
 function field([name,label,type],row={}){const val=esc(row[name]||'');if(type==='roles'){const selected=String(row[name]||'').split(',');return `<div class="field wide"><label>${label}</label><div class="actions">${['ADMIN','CONTROL','PROPIETARIO'].map(role=>`<label class="btn secondary" style="cursor:pointer"><input class="role-check" type="checkbox" value="${role}" ${selected.includes(role)?'checked':''}> ${role}</label>`).join('')}</div><span class="muted" style="font-size:.8rem">Uno o dos perfiles. Se admite ADMIN + PROPIETARIO o CONTROL + PROPIETARIO; no ADMIN + CONTROL.</span></div>`}if(type==='owner'){const options=(state.cache.formOptions?.owners||[]).map(u=>`<option value="${esc(u.Email)}" ${u.Email===row[name]?'selected':''}>${esc(ownerLabel(u))}</option>`).join('');return `<div class="field"><label>${label}</label><select name="${name}" required><option value="">Selecciona propietario</option>${options}</select></div>`}if(type==='housing'){const options=(state.cache.formOptions?.housing||[]).map(h=>`<option value="${esc(h.ID_Vivienda)}" ${h.ID_Vivienda===row[name]?'selected':''}>${esc(housingLabel(h))}</option>`).join('');return `<div class="field wide"><label>${label}</label><select name="${name}" required><option value="">Selecciona vivienda</option>${options}</select></div>`}if(type.startsWith('select:'))return `<div class="field"><label>${label}</label><select name="${name}">${type.slice(7).split('|').map(o=>`<option ${o===row[name]?'selected':''}>${o}</option>`).join('')}</select></div>`;if(type==='textarea')return `<div class="field"><label>${label}</label><textarea name="${name}">${val}</textarea></div>`;return `<div class="field"><label>${label}</label><input name="${name}" type="${type}" value="${val}"></div>`}

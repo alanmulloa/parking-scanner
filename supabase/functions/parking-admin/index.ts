@@ -579,13 +579,69 @@ Deno.serve(async (request) => {
     if (target.error) throw target.error;
     if (target.data.is_root) throw new Error('La identidad ROOT se gestiona únicamente mediante el procedimiento técnico seguro.');
 
-    if (action === 'setPassword' || action === 'generatePassword') {
-      const password = action === 'generatePassword' ? passwordValue() : String(payload.password || '');
-      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) throw new Error('La contraseña debe tener al menos 8 caracteres, una letra y un número.');
-      const updated = await service.auth.admin.updateUserById(targetId, { password });
+    if (action === 'generateTemporaryPassword') {
+      // Caracteres sin O/0, I/l/1 para facilitar lectura por teléfono.
+      const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      const numbers = '23456789';
+      const pool = letters + numbers;
+
+      const randomIndex = (max: number) => {
+        const bytes = new Uint32Array(1);
+        crypto.getRandomValues(bytes);
+        return bytes[0] % max;
+      };
+
+      let password =
+        letters[randomIndex(letters.length)] +
+        numbers[randomIndex(numbers.length)];
+
+      while (password.length < 12) {
+        password += pool[randomIndex(pool.length)];
+      }
+
+      // Mezcla final.
+      password = password
+        .split('')
+        .sort(() => crypto.getRandomValues(new Uint32Array(1))[0] % 3 - 1)
+        .join('');
+
+      if (
+        password.length < 8 ||
+        !/[A-Za-z]/.test(password) ||
+        !/\d/.test(password)
+      ) {
+        throw new Error('No se pudo generar una contraseña temporal válida.');
+      }
+
+      const updated = await service.auth.admin.updateUserById(
+        targetId,
+        { password }
+      );
+
       if (updated.error) throw updated.error;
-      await service.from('audit_log').insert({ community_id: actorCommunityId, actor_user_id: actorId, user_id: actorId, actor_email: actorAuditEmail, action: 'PASSWORD_RESET', entity: 'USUARIOS', entity_id: targetId, observations: 'Contraseña actualizada por Administración en Supabase Auth. No se registró la contraseña.', source: 'APPLICATION' });
-      return jsonResponse(200, { ok: true, emailQueued: false, accessDeliveryPending: action === 'generatePassword' }, origin);
+
+      await service.from('audit_log').insert({
+        community_id: actorCommunityId,
+        actor_user_id: actorId,
+        user_id: actorId,
+        actor_email: actorAuditEmail,
+        action: 'PASSWORD_TEMPORARY_GENERATED',
+        entity: 'USUARIOS',
+        entity_id: targetId,
+        observations:
+          'Administración generó una contraseña temporal. El valor no fue almacenado.',
+        source: 'APPLICATION'
+      });
+
+      return jsonResponse(
+        200,
+        {
+          ok: true,
+          temporaryPassword: password,
+          email: target.data.email
+        },
+        origin
+      );
     }
 
     if (action === 'closeSessions') {
