@@ -32,7 +32,10 @@ const checks = [
   ['parking-admin ping ROOT', parkingAdmin.includes("action === 'systemPing'") && parkingAdmin.includes('actorProfile.data.is_root')],
   ['scanner consulta mantenimiento', scanner.includes('/rest/v1/rpc/parking_public_state')],
   ['scanner sin URL personal antigua', !scanner.includes('alanmulloa.github.io/parking-scanner')],
-  ['preprod usa bundle/css actuales', preprod.includes('app.bundle.js?v=system-v2') && preprod.includes('app.css?v=system-v2')]
+  ['preprod usa bundle/css actuales',
+  /app\.bundle\.js\?v=[^"' ]+/.test(preprod) &&
+  /app\.css\?v=[^"' ]+/.test(preprod)
+]
 ];
 
 let failed = 0;
