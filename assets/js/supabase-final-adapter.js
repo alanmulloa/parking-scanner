@@ -874,7 +874,7 @@
     const ctx = await incidentContext();
     const anchorId = payload.anchorId || (Array.isArray(payload.ids) ? payload.ids[0] : '') || payload.id;
     if (!anchorId) throw new Error('No se indicó la incidencia a seguir.');
-    const candidates = payload.anchorId ? await buildFollowupCandidates(payload, ctx) : buildIncidentCandidates(payload, ctx);
+    const candidates = await buildFollowupCandidates({ ...payload, anchorId }, ctx);
     const raw = unwrap(await sb.rpc('preview_parking_incident_followup', { p_anchor_id: anchorId, p_candidates: candidates }));
     return publicFollowupPlan(raw);
   }
@@ -883,7 +883,7 @@
     const ctx = await incidentContext();
     const anchorId = payload.anchorId || (Array.isArray(payload.ids) ? payload.ids[0] : '') || payload.id;
     if (!anchorId) throw new Error('No se indicó la incidencia a seguir.');
-    const candidates = payload.anchorId ? await buildFollowupCandidates(payload, ctx) : buildIncidentCandidates(payload, ctx);
+    const candidates = await buildFollowupCandidates({ ...payload, anchorId }, ctx);
     const out = unwrap(await sb.rpc('save_parking_incident_followup', {
       p_anchor_id: anchorId,
       p_candidates: candidates,
