@@ -18,7 +18,7 @@ function naturalSort(a,b){return String(a).localeCompare(String(b),'es',{numeric
 function housingFilterOptions(){return state.cache.formOptions?.housing||[]}
 function blockFilterHtml(){const blocks=[...new Set(housingFilterOptions().map(h=>String(h.Bloque||'').trim()).filter(Boolean))].sort(naturalSort);return `<div class="field"><label>Bloque</label><select data-filter="__Bloque" id="filter-block"><option value="">Todos</option>${blocks.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></div>`}
 function dwellingFilterHtml(){const hs=[...housingFilterOptions()].sort((a,b)=>naturalSort(housingShort(a),housingShort(b)));return `<div class="field"><label>Vivienda</label><select data-filter="__Vivienda" id="filter-housing"><option value="">Todas</option>${hs.map(h=>`<option value="${esc(h.ID_Vivienda)}" data-block="${esc(h.Bloque)}">${esc(housingShort(h))}</option>`).join('')}</select></div>`}
-function renderFilterBar(kind){const defs=filterDefinitions(kind),locationFilters=kind==='housing'?blockFilterHtml():kind==='vehicles'?blockFilterHtml()+dwellingFilterHtml():'';return `<div class="filterbar" id="filterbar"><div class="field filter-search"><label>Buscar</label><input class="search" id="table-search" placeholder="Buscar en ${kind==='vehicles'?'matrículas o vivienda':'esta sección'}..."></div>${locationFilters}${defs.map(([key,label,values])=>`<div class="field"><label>${label}</label><select data-filter="${key}"><option value="">Todos</option>${values.map(v=>`<option>${v}</option>`).join('')}</select></div>`).join('')}<button type="button" class="secondary hide" id="clear-filters">Limpiar</button><span class="count" id="filter-count"></span></div>`}
+function renderFilterBar(kind){const defs=filterDefinitions(kind),locationFilters=kind==='housing'?blockFilterHtml():kind==='vehicles'?blockFilterHtml()+dwellingFilterHtml():'';const mobileToggle=kind==='vehicles'?`<div class="mobile-filter-toggle-wrap"><button type="button" class="secondary mobile-filter-toggle" id="vehicle-filter-toggle">Filtros</button></div>`:'';return `${mobileToggle}<div class="filterbar ${kind==='vehicles'?'vehicle-filterbar':''}" id="filterbar"><div class="field filter-search"><label>Buscar</label><input class="search" id="table-search" placeholder="Buscar en ${kind==='vehicles'?'matrículas o vivienda':'esta sección'}..."></div>${locationFilters}${defs.map(([key,label,values])=>`<div class="field"><label>${label}</label><select data-filter="${key}"><option value="">Todos</option>${values.map(v=>`<option>${v}</option>`).join('')}</select></div>`).join('')}<button type="button" class="secondary hide" id="clear-filters">Limpiar</button><span class="count" id="filter-count"></span></div>`}
 function bindTableFilters(kind,rows){const search=$('#table-search'),selects=[...document.querySelectorAll('[data-filter]')],clear=$('#clear-filters'),body=$('#data-body'),count=$('#filter-count'),block=$('#filter-block'),housingSelect=$('#filter-housing');if(!body||!search)return;const housingById=new Map(housingFilterOptions().map(h=>[h.ID_Vivienda,h]));const refreshHousingOptions=()=>{if(!housingSelect)return;const selected=housingSelect.value,selectedBlock=block?.value||'';[...housingSelect.options].forEach((o,i)=>{if(i===0)return;o.hidden=!!selectedBlock&&o.dataset.block!==selectedBlock});if(selected&&housingSelect.selectedOptions[0]?.hidden)housingSelect.value=''};const preset=state.cache.tablePreset&&state.cache.tablePreset.kind===kind?state.cache.tablePreset:null;if(preset){search.value=preset.search||'';selects.forEach(s=>s.value=(preset.filters&&preset.filters[s.dataset.filter])||'');delete state.cache.tablePreset}refreshHousingOptions();const matchesFilter=(r,s)=>{if(!s.value)return true;if(s.dataset.filter==='Rol')return String(r.Rol||'').split(',').includes(s.value);if(s.dataset.filter==='__Bloque'){const h=kind==='housing'?r:housingById.get(r.ID_Vivienda);return String(h?.Bloque||'')===s.value}if(s.dataset.filter==='__Vivienda')return String(r.ID_Vivienda||'')===s.value;if(s.dataset.filter==='__Clase')return s.value==='Moto'?r.Tipo==='Moto':r.Tipo!=='Moto';if(s.dataset.filter==='__Slot'){const has=r.Tipo!=='Moto'&&['1','2'].includes(String(r.Slot||''));return s.value==='Con slot'?has:!has}if(s.dataset.filter==='__SolicitudesPendientes'){const has=(state.cache.adminRequests||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado==='Abierta');return s.value==='Con abiertas'?has:!has}if(s.dataset.filter==='__IncidenciasPendientes'){const has=(state.cache.adminIncidents||[]).some(x=>x.ID_Vehiculo===r.ID_Vehiculo&&x.Estado!=='Cerrada');return s.value==='Con abiertas'?has:!has}if(s.dataset.filter==='__Temporal'){if(!r.PeriodoTemporalActual)return false;if(s.value==='Vigente')return true;if(s.value==='Vence en 7 días'){const today=new Date().toISOString().slice(0,10),limit=new Date(Date.now()+7*86400000).toISOString().slice(0,10);return r.PeriodoTemporalActual.Hasta>=today&&r.PeriodoTemporalActual.Hasta<=limit}}return String(r[s.dataset.filter]||'')===s.value};const render=()=>{refreshHousingOptions();const q=search.value.trim().toLowerCase(),active=selects.some(s=>s.value)||q;const filtered=rows.map((r,i)=>({r,i})).filter(({r})=>rowSearchText(kind,r).includes(q)&&selects.every(s=>matchesFilter(r,s)));state.cache.currentFilteredRows=filtered.map(x=>x.r);body.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('hide',!filtered.some(x=>String(x.i)===tr.dataset.i)));count.textContent=`Mostrando ${filtered.length} de ${rows.length}`;clear.classList.toggle('hide',!active)};search.oninput=render;selects.forEach(s=>s.onchange=()=>{if(s===block)refreshHousingOptions();render()});clear.onclick=()=>{search.value='';selects.forEach(s=>s.value='');refreshHousingOptions();render()};render()}
 function ownerImportCanonicalRows(rows){
   const norm=v=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
@@ -99,7 +99,7 @@ async function manager(kind){
   }
   return `<th>${esc(columnLabel(x))}</th>`;
 }).join('')}<th>Acciones</th></tr></thead><tbody id="data-body">${rows.map((r,i)=>`<tr data-i="${i}">${c.cols.map(x=>`<td data-label="${esc(columnLabel(x))}">${esc(displayCell(kind,r,x))}</td>`).join('')}<td data-label="Acciones">${actions(r,i)}</td></tr>`).join('')}</tbody></table>${rows.length?'':'<div class="empty">No hay registros.</div>'}</div>`;
-    $('#main').innerHTML=`<div class="head"><h1>${c.title}</h1><div class="actions">${exportButtonsHtml('export-current')}<button id="new">＋ Nuevo</button></div></div><div id="editor"></div>${kind==='vehicles'?`<div class="card" id="bulk-vehicle-bar" style="margin-bottom:.8rem"><b>Acciones masivas</b><div class="actions" style="margin-top:.6rem"><button class="secondary" id="bulk-suspend">Suspender</button><button class="secondary" id="bulk-revoke">Revocar QR</button><button class="danger" id="bulk-low">Dar de baja</button></div></div>`:''}${renderFilterBar(kind)}${tableHtml}`;
+    $('#main').innerHTML=`<div class="head"><h1>${c.title}</h1><div class="actions">${exportButtonsHtml('export-current')}<button id="new">＋ Nuevo</button></div></div><div id="editor"></div>${kind==='vehicles'?`<div class="card bulk-vehicle-bar" id="bulk-vehicle-bar"><div class="bulk-vehicle-head"><b>Acciones masivas</b><button type="button" class="secondary mobile-bulk-toggle" id="bulk-vehicle-toggle">Mostrar</button></div><div class="actions bulk-vehicle-actions" id="bulk-vehicle-actions"><button class="secondary" id="bulk-suspend">Suspender</button><button class="secondary" id="bulk-revoke">Revocar QR</button><button class="danger" id="bulk-low">Dar de baja</button></div></div>`:''}${renderFilterBar(kind)}${tableHtml}`;
     $('#new').onclick=()=>editor(kind,null);$('#export-current-xlsx').onclick=()=>exportRowsFromCurrent(kind,rows,'xlsx');$('#export-current-csv').onclick=()=>exportRowsFromCurrent(kind,rows,'csv');
     document.querySelectorAll('.edit').forEach(b=>b.onclick=()=>editor(kind,rows[b.dataset.i]));if(kind==='vehicles')document.querySelectorAll('.vehicle-detail').forEach(b=>b.onclick=()=>vehicleDetailView(rows[b.dataset.i].ID_Vehiculo));
     if(kind==='users'){document.querySelectorAll('.password').forEach(b=>b.onclick=()=>passwordEditor(rows[b.dataset.i]));document.querySelectorAll('.close-sessions').forEach(b=>b.onclick=async()=>{const u=rows[b.dataset.i];if(!confirm(`¿Cerrar todas las sesiones activas de ${u.Nombre||u.Email}?`))return;try{await call('closeUserSessions',{id:u.ID_Usuario});toast('Sesiones cerradas.')}catch(e){err(e)}})}
@@ -128,6 +128,30 @@ async function manager(kind){
       });
     }
     bindTableFilters(kind,rows);
+
+    if(kind==='vehicles'){
+      const filterToggle=$('#vehicle-filter-toggle');
+      const filterBar=$('#filterbar');
+
+      if(filterToggle&&filterBar){
+        filterBar.classList.add('mobile-filter-collapsed');
+        filterToggle.onclick=()=>{
+          const collapsed=filterBar.classList.toggle('mobile-filter-collapsed');
+          filterToggle.textContent=collapsed?'Filtros':'Ocultar filtros';
+        };
+      }
+
+      const bulkToggle=$('#bulk-vehicle-toggle');
+      const bulkActions=$('#bulk-vehicle-actions');
+
+      if(bulkToggle&&bulkActions){
+        bulkActions.classList.add('mobile-bulk-collapsed');
+        bulkToggle.onclick=()=>{
+          const collapsed=bulkActions.classList.toggle('mobile-bulk-collapsed');
+          bulkToggle.textContent=collapsed?'Mostrar':'Ocultar';
+        };
+      }
+    }
   }catch(e){err(e)}
 }
 

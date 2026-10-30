@@ -1493,3 +1493,56 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     min-height:44px;
   }
 }
+
+/* Vehículos ADMIN · controles móviles */
+.bulk-vehicle-bar{
+  margin-bottom:.8rem;
+}
+
+.bulk-vehicle-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.7rem;
+}
+
+.mobile-bulk-toggle{
+  display:none;
+}
+
+@media(max-width:720px){
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .vehicle-filterbar.mobile-filter-collapsed{
+    display:none!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) #vehicle-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-bar{
+    padding:.8rem;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-bulk-toggle{
+    display:inline-flex;
+    min-height:40px;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:.45rem;
+    margin-top:.7rem!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions.mobile-bulk-collapsed{
+    display:none!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions button{
+    width:100%;
+    min-height:44px;
+  }
+}
