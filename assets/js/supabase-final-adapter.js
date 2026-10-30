@@ -1367,7 +1367,7 @@
           ok: services.every((item) => item.ok),
           backendVersion: status.backendVersion || 'Supabase migration 129',
           schemaVersion: status.schemaVersion || '20261029012900',
-          environment: status.environment || (location.pathname.includes('/preproduccion/')?'PREPRODUCCIÓN':'PRODUCCIÓN'),
+          environment: location.pathname.includes('/preproduccion/')?'PREPRODUCCIÓN':'PRODUCCIÓN',
           hosting: 'GitHub Pages',
           repository: 'floresderiviera/parking-comunidad',
           timeZone: 'Europe/Madrid',
