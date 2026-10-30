@@ -71,6 +71,6 @@ La instrumentación diagnóstica temporal se retiró antes del despliegue final.
 
 No se ha purgado ninguna credencial. El estado global tras la prueba es: 78 filas en el vault contando la cuenta TEST, 76 pendientes, 0 migradas sin validar, 2 validadas con credencial retenida, 0 purgadas y 0 bloqueadas. La purga futura es una operación explícita y queda fuera de esta fase.
 
-## Integración pendiente en frontend
+## Integración en frontend
 
-La Edge Function está desplegada y validada, pero `supabase-poc-adapter.js` aún llama directamente a `signInWithPassword`. Antes de cualquier corte, `loginWithPassword` debe invocar `legacy-auth-migrate` y consumir la sesión devuelta; después se debe repetir el test funcional desde la interfaz.
+La Edge Function está desplegada y validada. El adaptador Supabase final utiliza `legacy-auth-migrate` para `loginWithPassword`, consume la sesión devuelta y mantiene la compatibilidad con las credenciales legacy durante la transición.
