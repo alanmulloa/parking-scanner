@@ -4,7 +4,6 @@ const read = (path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
 const adapter = read('../../assets/js/supabase-final-adapter.js');
 const m125 = read('../../supabase/migrations/20261029012500_owner_vehicle_request_parity.sql');
 const m126 = read('../../supabase/migrations/20261029012600_vehicle_request_lifecycle_parity.sql');
-const poc = read('../../assets/js/supabase-poc-adapter.js');
 
 const exactRequestTypes = ['REACTIVACION_VEHICULO', 'RENOVACION_QR', 'PERMANENCIA_PROLONGADA'];
 const checks = [
@@ -21,7 +20,7 @@ const checks = [
   ['cambio Activo a no Activo rechaza renovacion QR abierta', m125.includes("RENOVACION_QR") && m125.includes("Rechazada")],
   ['renovacion directa cierra solicitudes abiertas', m126.includes('renew_parking_qr') && m126.includes("RENOVACION_QR") && m126.includes("Aprobada")],
   ['reemplazo cierra solicitudes incompatibles', m126.includes('replace_parking_vehicle') && m126.includes("REACTIVACION_VEHICULO") && m126.includes("Rechazada")],
-  ['temporal mismo dia permitido en adapter POC', !poc.includes('endsAt <= startsAt')]
+  ['temporal mismo dia permitido en adapter final', !adapter.includes('endsAt <= startsAt')]
 ];
 
 let failed = 0;
