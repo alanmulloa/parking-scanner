@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-- Migraciones remotas `100` a `117` alineadas en el proyecto POC enlazado.
+- Migraciones remotas `100` a `117` alineadas en el proyecto Supabase enlazado.
 - El Excel se importó y se repitió una segunda vez sin duplicados.
 - `legacy-auth-migrate` está desplegada y pasó la prueba sintética end-to-end.
 - Las 77 credenciales reales permanecen retenidas y pendientes de primer login.

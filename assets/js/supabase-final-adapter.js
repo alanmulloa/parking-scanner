@@ -2227,7 +2227,7 @@
     throw new Error(`Operación de backend no soportada: "${fn}".`);
   };
 
-  // Restore the stable landing views after the temporary POC adapter override.
+  // Restore the stable landing views after adapter initialization.
   defaultViewForRole = function finalDefaultViewForRole(role) {
     return role === 'ADMIN' ? 'dashboard' : role === 'CONTROL' ? 'control' : 'ownerHome';
   };
