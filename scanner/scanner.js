@@ -33,7 +33,7 @@ async function start(){
   }finally{starting=false}
 }
 fallback.addEventListener('click',start);
-back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href=new URL('../preproduccion.html',location.href).href}});
+back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){window.location.href=returnUrl}else if(history.length>1){history.back()}else{window.location.href=new URL('../',location.href).href}});
 window.addEventListener('pagehide',()=>{stop()});
 async function publicState(){
   try{

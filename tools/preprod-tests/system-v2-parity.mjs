@@ -9,7 +9,7 @@ const scanner = read('scanner/scanner.js');
 const migration = read('supabase/migrations/20261029012800_system_v2_maintenance.sql');
 const statusFix = read('supabase/migrations/20261029012900_system_v2_status_corrections.sql');
 const parkingAdmin = read('supabase/functions/parking-admin/index.ts');
-const preprod = read('preproduccion.html');
+const preprod = read('index.html');
 
 const checks = [
   ['frontend version PRO/PRE dinámica',

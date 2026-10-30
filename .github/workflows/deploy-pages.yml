@@ -56,7 +56,6 @@ jobs:
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
-            --exclude='preproduccion.html' \
             --exclude='assets/js/app.bundle.preprod.js' \
             main-src/ _site/
 
@@ -68,8 +67,8 @@ jobs:
             --exclude='.github' \
             pre-src/ _site/preproduccion/
 
-          # La entrada pública de PRE es preproduccion.html.
-          cp pre-src/preproduccion.html _site/preproduccion/index.html
+          # PRE usa el index.html de la rama supabase-poc.
+          # El rsync anterior lo publica como /preproduccion/index.html.
 
           # Verificaciones mínimas del artefacto.
           test -f _site/index.html

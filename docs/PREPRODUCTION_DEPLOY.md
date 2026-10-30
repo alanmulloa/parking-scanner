@@ -48,7 +48,7 @@ No usar la gestión normal de usuarios para ROOT.
 
 ## 6. Publicar frontend staging
 
-Publicar `preproduccion.html` y los assets asociados en una URL distinta de producción.
+Publicar el `index.html` de la rama `supabase-poc` y sus assets bajo `/preproduccion/`.
 
 No modificar `index.html` productivo de Apps Script ni TinyURL.
 
