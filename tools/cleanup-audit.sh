@@ -116,7 +116,7 @@ OUT="reports/cleanup/post-migration-audit.txt"
   echo "============================================================"
   echo "10. BUNDLES / CSS REALMENTE CARGADOS"
   echo "============================================================"
-  grep -nE '<script|stylesheet' index.html preproduccion.html 2>/dev/null || true
+  grep -nE '<script|stylesheet' index.html 2>/dev/null || true
   echo
 
   echo "============================================================"

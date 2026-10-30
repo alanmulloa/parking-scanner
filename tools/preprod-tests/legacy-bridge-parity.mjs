@@ -6,7 +6,7 @@ const adapter = read('assets/js/supabase-final-adapter.js');
 const advanced = read('assets/js/admin/advanced.js');
 const admin = read('supabase/functions/parking-admin/index.ts');
 const bridge = read('legacy-apps-script/LegacyBridge.gs');
-const preprod = read('preproduccion.html');
+const preprod = read('index.html');
 
 const checks = [
   ['frontend bridge version', read('assets/js/core.js').includes("2.0.0-preprod.4")],

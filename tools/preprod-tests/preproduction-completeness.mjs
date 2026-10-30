@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
-const html = read('../../preproduccion.html');
+const html = read('../../index.html');
 const adapter = read('../../assets/js/supabase-final-adapter.js');
 const admin = read('../../supabase/functions/parking-admin/index.ts');
 const migration = read('../../supabase/migrations/20261029012300_preproduction_admin_completeness.sql');
@@ -17,7 +17,7 @@ const checks = [
   ['consistency fix implementado', adapter.includes("case 'consistencyFix'") && migration.includes('parking_consistency_fix')],
   ['upload logo implementado', adapter.includes("case 'uploadLogo'") && adapter.includes("from('parking-public')")],
   ['bucket público controlado por RLS', migration.includes("'parking-public'") && migration.includes('parking_public_insert_admin')],
-  ['producción carga adaptador final', read('../../index.html').includes('supabase-final-adapter.js')],
+  ['index carga adaptador final', read('../../index.html').includes('supabase-final-adapter.js')],
   ['service role no aparece en frontend final', !adapter.includes('SUPABASE_SERVICE_ROLE_KEY')],
   ['ROOT no se crea como membership normal desde owner import', !admin.includes("roles: ['ROOT']")]
 ];

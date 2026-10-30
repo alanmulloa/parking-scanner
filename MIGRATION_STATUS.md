@@ -107,7 +107,7 @@ Antes de marcarla como completada deben ejecutarse en Supabase real:
 2. Aplicar 123–127 en orden.
 3. Desplegar `legacy-auth-migrate` y `parking-admin`.
 4. Aprovisionar ROOT con mismo email/contraseña técnica mediante `tools/sheet-import/root-provision.mjs`.
-5. Publicar `preproduccion.html` en URL staging.
+5. Publicar el `index.html` de `supabase-poc` bajo `/preproduccion/`.
 6. Configurar `ALLOWED_ORIGIN` para staging.
 7. E2E ROOT, ADMIN, CONTROL y PROPIETARIO.
 8. Probar QR físico y matrícula.
