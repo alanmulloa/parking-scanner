@@ -48,28 +48,112 @@ function server(fn,...args){
     }catch(e){finish(reject,e instanceof Error?e:new Error(String(e)))}
   })
 }
-const CLIENT_CALL_METRICS=[];
-function recordClientCall(action,ms,ok=true){
-  if(/^systemPerformanceHistory$/.test(action))return;
-  CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,at:Date.now()});
-  if(CLIENT_CALL_METRICS.length>160)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
+const CLIENT_CALL_STORAGE_KEY='parking_client_metrics_v1';
+
+function loadClientCallMetrics(){
+  try{
+    const rows=JSON.parse(localStorage.getItem(CLIENT_CALL_STORAGE_KEY)||'[]');
+    return Array.isArray(rows)?rows.slice(-160):[];
+  }catch(_e){
+    return [];
+  }
 }
+
+const CLIENT_CALL_METRICS=loadClientCallMetrics();
+
+function persistClientCallMetrics(){
+  try{
+    localStorage.setItem(
+      CLIENT_CALL_STORAGE_KEY,
+      JSON.stringify(CLIENT_CALL_METRICS.slice(-160))
+    );
+  }catch(_e){}
+}
+
+function recordClientCall(action,ms,ok,error=''){
+  CLIENT_CALL_METRICS.push({
+    action:String(action||''),
+    ms:Math.max(0,Math.round(ms||0)),
+    ok:!!ok,
+    error:ok?'':String(error||'').slice(0,300),
+    at:Date.now()
+  });
+  if(CLIENT_CALL_METRICS.length>160){
+    CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
+  }
+  persistClientCallMetrics();
+}
+
+function percentileClient(values,p){
+  if(!values.length)return 0;
+  const sorted=[...values].sort((a,b)=>a-b);
+  return sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*p)-1)]||0;
+}
+
 function clientCallSummary(){
-  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,total:0,max:0,errors:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);if(!x.ok)m.errors++});
-  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count))})).sort((a,b)=>b.total-a.total);
+  const map={};
+  CLIENT_CALL_METRICS.forEach(x=>{
+    const k=x.action||'—';
+    const m=map[k]||(map[k]={
+      action:k,count:0,total:0,max:0,errors:0,times:[]
+    });
+    m.count++;
+    m.total+=Number(x.ms||0);
+    m.max=Math.max(m.max,Number(x.ms||0));
+    m.times.push(Number(x.ms||0));
+    if(!x.ok)m.errors++;
+  });
+
+  return Object.values(map)
+    .map(x=>({
+      action:x.action,
+      count:x.count,
+      total:Math.round(x.total),
+      avg:Math.round(x.total/Math.max(1,x.count)),
+      max:Math.round(x.max),
+      p95:Math.round(percentileClient(x.times,.95)),
+      errors:x.errors
+    }))
+    .sort((a,b)=>b.total-a.total);
 }
+
+function clientObservability(){
+  const rows=[...CLIENT_CALL_METRICS];
+  const total=rows.length;
+  const errors=rows.filter(x=>!x.ok);
+  const times=rows.map(x=>Number(x.ms||0));
+  const slow=rows.filter(x=>Number(x.ms||0)>2000);
+
+  return {
+    total,
+    success:total-errors.length,
+    errors:errors.length,
+    successRate:total?Math.round(((total-errors.length)/total)*1000)/10:100,
+    avg:total?Math.round(times.reduce((a,b)=>a+b,0)/total):0,
+    p95:Math.round(percentileClient(times,.95)),
+    slow:slow.length,
+    recentErrors:errors.slice(-10).reverse(),
+    recentSlow:slow.slice(-10).reverse()
+  };
+}
+
+function clearClientObservability(){
+  CLIENT_CALL_METRICS.splice(0);
+  persistClientCallMetrics();
+}
+
 async function call(action,payload={}){
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
   let last;const callStarted=performance.now();
   for(let i=0;i<attempts;i++){
     try{const value=await server('api',state.token,action,payload);recordClientCall(action,performance.now()-callStarted,true);return value}catch(e){
       last=e;
-      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false);localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
-      if(/mantenimiento/i.test(e.message||'')){try{const publicState=await server('getPublicAppState');renderMaintenanceScreen(publicState)}catch(_e){}recordClientCall(action,performance.now()-callStarted,false);throw e}
+      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false,e.message||String(e));localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
+      if(/mantenimiento/i.test(e.message||'')){try{const publicState=await server('getPublicAppState');renderMaintenanceScreen(publicState)}catch(_e){}recordClientCall(action,performance.now()-callStarted,false,e.message||String(e));throw e}
       if(i+1<attempts)await sleep(650);
     }
   }
-  recordClientCall(action,performance.now()-callStarted,false);throw last;
+  recordClientCall(action,performance.now()-callStarted,false,last?.message||String(last||''));throw last;
 }
 function busy(el,on=true){if(el)el.disabled=on}
 function toast(message,bad=false){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.className='message '+(bad?'bad':'');t.textContent=message;t.style.cssText='position:fixed;right:1rem;bottom:1rem;z-index:99;max-width:420px';clearTimeout(t.timer);t.timer=setTimeout(()=>t.remove(),4500)}
@@ -911,7 +995,84 @@ async function configurationView(initialTab='identity'){
       async function runConsistency(){const box=$('#consistency-result');box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Comprobando consistencia…</span>';try{const r=await call('consistencyReport'),items=Array.isArray(r?.items)?r.items:[],errors=Number(r?.errors||0),warnings=Number(r?.warnings||0);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>${errors||warnings?'Requiere revisión':'Sin inconsistencias detectadas'}</b><span>${errors} error(es) · ${warnings} aviso(s)</span></div><span class="system-pill ${errors?'bad':'ok'}">${errors?'REVISAR':'OK'}</span></div>${items.length?`<div class="diagnostic-grid">${items.slice(0,12).map(x=>`<div class="diagnostic-row"><div><b>${esc(x.label||x.code||'Observación')}</b><small>${esc(x.detail||'')}</small></div><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity||'Aviso')}</span></div>`).join('')}</div>`:'<div class="system-summary ok">Las reglas de consistencia no detectaron incidencias.</div>'}` }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}}
       async function runRoundTrip(){const box=resultBox();box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Midiendo latencia…</span>';try{const samples=[];for(let i=0;i<3;i++){const t=performance.now(),r=await call('systemRoundTripPing',{seq:i+1}),total=Math.max(1,Math.round(performance.now()-t)),serverMs=Number(r.serverMs||0);samples.push({total,serverMs,overhead:Math.max(0,total-serverMs)})}const avg=k=>Math.round(samples.reduce((a,x)=>a+x[k],0)/samples.length),total=avg('total'),server=avg('serverMs'),over=avg('overhead');box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Rendimiento</b><span>Promedio de 3 muestras</span></div><span class="perf-badge">${total} ms</span></div><div class="diagnostic-grid"><div class="diagnostic-row"><div><b>Respuesta total</b></div><span>${total} ms</span></div><div class="diagnostic-row"><div><b>RPC Supabase</b></div><span>${server} ms</span></div><div class="diagnostic-row"><div><b>Navegador / transporte</b></div><span>${over} ms</span></div></div>`}catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{renderSessionCalls()}}
       async function runConcurrency(){if(!confirm('Se ejecutarán lotes de 5, 10 y 20 lecturas simultáneas desde este navegador. ¿Continuar?'))return;const box=resultBox();box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando concurrencia controlada…</span>';try{const batches=[];for(const n of [5,10,20]){const started=performance.now(),jobs=Array.from({length:n},(_,i)=>call('systemRoundTripPing',{seq:i+1}).then(()=>({ok:true})).catch(()=>({ok:false}))),r=await Promise.all(jobs),ms=Math.max(1,Math.round(performance.now()-started));batches.push({n,ms,fails:r.filter(x=>!x.ok).length})}const ok=batches.every(x=>!x.fails);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Concurrencia controlada</b><span>Desde un único navegador</span></div><span class="system-pill ${ok?'ok':'bad'}">${ok?'Correcta':'Revisar'}</span></div><div class="diagnostic-grid">${batches.map(x=>`<div class="diagnostic-row"><div><b>${x.n} simultáneas</b><small>${x.fails?x.fails+' fallo(s)':'Sin fallos'}</small></div><span>${x.ms} ms</span></div>`).join('')}</div>`}catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{renderSessionCalls()}}
-      function renderSessionCalls(){const box=$('#diag-calls');if(!box)return;const rows=clientCallSummary().slice(0,10);if(!rows.length){box.className='diagnostic-empty';box.innerHTML='<b>Llamadas de esta sesión</b><span>Todavía no hay llamadas registradas.</span>';return}box.className='diagnostic-result';box.innerHTML='<div class="diagnostic-summary"><div><b>Llamadas de esta sesión</b><span>Ordenadas por impacto acumulado</span></div></div><div class="call-stats-grid">'+rows.map(x=>`<div class="call-stat"><b>${esc(x.action)}</b><span>${x.count} llamada${x.count===1?'':'s'} · media ${x.avg} ms · máx. ${x.max} ms · total ${x.total} ms${x.errors?' · '+x.errors+' error(es)':''}</span></div>`).join('')+'</div>'}
+      function renderSessionCalls(){
+        const box=$('#diag-calls');
+        if(!box)return;
+
+        const summary=clientObservability();
+        const rows=clientCallSummary().slice(0,10);
+
+        if(!summary.total){
+          box.className='diagnostic-empty';
+          box.innerHTML='<b>Observabilidad del navegador</b><span>Todavía no hay llamadas registradas.</span>';
+          return;
+        }
+
+        const errorsHtml=summary.recentErrors.length
+          ? `<div class="diagnostic-grid">${summary.recentErrors.map(x=>`
+              <div class="diagnostic-row">
+                <div>
+                  <b>${esc(x.action||'—')}</b>
+                  <small>${esc(x.error||'Error sin detalle')} · ${esc(shortDateTime(new Date(x.at).toISOString()))}</small>
+                </div>
+                <span class="perf-badge warn">${Number(x.ms||0)} ms</span>
+              </div>`).join('')}</div>`
+          : '<div class="system-summary ok">No hay errores registrados en las últimas operaciones.</div>';
+
+        box.className='diagnostic-result';
+        box.innerHTML=`
+          <div class="diagnostic-summary">
+            <div>
+              <b>Observabilidad del navegador</b>
+              <span>Últimas ${summary.total} operaciones conservadas en este dispositivo</span>
+            </div>
+            <button type="button" class="secondary" id="clear-client-observability">Limpiar métricas</button>
+          </div>
+
+          <div class="system-data-grid">
+            <div><b>${summary.successRate}%</b><span>Éxito</span></div>
+            <div><b>${summary.errors}</b><span>Errores</span></div>
+            <div><b>${summary.avg} ms</b><span>Media</span></div>
+            <div><b>${summary.p95} ms</b><span>P95</span></div>
+            <div><b>${summary.slow}</b><span>&gt; 2 segundos</span></div>
+            <div><b>${summary.total}</b><span>Operaciones</span></div>
+          </div>
+
+          <div class="incident-dossier-section" style="margin-top:1rem">
+            <div class="incident-dossier-section-head">
+              <h3>Operaciones con mayor impacto</h3>
+              <span>${rows.length}</span>
+            </div>
+            <div class="call-stats-grid">
+              ${rows.map(x=>`
+                <div class="call-stat">
+                  <b>${esc(x.action)}</b>
+                  <span>
+                    ${x.count} llamada${x.count===1?'':'s'}
+                    · media ${x.avg} ms
+                    · P95 ${x.p95} ms
+                    · máx. ${x.max} ms
+                    ${x.errors?' · '+x.errors+' error(es)':''}
+                  </span>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="incident-dossier-section" style="margin-top:1rem">
+            <div class="incident-dossier-section-head">
+              <h3>Últimos errores</h3>
+              <span>${summary.recentErrors.length}</span>
+            </div>
+            ${errorsHtml}
+          </div>`;
+
+        const clear=$('#clear-client-observability');
+        if(clear)clear.onclick=()=>{
+          if(!confirm('¿Limpiar las métricas técnicas guardadas en este navegador?'))return;
+          clearClientObservability();
+          renderSessionCalls();
+        };
+      }
       loadStatus();
     }
     tabs.forEach(b=>b.onclick=()=>{const tab=b.dataset.configTab;if(tab==='system')return renderSystem();if(tab==='data')return renderData();return renderIdentity()});
