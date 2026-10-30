@@ -48,28 +48,112 @@ function server(fn,...args){
     }catch(e){finish(reject,e instanceof Error?e:new Error(String(e)))}
   })
 }
-const CLIENT_CALL_METRICS=[];
-function recordClientCall(action,ms,ok=true){
-  if(/^systemPerformanceHistory$/.test(action))return;
-  CLIENT_CALL_METRICS.push({action:String(action||''),ms:Math.round(ms),ok:!!ok,at:Date.now()});
-  if(CLIENT_CALL_METRICS.length>160)CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
+const CLIENT_CALL_STORAGE_KEY='parking_client_metrics_v1';
+
+function loadClientCallMetrics(){
+  try{
+    const rows=JSON.parse(localStorage.getItem(CLIENT_CALL_STORAGE_KEY)||'[]');
+    return Array.isArray(rows)?rows.slice(-160):[];
+  }catch(_e){
+    return [];
+  }
 }
+
+const CLIENT_CALL_METRICS=loadClientCallMetrics();
+
+function persistClientCallMetrics(){
+  try{
+    localStorage.setItem(
+      CLIENT_CALL_STORAGE_KEY,
+      JSON.stringify(CLIENT_CALL_METRICS.slice(-160))
+    );
+  }catch(_e){}
+}
+
+function recordClientCall(action,ms,ok,error=''){
+  CLIENT_CALL_METRICS.push({
+    action:String(action||''),
+    ms:Math.max(0,Math.round(ms||0)),
+    ok:!!ok,
+    error:ok?'':String(error||'').slice(0,300),
+    at:Date.now()
+  });
+  if(CLIENT_CALL_METRICS.length>160){
+    CLIENT_CALL_METRICS.splice(0,CLIENT_CALL_METRICS.length-160);
+  }
+  persistClientCallMetrics();
+}
+
+function percentileClient(values,p){
+  if(!values.length)return 0;
+  const sorted=[...values].sort((a,b)=>a-b);
+  return sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*p)-1)]||0;
+}
+
 function clientCallSummary(){
-  const map={};CLIENT_CALL_METRICS.forEach(x=>{const k=x.action||'—',m=map[k]||(map[k]={action:k,count:0,total:0,max:0,errors:0});m.count++;m.total+=x.ms;m.max=Math.max(m.max,x.ms);if(!x.ok)m.errors++});
-  return Object.values(map).map(x=>({...x,avg:Math.round(x.total/Math.max(1,x.count))})).sort((a,b)=>b.total-a.total);
+  const map={};
+  CLIENT_CALL_METRICS.forEach(x=>{
+    const k=x.action||'—';
+    const m=map[k]||(map[k]={
+      action:k,count:0,total:0,max:0,errors:0,times:[]
+    });
+    m.count++;
+    m.total+=Number(x.ms||0);
+    m.max=Math.max(m.max,Number(x.ms||0));
+    m.times.push(Number(x.ms||0));
+    if(!x.ok)m.errors++;
+  });
+
+  return Object.values(map)
+    .map(x=>({
+      action:x.action,
+      count:x.count,
+      total:Math.round(x.total),
+      avg:Math.round(x.total/Math.max(1,x.count)),
+      max:Math.round(x.max),
+      p95:Math.round(percentileClient(x.times,.95)),
+      errors:x.errors
+    }))
+    .sort((a,b)=>b.total-a.total);
 }
+
+function clientObservability(){
+  const rows=[...CLIENT_CALL_METRICS];
+  const total=rows.length;
+  const errors=rows.filter(x=>!x.ok);
+  const times=rows.map(x=>Number(x.ms||0));
+  const slow=rows.filter(x=>Number(x.ms||0)>2000);
+
+  return {
+    total,
+    success:total-errors.length,
+    errors:errors.length,
+    successRate:total?Math.round(((total-errors.length)/total)*1000)/10:100,
+    avg:total?Math.round(times.reduce((a,b)=>a+b,0)/total):0,
+    p95:Math.round(percentileClient(times,.95)),
+    slow:slow.length,
+    recentErrors:errors.slice(-10).reverse(),
+    recentSlow:slow.slice(-10).reverse()
+  };
+}
+
+function clearClientObservability(){
+  CLIENT_CALL_METRICS.splice(0);
+  persistClientCallMetrics();
+}
+
 async function call(action,payload={}){
   const attempts=RETRYABLE_ACTIONS.has(action)?2:1;
   let last;const callStarted=performance.now();
   for(let i=0;i<attempts;i++){
     try{const value=await server('api',state.token,action,payload);recordClientCall(action,performance.now()-callStarted,true);return value}catch(e){
       last=e;
-      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false);localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
-      if(/mantenimiento/i.test(e.message||'')){try{const publicState=await server('getPublicAppState');renderMaintenanceScreen(publicState)}catch(_e){}recordClientCall(action,performance.now()-callStarted,false);throw e}
+      if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false,e.message||String(e));localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
+      if(/mantenimiento/i.test(e.message||'')){try{const publicState=await server('getPublicAppState');renderMaintenanceScreen(publicState)}catch(_e){}recordClientCall(action,performance.now()-callStarted,false,e.message||String(e));throw e}
       if(i+1<attempts)await sleep(650);
     }
   }
-  recordClientCall(action,performance.now()-callStarted,false);throw last;
+  recordClientCall(action,performance.now()-callStarted,false,last?.message||String(last||''));throw last;
 }
 function busy(el,on=true){if(el)el.disabled=on}
 function toast(message,bad=false){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.className='message '+(bad?'bad':'');t.textContent=message;t.style.cssText='position:fixed;right:1rem;bottom:1rem;z-index:99;max-width:420px';clearTimeout(t.timer);t.timer=setTimeout(()=>t.remove(),4500)}

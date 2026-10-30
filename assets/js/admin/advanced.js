@@ -11,7 +11,7 @@ async function housingDetailView(id){
   $('#main').innerHTML=`<div class="head"><div><h1>${esc(housingShort(h))}</h1><div class="muted">Ficha completa de vivienda</div></div><div class="actions"><button class="secondary" id="hd-back">← Viviendas</button><button id="hd-add">＋ Vehículo</button></div></div>
   <div class="summary-grid"><article class="summary-card"><b>${esc(d.slotsUsed)}</b><span>Slots ocupados</span><small>${esc(d.slotsFree)} libres</small></article><article class="summary-card"><b>${vs.filter(v=>v.Estado==='Activo'&&v.Tipo==='Moto').length}</b><span>Motos activas</span></article><article class="summary-card"><b>${incs.filter(i=>(i.Estado||'Abierta')!=='Cerrada').length}</b><span>Incidencias abiertas</span></article><article class="summary-card"><b>${reqs.filter(r=>r.Estado==='Abierta').length}</b><span>Solicitudes abiertas</span></article></div>
   <section class="card" style="margin-top:1rem"><h2>Propietario</h2><div class="details"><div><small>Nombre</small>${esc(o.Nombre||'Sin responsable')}</div><div><small>Email</small>${esc(o.Email||h.Responsable||'—')}</div><div><small>Estado vivienda</small>${esc(h.Estado)}</div></div></section>
-  <section class="card" style="margin-top:1rem"><div class="head"><h2>Vehículos</h2></div><div class="tablebox"><table class="table"><thead><tr><th>Matrícula</th><th>Clase</th><th>Estado</th><th>Slot</th><th>Temporal</th><th></th></tr></thead><tbody>${vs.map((v,i)=>`<tr><td><b>${esc(v.MatriculaHabitual)}</b></td><td>${esc(v.Tipo==='Moto'?'Moto':'Vehículo')}</td><td>${esc(v.Estado)}</td><td>${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Liberado')}</td><td>${esc(displayCell('vehicles',v,'MatriculaTemporal'))}</td><td><button class="secondary hd-history" data-i="${i}">Historial</button></td></tr>`).join('')}</tbody></table></div></section>
+  <section class="card" style="margin-top:1rem"><div class="head"><h2>Vehículos</h2></div><div class="tablebox"><table class="table responsive-data-table"><thead><tr><th>Matrícula</th><th>Clase</th><th>Estado</th><th>Slot</th><th>Temporal</th><th></th></tr></thead><tbody>${vs.map((v,i)=>`<tr><td><b>${esc(v.MatriculaHabitual)}</b></td><td>${esc(v.Tipo==='Moto'?'Moto':'Vehículo')}</td><td>${esc(v.Estado)}</td><td>${esc(v.Tipo==='Moto'?'No aplica':v.Slot||'Liberado')}</td><td>${esc(displayCell('vehicles',v,'MatriculaTemporal'))}</td><td><button class="secondary hd-history" data-i="${i}">Historial</button></td></tr>`).join('')}</tbody></table></div></section>
   <section class="grid" style="margin-top:1rem"><article class="card"><h2>Incidencias recientes</h2>${incs.slice(0,10).map(i=>`<div class="attention-item"><div><strong>${esc(i.Tipo)}</strong><span>${esc(i.MatriculaObservada||'')} · ${esc(shortDateTime(i.FechaHora))}</span></div></div>`).join('')||'<div class="empty">Sin incidencias.</div>'}</article><article class="card"><h2>Solicitudes recientes</h2>${reqs.slice(0,10).map(r=>`<div class="attention-item"><div><strong>${esc(requestTypeLabel(r.Tipo))}</strong><span>${esc(r.Estado)} · ${esc(shortDateTime(r.FechaHora))}</span></div></div>`).join('')||'<div class="empty">Sin solicitudes.</div>'}</article></section>`;
   $('#hd-back').onclick=()=>go('housing');$('#hd-add').onclick=()=>{state.cache.tablePreset={kind:'vehicles',filters:{__Vivienda:h.ID_Vivienda}};go('vehicles')};document.querySelectorAll('.hd-history').forEach(b=>b.onclick=()=>vehicleHistoryView(vs[Number(b.dataset.i)].ID_Vehiculo,()=>housingDetailView(id)));
   }catch(e){err(e)}
@@ -37,7 +37,7 @@ function exportRowsFromCurrent(kind,rows,format='xlsx'){const filtered=state.cac
 
 async function consistencyReviewView(){
   renderLoading('dataReview');try{const d=await call('consistencyReport'),items=d.items||[];
-  $('#main').innerHTML=`<div class="head"><div><h1>Revisión de datos</h1><div class="muted">Solo muestra incoherencias de datos. Los pendientes operativos se gestionan desde Resumen.</div></div><button class="secondary" id="review-refresh">Revisar nuevamente</button></div><div class="summary-grid"><article class="summary-card ${d.errors?'alert':''}"><b>${esc(d.errors)}</b><span>Errores de integridad</span></article><article class="summary-card ${d.warnings?'alert':''}"><b>${esc(d.warnings)}</b><span>Inconsistencias</span></article><article class="summary-card"><b>${esc(items.length)}</b><span>Total detectado</span></article></div><section class="card" style="margin-top:1rem"><div class="tablebox compact-table"><table class="table"><thead><tr><th>Nivel</th><th>Comprobación</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>${items.map((x,i)=>{const fix=['MOTO_CON_SLOT','MOTO_QR_ACTIVO','TEMPORAL_NO_ACTIVO','MATRICULA_DUPLICADA'].includes(x.code);return `<tr><td><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity)}</span></td><td><b>${esc(x.label)}</b><span class="subtle">${esc(x.code)}</span></td><td>${esc(x.detail||'—')}</td><td><div class="actions"><button class="secondary review-open" data-i="${i}">Ir al registro</button>${fix?`<button class="review-fix" data-i="${i}">Corregir</button>`:''}</div></td></tr>`}).join('')}</tbody></table>${items.length?'':'<div class="empty">No se detectaron inconsistencias.</div>'}</div></section>`;
+  $('#main').innerHTML=`<div class="head"><div><h1>Revisión de datos</h1><div class="muted">Solo muestra incoherencias de datos. Los pendientes operativos se gestionan desde Resumen.</div></div><button class="secondary" id="review-refresh">Revisar nuevamente</button></div><div class="summary-grid"><article class="summary-card ${d.errors?'alert':''}"><b>${esc(d.errors)}</b><span>Errores de integridad</span></article><article class="summary-card ${d.warnings?'alert':''}"><b>${esc(d.warnings)}</b><span>Inconsistencias</span></article><article class="summary-card"><b>${esc(items.length)}</b><span>Total detectado</span></article></div><section class="card" style="margin-top:1rem"><div class="tablebox compact-table"><table class="table responsive-data-table"><thead><tr><th>Nivel</th><th>Comprobación</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>${items.map((x,i)=>{const fix=['MOTO_CON_SLOT','MOTO_QR_ACTIVO','TEMPORAL_NO_ACTIVO','MATRICULA_DUPLICADA'].includes(x.code);return `<tr><td><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity)}</span></td><td><b>${esc(x.label)}</b><span class="subtle">${esc(x.code)}</span></td><td>${esc(x.detail||'—')}</td><td><div class="actions"><button class="secondary review-open" data-i="${i}">Ir al registro</button>${fix?`<button class="review-fix" data-i="${i}">Corregir</button>`:''}</div></td></tr>`}).join('')}</tbody></table>${items.length?'':'<div class="empty">No se detectaron inconsistencias.</div>'}</div></section>`;
   $('#review-refresh').onclick=consistencyReviewView;document.querySelectorAll('.review-open').forEach(b=>b.onclick=()=>openConsistencyItem(items[Number(b.dataset.i)]));document.querySelectorAll('.review-fix').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.i)],msg={MOTO_CON_SLOT:'Quitar el slot asignado a esta moto',MOTO_QR_ACTIVO:'Revocar el QR de esta moto',TEMPORAL_NO_ACTIVO:'Anular el temporal vigente',MATRICULA_DUPLICADA:'Consolidar los registros duplicados de esta matrícula (se creará backup)'}[x.code]||'Aplicar corrección';if(!confirm(`${msg}.\n\nSe registrará en Auditoría. ¿Continuar?`))return;busy(b);try{const out=await call('consistencyFix',{code:x.code,vehicleId:x.vehicleId});invalidateClientParkingData();toast(out.message||'Corrección aplicada.');consistencyReviewView()}catch(e){err(e);busy(b,false)}});
   }catch(e){err(e)}
 }
@@ -310,7 +310,84 @@ async function configurationView(initialTab='identity'){
       async function runConsistency(){const box=$('#consistency-result');box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Comprobando consistencia…</span>';try{const r=await call('consistencyReport'),items=Array.isArray(r?.items)?r.items:[],errors=Number(r?.errors||0),warnings=Number(r?.warnings||0);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>${errors||warnings?'Requiere revisión':'Sin inconsistencias detectadas'}</b><span>${errors} error(es) · ${warnings} aviso(s)</span></div><span class="system-pill ${errors?'bad':'ok'}">${errors?'REVISAR':'OK'}</span></div>${items.length?`<div class="diagnostic-grid">${items.slice(0,12).map(x=>`<div class="diagnostic-row"><div><b>${esc(x.label||x.code||'Observación')}</b><small>${esc(x.detail||'')}</small></div><span class="status ${x.severity==='Error'?'bad':''}">${esc(x.severity||'Aviso')}</span></div>`).join('')}</div>`:'<div class="system-summary ok">Las reglas de consistencia no detectaron incidencias.</div>'}` }catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}}
       async function runRoundTrip(){const box=resultBox();box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Midiendo latencia…</span>';try{const samples=[];for(let i=0;i<3;i++){const t=performance.now(),r=await call('systemRoundTripPing',{seq:i+1}),total=Math.max(1,Math.round(performance.now()-t)),serverMs=Number(r.serverMs||0);samples.push({total,serverMs,overhead:Math.max(0,total-serverMs)})}const avg=k=>Math.round(samples.reduce((a,x)=>a+x[k],0)/samples.length),total=avg('total'),server=avg('serverMs'),over=avg('overhead');box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Rendimiento</b><span>Promedio de 3 muestras</span></div><span class="perf-badge">${total} ms</span></div><div class="diagnostic-grid"><div class="diagnostic-row"><div><b>Respuesta total</b></div><span>${total} ms</span></div><div class="diagnostic-row"><div><b>RPC Supabase</b></div><span>${server} ms</span></div><div class="diagnostic-row"><div><b>Navegador / transporte</b></div><span>${over} ms</span></div></div>`}catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{renderSessionCalls()}}
       async function runConcurrency(){if(!confirm('Se ejecutarán lotes de 5, 10 y 20 lecturas simultáneas desde este navegador. ¿Continuar?'))return;const box=resultBox();box.className='diagnostic-running';box.innerHTML='<div class="spinner"></div><span>Ejecutando concurrencia controlada…</span>';try{const batches=[];for(const n of [5,10,20]){const started=performance.now(),jobs=Array.from({length:n},(_,i)=>call('systemRoundTripPing',{seq:i+1}).then(()=>({ok:true})).catch(()=>({ok:false}))),r=await Promise.all(jobs),ms=Math.max(1,Math.round(performance.now()-started));batches.push({n,ms,fails:r.filter(x=>!x.ok).length})}const ok=batches.every(x=>!x.fails);box.className='diagnostic-result';box.innerHTML=`<div class="diagnostic-summary"><div><b>Concurrencia controlada</b><span>Desde un único navegador</span></div><span class="system-pill ${ok?'ok':'bad'}">${ok?'Correcta':'Revisar'}</span></div><div class="diagnostic-grid">${batches.map(x=>`<div class="diagnostic-row"><div><b>${x.n} simultáneas</b><small>${x.fails?x.fails+' fallo(s)':'Sin fallos'}</small></div><span>${x.ms} ms</span></div>`).join('')}</div>`}catch(e){box.className='diagnostic-result';box.innerHTML=`<div class="message bad">${esc(e.message||String(e))}</div>`}finally{renderSessionCalls()}}
-      function renderSessionCalls(){const box=$('#diag-calls');if(!box)return;const rows=clientCallSummary().slice(0,10);if(!rows.length){box.className='diagnostic-empty';box.innerHTML='<b>Llamadas de esta sesión</b><span>Todavía no hay llamadas registradas.</span>';return}box.className='diagnostic-result';box.innerHTML='<div class="diagnostic-summary"><div><b>Llamadas de esta sesión</b><span>Ordenadas por impacto acumulado</span></div></div><div class="call-stats-grid">'+rows.map(x=>`<div class="call-stat"><b>${esc(x.action)}</b><span>${x.count} llamada${x.count===1?'':'s'} · media ${x.avg} ms · máx. ${x.max} ms · total ${x.total} ms${x.errors?' · '+x.errors+' error(es)':''}</span></div>`).join('')+'</div>'}
+      function renderSessionCalls(){
+        const box=$('#diag-calls');
+        if(!box)return;
+
+        const summary=clientObservability();
+        const rows=clientCallSummary().slice(0,10);
+
+        if(!summary.total){
+          box.className='diagnostic-empty';
+          box.innerHTML='<b>Observabilidad del navegador</b><span>Todavía no hay llamadas registradas.</span>';
+          return;
+        }
+
+        const errorsHtml=summary.recentErrors.length
+          ? `<div class="diagnostic-grid">${summary.recentErrors.map(x=>`
+              <div class="diagnostic-row">
+                <div>
+                  <b>${esc(x.action||'—')}</b>
+                  <small>${esc(x.error||'Error sin detalle')} · ${esc(shortDateTime(new Date(x.at).toISOString()))}</small>
+                </div>
+                <span class="perf-badge warn">${Number(x.ms||0)} ms</span>
+              </div>`).join('')}</div>`
+          : '<div class="system-summary ok">No hay errores registrados en las últimas operaciones.</div>';
+
+        box.className='diagnostic-result';
+        box.innerHTML=`
+          <div class="diagnostic-summary">
+            <div>
+              <b>Observabilidad del navegador</b>
+              <span>Últimas ${summary.total} operaciones conservadas en este dispositivo</span>
+            </div>
+            <button type="button" class="secondary" id="clear-client-observability">Limpiar métricas</button>
+          </div>
+
+          <div class="system-data-grid">
+            <div><b>${summary.successRate}%</b><span>Éxito</span></div>
+            <div><b>${summary.errors}</b><span>Errores</span></div>
+            <div><b>${summary.avg} ms</b><span>Media</span></div>
+            <div><b>${summary.p95} ms</b><span>P95</span></div>
+            <div><b>${summary.slow}</b><span>&gt; 2 segundos</span></div>
+            <div><b>${summary.total}</b><span>Operaciones</span></div>
+          </div>
+
+          <div class="incident-dossier-section" style="margin-top:1rem">
+            <div class="incident-dossier-section-head">
+              <h3>Operaciones con mayor impacto</h3>
+              <span>${rows.length}</span>
+            </div>
+            <div class="call-stats-grid">
+              ${rows.map(x=>`
+                <div class="call-stat">
+                  <b>${esc(x.action)}</b>
+                  <span>
+                    ${x.count} llamada${x.count===1?'':'s'}
+                    · media ${x.avg} ms
+                    · P95 ${x.p95} ms
+                    · máx. ${x.max} ms
+                    ${x.errors?' · '+x.errors+' error(es)':''}
+                  </span>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div class="incident-dossier-section" style="margin-top:1rem">
+            <div class="incident-dossier-section-head">
+              <h3>Últimos errores</h3>
+              <span>${summary.recentErrors.length}</span>
+            </div>
+            ${errorsHtml}
+          </div>`;
+
+        const clear=$('#clear-client-observability');
+        if(clear)clear.onclick=()=>{
+          if(!confirm('¿Limpiar las métricas técnicas guardadas en este navegador?'))return;
+          clearClientObservability();
+          renderSessionCalls();
+        };
+      }
       loadStatus();
     }
     tabs.forEach(b=>b.onclick=()=>{const tab=b.dataset.configTab;if(tab==='system')return renderSystem();if(tab==='data')return renderData();return renderIdentity()});
