@@ -1,10 +1,35 @@
 (() => {
   'use strict';
 
-  const sb = window.parkingSupabase;
-  if (!sb) throw new Error('Supabase no está inicializado.');
+  const cfg = window.SUPABASE_POC_CONFIG;
 
-  const previousServer = server;
+  if (
+    !cfg?.url ||
+    !cfg?.publishableKey ||
+    cfg.publishableKey === 'PEGAR_AQUI_PUBLISHABLE_KEY'
+  ) {
+    throw new Error('Falta configurar la Publishable Key de Supabase.');
+  }
+
+  if (!window.supabase?.createClient) {
+    throw new Error('No se pudo cargar supabase-js.');
+  }
+
+  const sb =
+    window.parkingSupabase ||
+    window.supabase.createClient(
+      cfg.url,
+      cfg.publishableKey,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      }
+    );
+
+  window.parkingSupabase = sb;
   const CACHE_MS = 15000;
   const cache = new Map();
   let bootstrapCache = null;
@@ -1089,6 +1114,337 @@
     );
   }
 
+
+  function mapTemporaryPeriodLegacy(row) {
+    if (!row) return null;
+    return {
+      ID_Periodo: row.id,
+      ID_Temporal: row.id,
+      ID_Vehiculo: row.vehicle_id,
+      MatriculaTemporal: row.temporary_plate,
+      MatriculaTemporalNormalizada: row.normalized_temporary_plate || '',
+      Desde: asDate(row.starts_at),
+      Hasta: asDate(row.ends_at),
+      Estado: row.state,
+      Observaciones: row.observations || '',
+      FechaAlta: row.created_at || '',
+      UsuarioAlta: row.created_by || ''
+    };
+  }
+
+  async function listTemporaryPeriods(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    if (!vehicleId) {
+      throw new Error('No se pudo determinar el vehículo.');
+    }
+
+    const rows = unwrap(
+      await sb
+        .from('temporary_periods')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .order('starts_at', { ascending: true })
+    ) || [];
+
+    return rows.map(mapTemporaryPeriodLegacy);
+  }
+
+  async function saveTemporaryPeriod(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id;
+
+    const periodId =
+      payload.ID_Periodo ||
+      payload.ID_Temporal ||
+      payload.periodId ||
+      payload.period_id;
+
+    const temporaryPlate = String(
+      payload.MatriculaTemporal ||
+      payload.temporaryPlate ||
+      payload.temporary_plate ||
+      ''
+    ).trim().toUpperCase();
+
+    const startsAt = String(
+      payload.Desde ||
+      payload.desde ||
+      payload.startsAt ||
+      payload.starts_at ||
+      ''
+    ).trim();
+
+    const endsAt = String(
+      payload.Hasta ||
+      payload.hasta ||
+      payload.endsAt ||
+      payload.ends_at ||
+      ''
+    ).trim();
+
+    const observations = String(
+      payload.Observaciones ||
+      payload.observations ||
+      ''
+    ).trim();
+
+    if (!vehicleId) {
+      throw new Error('No se pudo determinar el vehículo.');
+    }
+
+    if (!temporaryPlate || !startsAt || !endsAt) {
+      throw new Error('Completa matrícula temporal, desde y hasta.');
+    }
+
+    if (endsAt < startsAt) {
+      throw new Error('La fecha hasta no puede ser anterior a la fecha desde.');
+    }
+
+    const vehicle = unwrap(
+      await sb
+        .from('vehicles')
+        .select('id,community_id,state,habitual_plate,normalized_habitual_plate')
+        .eq('id', vehicleId)
+        .single()
+    );
+
+    if (!vehicle) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    if (vehicle.state !== 'Activo') {
+      throw new Error(
+        'Solo se pueden crear o modificar períodos mientras el vehículo está activo.'
+      );
+    }
+
+    if (periodId) {
+      const previous = unwrap(
+        await sb
+          .from('temporary_periods')
+          .select('id,vehicle_id,state')
+          .eq('id', periodId)
+          .single()
+      );
+
+      if (!previous || previous.vehicle_id !== vehicleId) {
+        throw new Error('Período no válido.');
+      }
+    }
+
+    const row = {
+      community_id: vehicle.community_id,
+      vehicle_id: vehicleId,
+      temporary_plate: temporaryPlate,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      observations,
+      state: payload.Estado || 'Activo'
+    };
+
+    let saved;
+
+    if (periodId) {
+      saved = unwrap(
+        await sb
+          .from('temporary_periods')
+          .update(row)
+          .eq('id', periodId)
+          .select()
+          .single()
+      );
+    } else {
+      const user = await sessionUser();
+
+      saved = unwrap(
+        await sb
+          .from('temporary_periods')
+          .insert({
+            ...row,
+            created_by: user.id
+          })
+          .select()
+          .single()
+      );
+    }
+
+    invalidate();
+    return mapTemporaryPeriodLegacy(saved);
+  }
+
+  async function extendTemporaryPeriod(payload = {}) {
+    const periodId =
+      payload.ID_Periodo ||
+      payload.ID_Temporal ||
+      payload.periodId ||
+      payload.period_id;
+
+    const newUntil = String(
+      payload.Hasta ||
+      payload.hasta ||
+      payload.endsAt ||
+      ''
+    ).trim();
+
+    if (!periodId) {
+      throw new Error('Período no encontrado.');
+    }
+
+    const period = unwrap(
+      await sb
+        .from('temporary_periods')
+        .select('*')
+        .eq('id', periodId)
+        .single()
+    );
+
+    if (!period) {
+      throw new Error('Período no encontrado.');
+    }
+
+    if (period.state === 'Anulado') {
+      throw new Error('No se puede prorrogar un período anulado.');
+    }
+
+    if (!newUntil || newUntil <= asDate(period.ends_at)) {
+      throw new Error(
+        'La nueva fecha debe ser posterior a la fecha final actual.'
+      );
+    }
+
+    const extra = String(payload.Observaciones || '').trim();
+
+    const observations = [
+      period.observations || '',
+      extra
+    ].filter(Boolean).join(' | ');
+
+    return saveTemporaryPeriod({
+      ID_Periodo: period.id,
+      ID_Vehiculo: period.vehicle_id,
+      MatriculaTemporal: period.temporary_plate,
+      Desde: asDate(period.starts_at),
+      Hasta: newUntil,
+      Observaciones: observations,
+      Estado: 'Activo'
+    });
+  }
+
+  async function deleteTemporaryPeriod(payload = {}) {
+    const periodId =
+      payload.ID_Periodo ||
+      payload.ID_Temporal ||
+      payload.periodId ||
+      payload.period_id ||
+      payload.id;
+
+    if (!periodId) {
+      throw new Error('Período no encontrado.');
+    }
+
+    const row = unwrap(
+      await sb
+        .from('temporary_periods')
+        .update({ state: 'Anulado' })
+        .eq('id', periodId)
+        .select()
+        .single()
+    );
+
+    invalidate();
+    return mapTemporaryPeriodLegacy(row);
+  }
+
+  async function assignVehicleSlot(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    const slot = Number(payload.Slot || payload.slot);
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const data = unwrap(
+      await sb.rpc('assign_vehicle_slot', {
+        p_vehicle_id: vehicleId,
+        p_slot: slot,
+        p_confirm_replace: !!payload.confirmReplace
+      })
+    );
+
+    invalidate();
+    return data;
+  }
+
+  async function releaseVehicleSlot(payload = {}) {
+    const vehicleId =
+      payload.ID_Vehiculo ||
+      payload.vehicleId ||
+      payload.vehicle_id ||
+      payload.id;
+
+    if (!vehicleId) {
+      throw new Error('Vehículo no encontrado.');
+    }
+
+    const data = unwrap(
+      await sb.rpc('release_vehicle_slot', {
+        p_vehicle_id: vehicleId
+      })
+    );
+
+    invalidate();
+    return data;
+  }
+
+  async function bulkVehiclePreview(payload = {}) {
+    const ids = Array.isArray(payload.ids)
+      ? payload.ids.filter(Boolean)
+      : [];
+
+    if (!ids.length) {
+      throw new Error('Selecciona al menos un vehículo.');
+    }
+
+    return unwrap(
+      await sb.rpc('bulk_vehicle_preview', {
+        p_vehicle_ids: ids,
+        p_action: payload.action
+      })
+    );
+  }
+
+  async function bulkVehicleAction(payload = {}) {
+    const ids = Array.isArray(payload.ids)
+      ? payload.ids.filter(Boolean)
+      : [];
+
+    if (!ids.length) {
+      throw new Error('Selecciona al menos un vehículo.');
+    }
+
+    const data = unwrap(
+      await sb.rpc('bulk_vehicle_action', {
+        p_vehicle_ids: ids,
+        p_action: payload.action
+      })
+    );
+
+    invalidate();
+    return data;
+  }
+
   async function createRequest(payload) {
     const created = unwrap(await sb.rpc('create_parking_request', {
       p_vehicle_id: payload.ID_Vehiculo,
@@ -1527,6 +1883,31 @@
       }
       case 'saveVehicle': return saveVehicle(payload);
       case 'saveHousing': return saveHousing(payload);
+
+      case 'listTemporaryPeriods':
+        return listTemporaryPeriods(payload);
+
+      case 'saveTemporaryPeriod':
+        return saveTemporaryPeriod(payload);
+
+      case 'extendTemporaryPeriod':
+        return extendTemporaryPeriod(payload);
+
+      case 'deleteTemporaryPeriod':
+        return deleteTemporaryPeriod(payload);
+
+      case 'assignVehicleSlot':
+        return assignVehicleSlot(payload);
+
+      case 'releaseVehicleSlot':
+        return releaseVehicleSlot(payload);
+
+      case 'bulkVehiclePreview':
+        return bulkVehiclePreview(payload);
+
+      case 'bulkVehicleAction':
+        return bulkVehicleAction(payload);
+
       case 'renewQr': return renewQr(payload);
       case 'replaceVehicle': return replaceVehicle(payload);
       case 'createRequest': return createRequest(payload);
@@ -1720,19 +2101,46 @@
       case 'systemRecordClientPerformance': return { ok: true };
       case 'systemSheetsRealBenchmark': throw new Error('Google Sheets ya no es el backend de la aplicación. Las integraciones heredadas de correo y documentos se controlan por separado.');
       case 'managerData': {
-        if (payload.kind === 'users') return { rows: await listUsers(), options: await formOptions() };
-        const result = await previousServer('api', 'supabase-session', name, payload);
-        if (payload.kind === 'vehicles') {
-          const [requests, incidents] = await Promise.all([listRequests(), listIncidents()]);
-          result.requests = requests; result.incidents = incidents; result.requestStats = {};
+        const kind = payload?.kind;
+
+        if (kind === 'users') {
+          const [rows, options] = await Promise.all([
+            listUsers(),
+            formOptions()
+          ]);
+          return { rows, options };
         }
-        return result;
+
+        if (kind === 'housing') {
+          const [rows, options] = await Promise.all([
+            listHousing(),
+            formOptions()
+          ]);
+          return { rows, options };
+        }
+
+        if (kind === 'vehicles') {
+          const [rows, options, requests, incidents] = await Promise.all([
+            listVehicles(),
+            formOptions(),
+            listRequests(),
+            listIncidents()
+          ]);
+
+          return {
+            rows,
+            options,
+            requests,
+            incidents,
+            requestStats: {}
+          };
+        }
+
+        throw new Error(`managerData no soporta el tipo "${kind || ''}".`);
       }
-      default: {
-        const result = await previousServer('api', 'supabase-session', name, payload);
-        if (!['bootstrap', 'listHousing', 'listVehicles', 'formOptions'].includes(name)) invalidate();
-        return result;
-      }
+
+      default:
+        throw new Error(`Acción Supabase no soportada: "${name}".`);
     }
   }
 
@@ -1814,7 +2222,7 @@
     }
     if (fn === 'getPublicAppState') return publicAppState(true);
     if (fn === 'api') return action(args[1], args[2] || {});
-    return previousServer(fn, ...args);
+    throw new Error(`Operación de backend no soportada: "${fn}".`);
   };
 
   // Restore the stable landing views after the temporary POC adapter override.

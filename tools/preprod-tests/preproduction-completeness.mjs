@@ -7,9 +7,9 @@ const admin = read('../../supabase/functions/parking-admin/index.ts');
 const migration = read('../../supabase/migrations/20261029012300_preproduction_admin_completeness.sql');
 
 const checks = [
-  ['preproducción carga POC adapter', html.includes('supabase-poc-adapter.js')],
+  ['preproducción no carga POC adapter', !html.includes('supabase-poc-adapter.js')],
   ['preproducción carga final adapter', html.includes('supabase-final-adapter.js')],
-  ['final adapter se carga después del POC adapter', html.indexOf('supabase-final-adapter.js') > html.indexOf('supabase-poc-adapter.js')],
+  ['final adapter inicializa Supabase', adapter.includes('window.supabase.createClient') && adapter.includes('window.parkingSupabase = sb')],
   ['owner import template implementado', adapter.includes("case 'ownerImportTemplate'")],
   ['owner import preview implementado', adapter.includes("case 'previewOwnerImport'") && admin.includes("action === 'previewOwnerImport'")],
   ['owner import apply implementado', adapter.includes("case 'applyOwnerImport'") && admin.includes("action === 'applyOwnerImport'")],

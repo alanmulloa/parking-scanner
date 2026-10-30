@@ -55,7 +55,6 @@ test('PRE carga los JS críticos', async ({ page }) => {
     [
       'supabase-poc-config.js',
       'app.bundle.js',
-      'supabase-poc-adapter.js',
       'supabase-final-adapter.js',
       'app-init.js'
     ].forEach(name => {
@@ -72,7 +71,6 @@ test('PRE carga los JS críticos', async ({ page }) => {
   for (const name of [
     'supabase-poc-config.js',
     'app.bundle.js',
-    'supabase-poc-adapter.js',
     'supabase-final-adapter.js',
     'app-init.js'
   ]) {
