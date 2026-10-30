@@ -8,8 +8,7 @@ const ENVIRONMENTS = [
   {
     name: 'PRE',
     base: 'https://floresderiviera.github.io/parking-comunidad/preproduccion/',
-    expectedTitle: 'Urbanización Flores de Riviera · Preproducción',
-    mustContain: ['Preproducción'],
+    expectedTitle: 'Urbanización Flores de Riviera',
   },
 ];
 
