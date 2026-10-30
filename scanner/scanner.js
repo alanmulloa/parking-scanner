@@ -37,7 +37,7 @@ back.addEventListener('click',async()=>{done=true;await stop();if(returnUrl){win
 window.addEventListener('pagehide',()=>{stop()});
 async function publicState(){
   try{
-    const cfg=window.SUPABASE_POC_CONFIG;if(!cfg?.url||!cfg?.publishableKey)return null;
+    const cfg=window.SUPABASE_CONFIG;if(!cfg?.url||!cfg?.publishableKey)return null;
     const response=await fetch(`${cfg.url}/rest/v1/rpc/parking_public_state`,{method:'POST',headers:{apikey:cfg.publishableKey,authorization:`Bearer ${cfg.publishableKey}`,'content-type':'application/json'},body:'{}',cache:'no-store'});
     if(!response.ok)return null;return await response.json();
   }catch(_e){return null}

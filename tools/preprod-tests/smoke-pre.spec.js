@@ -53,7 +53,7 @@ test('PRE carga los JS críticos', async ({ page }) => {
     const url = response.url();
 
     [
-      'supabase-poc-config.js',
+      'supabase-config.js',
       'app.bundle.js',
       'supabase-final-adapter.js',
       'app-init.js'
@@ -69,7 +69,7 @@ test('PRE carga los JS críticos', async ({ page }) => {
   });
 
   for (const name of [
-    'supabase-poc-config.js',
+    'supabase-config.js',
     'app.bundle.js',
     'supabase-final-adapter.js',
     'app-init.js'
