@@ -1707,6 +1707,51 @@
 
   server = async function finalSupabaseServer(fn, ...args) {
     if (fn === 'loginWithPassword') return login(args[0], args[1]);
+
+    if (fn === 'requestPasswordReset') {
+      const email = String(args[0] || '').trim().toLowerCase();
+
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        throw new Error('Introduce un email válido.');
+      }
+
+      const redirectTo = location.origin + location.pathname + '?resetPassword=1';
+
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+
+      if (error) {
+        throw new Error('No se pudo solicitar el restablecimiento. Inténtalo de nuevo.');
+      }
+
+      return { ok: true };
+    }
+
+    if (fn === 'completePasswordReset') {
+      const password = String(args[0] || '');
+
+      if (
+        password.length < 8 ||
+        !/[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(password) ||
+        !/\d/.test(password)
+      ) {
+        throw new Error('La contraseña debe tener al menos 8 caracteres, una letra y un número.');
+      }
+
+      const session = await sb.auth.getSession();
+
+      if (session.error || !session.data.session) {
+        throw new Error('El enlace de recuperación no es válido o ha caducado. Solicita uno nuevo.');
+      }
+
+      const updated = await sb.auth.updateUser({ password });
+
+      if (updated.error) {
+        throw new Error(updated.error.message || 'No se pudo actualizar la contraseña.');
+      }
+
+      return { ok: true };
+    }
+
     if (fn === 'logout') {
       try {
         const boot = await appBootstrap();

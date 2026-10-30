@@ -580,7 +580,6 @@ Deno.serve(async (request) => {
     if (target.data.is_root) throw new Error('La identidad ROOT se gestiona únicamente mediante el procedimiento técnico seguro.');
 
     if (action === 'generateTemporaryPassword') {
-      // Caracteres sin O/0, I/l/1 para facilitar lectura por teléfono.
       const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
       const numbers = '23456789';
       const pool = letters + numbers;
@@ -599,11 +598,12 @@ Deno.serve(async (request) => {
         password += pool[randomIndex(pool.length)];
       }
 
-      // Mezcla final.
-      password = password
-        .split('')
-        .sort(() => crypto.getRandomValues(new Uint32Array(1))[0] % 3 - 1)
-        .join('');
+      const chars = password.split('');
+      for (let i = chars.length - 1; i > 0; i--) {
+        const j = randomIndex(i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+      }
+      password = chars.join('');
 
       if (
         password.length < 8 ||
@@ -620,6 +620,37 @@ Deno.serve(async (request) => {
 
       if (updated.error) throw updated.error;
 
+      let emailQueued = false;
+      let emailQueueId = '';
+      let emailQueueError = '';
+
+      try {
+        const queued = await legacyBridgeRequest(
+          'command.enqueue',
+          {
+            domain: 'mail',
+            command: 'sendTemporaryPassword',
+            args: {
+              email: String(target.data.email || '').trim().toLowerCase(),
+              password
+            },
+            requestedBy: actorAuditEmail
+          }
+        );
+
+        emailQueued = Boolean(queued?.id);
+        emailQueueId = String(queued?.id || '');
+      } catch (error) {
+        emailQueueError =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo encolar el correo.';
+        console.error(
+          'No se pudo encolar correo de contraseña temporal:',
+          error
+        );
+      }
+
       await service.from('audit_log').insert({
         community_id: actorCommunityId,
         actor_user_id: actorId,
@@ -629,7 +660,9 @@ Deno.serve(async (request) => {
         entity: 'USUARIOS',
         entity_id: targetId,
         observations:
-          'Administración generó una contraseña temporal. El valor no fue almacenado.',
+          emailQueued
+            ? 'Administración generó una contraseña temporal y solicitó su envío por correo. El valor no fue almacenado.'
+            : 'Administración generó una contraseña temporal. El correo no pudo quedar en cola y el valor no fue almacenado.',
         source: 'APPLICATION'
       });
 
@@ -638,7 +671,10 @@ Deno.serve(async (request) => {
         {
           ok: true,
           temporaryPassword: password,
-          email: target.data.email
+          email: target.data.email,
+          emailQueued,
+          emailQueueId,
+          emailQueueError
         },
         origin
       );
