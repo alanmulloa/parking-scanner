@@ -17,7 +17,7 @@ const checks = [
   ['consistency fix implementado', adapter.includes("case 'consistencyFix'") && migration.includes('parking_consistency_fix')],
   ['upload logo implementado', adapter.includes("case 'uploadLogo'") && adapter.includes("from('parking-public')")],
   ['bucket público controlado por RLS', migration.includes("'parking-public'") && migration.includes('parking_public_insert_admin')],
-  ['producción no carga adaptador final', !read('../../index.html').includes('supabase-final-adapter.js')],
+  ['producción carga adaptador final', read('../../index.html').includes('supabase-final-adapter.js')],
   ['service role no aparece en frontend final', !adapter.includes('SUPABASE_SERVICE_ROLE_KEY')],
   ['ROOT no se crea como membership normal desde owner import', !admin.includes("roles: ['ROOT']")]
 ];

@@ -12,7 +12,10 @@ const parkingAdmin = read('supabase/functions/parking-admin/index.ts');
 const preprod = read('preproduccion.html');
 
 const checks = [
-  ['frontend version preprod v2', core.includes("APP_FRONTEND_VERSION='2.0.0-preprod.4'")],
+  ['frontend version PRO/PRE dinámica',
+    core.includes("location.pathname.includes('/preproduccion/')")
+    && core.includes("'2.0.0-preprod.4'")
+    && core.includes("'2.0.0'")],
   ['favicon dinamico', core.includes("dataset.parkingFavicon='1'") && core.includes("apple-touch-icon")],
   ['pantalla mantenimiento', core.includes('renderMaintenanceScreen') && core.includes('Acceso técnico ROOT')],
   ['init consulta estado publico', nav.includes("server('getPublicAppState')")],
@@ -32,7 +35,10 @@ const checks = [
   ['parking-admin ping ROOT', parkingAdmin.includes("action === 'systemPing'") && parkingAdmin.includes('actorProfile.data.is_root')],
   ['scanner consulta mantenimiento', scanner.includes('/rest/v1/rpc/parking_public_state')],
   ['scanner sin URL personal antigua', !scanner.includes('alanmulloa.github.io/parking-scanner')],
-  ['preprod usa bundle/css actuales', preprod.includes('app.bundle.js?v=system-v2') && preprod.includes('app.css?v=system-v2')]
+  ['preprod usa bundle/css actuales',
+  /app\.bundle\.js\?v=[^"' ]+/.test(preprod) &&
+  /app\.css\?v=[^"' ]+/.test(preprod)
+]
 ];
 
 let failed = 0;

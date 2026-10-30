@@ -1329,3 +1329,234 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     grid-template-columns:1fr;
   }
 }
+
+/* Auditoría: todas las columnas visibles y scroll controlado */
+.audit-tablebox{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto!important;
+  overflow-y:visible;
+  -webkit-overflow-scrolling:touch;
+}
+
+.audit-table{
+  width:100%;
+  min-width:1180px;
+  table-layout:auto;
+}
+
+.audit-table th:nth-child(1),
+.audit-table td:nth-child(1){
+  min-width:145px;
+}
+
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2){
+  min-width:190px;
+}
+
+.audit-table th:nth-child(3),
+.audit-table td:nth-child(3){
+  min-width:135px;
+}
+
+.audit-table th:nth-child(4),
+.audit-table td:nth-child(4){
+  min-width:190px;
+}
+
+.audit-table th:nth-child(5),
+.audit-table td:nth-child(5){
+  min-width:130px;
+}
+
+.audit-table th:nth-child(6),
+.audit-table td:nth-child(6),
+.audit-table th:nth-child(7),
+.audit-table td:nth-child(7){
+  min-width:190px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+@media(max-width:720px){
+  .audit-tablebox{
+    overflow:visible!important;
+    border:0;
+    background:transparent;
+  }
+
+  .audit-table{
+    min-width:0!important;
+    width:100%!important;
+  }
+}
+
+/* Auditoría desktop: compactar columnas largas */
+@media(min-width:721px){
+  .audit-table th:nth-child(2),
+  .audit-table td:nth-child(2){
+    width:160px;
+    min-width:160px;
+    max-width:160px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+  }
+
+  .audit-table th:nth-child(4),
+  .audit-table td:nth-child(4){
+    width:180px;
+    min-width:180px;
+    max-width:180px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+  }
+}
+
+/* Auditoría desktop: compactar Usuario y Entidad */
+@media(min-width:721px){
+  .audit-table th:nth-child(2),
+  .audit-table td:nth-child(2){
+    width:160px;
+    min-width:160px;
+    max-width:160px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+  }
+
+  .audit-table th:nth-child(4),
+  .audit-table td:nth-child(4){
+    width:180px;
+    min-width:180px;
+    max-width:180px;
+    white-space:normal!important;
+    overflow-wrap:anywhere;
+  }
+}
+
+/* Auditoría · paginación */
+.audit-pager{
+  margin-top:.75rem;
+  padding:.65rem .2rem;
+}
+
+.audit-page-size-label{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  color:var(--muted);
+  font-size:.82rem;
+  font-weight:700;
+}
+
+.audit-page-size-label select{
+  border:1px solid #cbd8da;
+  background:#fff;
+  border-radius:9px;
+  padding:.5rem .7rem;
+  color:var(--ink);
+  font:inherit;
+}
+
+.audit-pager button:disabled{
+  cursor:default;
+  opacity:.45;
+}
+
+@media(max-width:720px){
+  .audit-pager{
+    align-items:stretch;
+  }
+
+  .audit-pager .actions{
+    width:100%;
+  }
+
+  .audit-pager .actions button{
+    flex:1 1 120px;
+  }
+}
+
+/* Filtros móviles · Incidencias / Solicitudes */
+.mobile-filter-toggle-wrap{
+  display:none;
+}
+
+@media(max-width:720px){
+  body:has(#mobile-nav) .mobile-filter-toggle-wrap{
+    display:flex;
+    margin:0 0 .65rem;
+  }
+
+  body:has(#mobile-nav) .mobile-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+}
+
+/* Vehículos ADMIN · controles móviles */
+.bulk-vehicle-bar{
+  margin-bottom:.8rem;
+}
+
+.bulk-vehicle-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.7rem;
+}
+
+.mobile-bulk-toggle{
+  display:none;
+}
+
+@media(max-width:720px){
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .vehicle-filterbar.mobile-filter-collapsed{
+    display:none!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) #vehicle-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-bar{
+    padding:.8rem;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-bulk-toggle{
+    display:inline-flex;
+    min-height:40px;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:.45rem;
+    margin-top:.7rem!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions.mobile-bulk-collapsed{
+    display:none!important;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .bulk-vehicle-actions button{
+    width:100%;
+    min-height:44px;
+  }
+}
+
+/* ADMIN · filtros móviles comunes */
+@media(max-width:720px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-filter-toggle-wrap{
+    display:flex;
+    width:100%;
+    margin:0 0 .65rem;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+}
