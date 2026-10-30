@@ -83,6 +83,13 @@ jobs:
           echo "=== PREPRODUCCION ==="
           grep -E 'title>|app\.bundle' _site/preproduccion/index.html
 
+          echo "=== ARTEFACTO FINAL ==="
+          find _site -maxdepth 3 -type f | sort | head -200
+
+          echo "=== PRE INDEX ==="
+          ls -la _site/preproduccion/
+          test -f _site/preproduccion/index.html
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
