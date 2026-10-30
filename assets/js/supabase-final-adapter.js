@@ -1236,6 +1236,10 @@
     return result;
   }
 
+  let systemStatusCache = null;
+  let systemStatusCachedAt = 0;
+  const SYSTEM_STATUS_TTL_MS = 45000;
+
   async function action(name, payload = {}) {
     if (name !== 'bootstrap' && !name.startsWith('system')) {
       const publicState = await publicAppState();
@@ -1333,12 +1337,17 @@
         return true;
       }
       case 'systemStatus': {
+        const force = !!payload.force;
+        if (!force && systemStatusCache && Date.now() - systemStatusCachedAt < SYSTEM_STATUS_TTL_MS) {
+          return { ...systemStatusCache, cached: true };
+        }
+
         const overallStarted = performance.now();
         const [database, auth, adminEdge, legacyEdge] = await Promise.all([
           timed('Base de datos', async () => unwrap(await sb.rpc('root_system_status'))),
           timed('Auth / RLS', async () => {
             const user = await sessionUser();
-            const boot = await appBootstrap(true);
+            const boot = await appBootstrap();
             if (!boot.user.IsRoot || !user?.id) throw new Error('La sesión ROOT no pudo verificarse.');
             return boot;
           }),
@@ -1354,7 +1363,7 @@
           { label: 'Edge · legacy-auth-migrate', ok: legacyEdge.ok, detail: legacyEdge.ok ? 'Endpoint disponible' : String(legacyEdge.error?.message || 'No disponible'), ms: legacyEdge.ms, level: legacyEdge.level }
         ];
         const totalMs = Math.max(1, Math.round(performance.now() - overallStarted));
-        return {
+        const result = {
           ok: services.every((item) => item.ok),
           backendVersion: status.backendVersion || 'Supabase migration 129',
           schemaVersion: status.schemaVersion || '20261029012900',
@@ -1369,6 +1378,10 @@
           maintenance: status.maintenance || { enabled: false, message: '' },
           integrations: status.integrations || {}
         };
+
+        systemStatusCache = result;
+        systemStatusCachedAt = Date.now();
+        return result;
       }
       case 'systemSetMaintenance': {
         const result = unwrap(await sb.rpc('parking_set_maintenance', {
@@ -1378,6 +1391,8 @@
         publicStateCache = result;
         publicStateCachedAt = Date.now();
         invalidate();
+        systemStatusCache = null;
+        systemStatusCachedAt = 0;
         return result;
       }
       case 'systemLegacyBridgeStatus': return parkingAdmin('legacyBridgeStatus', {});
