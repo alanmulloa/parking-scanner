@@ -11,13 +11,14 @@
     throw new Error('Falta configurar la Publishable Key de Supabase.');
   }
 
-  if (!window.supabase?.createClient) {
-    throw new Error('No se pudo cargar supabase-js.');
-  }
+  let sb = window.parkingSupabase;
 
-  const sb =
-    window.parkingSupabase ||
-    window.supabase.createClient(
+  if (!sb) {
+    if (!window.supabase?.createClient) {
+      throw new Error('No se pudo cargar supabase-js.');
+    }
+
+    sb = window.supabase.createClient(
       cfg.url,
       cfg.publishableKey,
       {
@@ -29,7 +30,8 @@
       }
     );
 
-  window.parkingSupabase = sb;
+    window.parkingSupabase = sb;
+  }
   const CACHE_MS = 15000;
   const cache = new Map();
   let bootstrapCache = null;
