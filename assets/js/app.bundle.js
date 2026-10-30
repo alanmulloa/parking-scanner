@@ -955,6 +955,161 @@ async function configurationView(initialTab='identity'){
       const renderBridgeService=(ok,detail,ms)=>{const box=$('#system-bridge-service');if(!box)return;box.className=`system-service ${ok?'ok':'bad'}`;box.innerHTML=`<span class="system-dot"></span><div><b>Bridge · Apps Script</b><small>${esc(detail||'')}</small>${Number.isFinite(ms)?`<span class="perf-badge ${ms>1500?'warn':'good'}">${Math.round(ms)} ms</span>`:''}</div>`};
       const renderBridgeIntegrations=(integrations)=>{const host=$('#system-integrations');if(!host)return;host.innerHTML=`${integrationCard('Correo',integrations?.mail,'mail')}${integrationCard('Google Drive / Docs',integrations?.documents,'documents')}`;bindLegacyActions(integrations||{})};
       async function refreshBridgeStatus(){const started=performance.now(),service=$('#system-bridge-service');if(service){service.className='system-service';service.innerHTML='<span class="system-dot"></span><div><b>Bridge · Apps Script</b><small>Comprobando en segundo plano…</small></div>'}try{const out=await call('systemLegacyBridgeStatus'),ms=Math.max(1,Math.round(performance.now()-started)),integrations=out?.bridge||{};state.cache.legacyBridgeStatus={bridge:integrations,ms,checkedAt:new Date().toISOString()};renderBridgeService(true,'Bridge firmado disponible',ms);renderBridgeIntegrations(integrations)}catch(e){const ms=Math.max(1,Math.round(performance.now()-started)),message=e.message||String(e);state.cache.legacyBridgeStatus={bridge:{},ms,checkedAt:new Date().toISOString(),error:message};renderBridgeService(false,message,ms);renderBridgeIntegrations({})}finally{renderSessionCalls()}}
+
+
+      async function refreshBackupStatus(){
+        const box=$('#system-backup-card');
+        if(!box)return;
+
+        box.innerHTML=`
+          <div class="system-loading">
+            <div class="spinner"></div>
+            <span>Consultando backup…</span>
+          </div>
+        `;
+
+        try{
+          const out=await call('systemBackupStatus');
+          const backup=out?.backup?.data||out?.backup||{};
+          const automatic=backup.automatic||{};
+          const last=backup.last||{};
+
+          const installed=!!automatic.installed;
+          const lastOk=last.status==='OK';
+
+          box.innerHTML=`
+            <div class="system-status-head">
+              <div>
+                <h2>Backup Supabase</h2>
+                <p class="muted">
+                  Copia automática de la base de datos en Google Drive.
+                </p>
+              </div>
+
+              <span class="system-pill ${lastOk?'ok':'legacy'}">
+                ${lastOk?'BACKUP OK':'SIN BACKUP'}
+              </span>
+            </div>
+
+            <div class="legacy-integration-status">
+              <span>
+                <b>Último backup</b>
+                ${last.at?esc(shortDateTime(last.at)):'—'}
+              </span>
+
+              <span>
+                <b>Automático</b>
+                ${installed?'ACTIVO · 03:00':'NO INSTALADO'}
+              </span>
+
+              <span>
+                <b>Retención</b>
+                ${Number(backup.retentionDays||30)} días
+              </span>
+
+              <span>
+                <b>Archivo</b>
+                ${last.fileName?esc(last.fileName):'—'}
+              </span>
+            </div>
+
+            <div class="legacy-integration-actions">
+              <button
+                type="button"
+                id="backup-run-now"
+              >
+                Ejecutar backup ahora
+              </button>
+
+              ${
+                last.fileUrl
+                  ? `<a
+                       class="button secondary"
+                       href="${esc(last.fileUrl)}"
+                       target="_blank"
+                       rel="noopener"
+                     >
+                       Abrir último backup
+                     </a>`
+                  : ''
+              }
+            </div>
+
+            <div
+              id="backup-result"
+              class="system-legacy-note"
+            ></div>
+          `;
+
+          const runButton=$('#backup-run-now');
+
+          if(runButton){
+            runButton.onclick=async()=>{
+              if(!confirm(
+                '¿Ejecutar ahora una copia completa de Supabase en Google Drive?'
+              ))return;
+
+              const result=$('#backup-result');
+
+              busy(runButton,true);
+
+              if(result){
+                result.textContent='Ejecutando backup…';
+              }
+
+              try{
+                const response=await call('systemBackupRunNow');
+
+                const completed=
+                  response?.backup?.data||
+                  response?.backup||
+                  {};
+
+                if(result){
+                  result.innerHTML=`
+                    <div class="message">
+                      <b>Completado</b>
+                      ${
+                        completed.fileName
+                          ? ` · ${esc(completed.fileName)}`
+                          : ''
+                      }
+                    </div>
+                  `;
+                }
+
+                toast('Backup completado');
+
+                await refreshBackupStatus();
+
+              }catch(e){
+                const message=e.message||String(e);
+
+                if(result){
+                  result.innerHTML=`
+                    <div class="message bad">
+                      ${esc(message)}
+                    </div>
+                  `;
+                }
+
+                toast(message,true);
+
+              }finally{
+                busy(runButton,false);
+              }
+            };
+          }
+
+        }catch(e){
+          box.innerHTML=`
+            <div class="message bad">
+              No se pudo consultar el estado del backup:
+              ${esc(e.message||String(e))}
+            </div>
+          `;
+        }
+      }
       const legacyArgs=(domain,command,integrations)=>{
         if(domain==='mail'&&command==='testWelcome'){const email=prompt('Email donde querés recibir la prueba:','');if(email===null)return null;return {email:email.trim()}}
         if(domain==='mail'&&command==='setNoReply'){const enabled=!(integrations.mail?.sender?.realNoReply);if(!confirm(`${enabled?'Activar':'Desactivar'} no-reply real? Solo debe estar activo si la cuenta remitente pertenece realmente a Google Workspace.`))return null;return {enabled}}
@@ -980,12 +1135,22 @@ async function configurationView(initialTab='identity'){
               ${integrationCard('Correo',integrations.mail,'mail')}
               ${integrationCard('Google Drive / Docs',integrations.documents,'documents')}
             </div>
+            <section
+              id="system-backup-card"
+              class="card legacy-integration-card"
+            >
+              <div class="system-loading">
+                <div class="spinner"></div>
+                <span>Consultando backup…</span>
+              </div>
+            </section>
             <section class="card consistency-card"><div class="system-status-head"><div><h2>Consistencia</h2><p class="muted">Comprueba slots, QR, temporales y relaciones operativas protegidas por Supabase.</p></div><button type="button" class="secondary" id="system-consistency">Ejecutar diagnóstico</button></div><div id="consistency-result" class="diagnostic-empty"><span>Sin comprobación ejecutada.</span></div></section>
             <section class="card performance-card"><div class="system-status-head"><div><h2>Diagnóstico</h2><p class="muted">Pruebas de lectura sobre Supabase y las Edge Functions. No utiliza Google Sheets como backend.</p></div></div><div class="performance-actions"><button type="button" id="diag-quick">Prueba rápida</button><button type="button" class="secondary" id="diag-full">Diagnóstico completo</button><button type="button" class="secondary" id="diag-roundtrip">Rendimiento</button><button type="button" class="secondary" id="diag-concurrency">Concurrencia</button></div><div id="diag-result" class="diagnostic-empty"><b>Sin prueba ejecutada</b><span>Selecciona una comprobación.</span></div><div id="diag-calls" class="diagnostic-empty"><b>Llamadas de esta sesión</b><span>Resumen de llamadas realizadas por este navegador.</span></div></section>`;
           $('#system-refresh').onclick=()=>loadStatus(true);
           $('#maintenance-toggle').onclick=async()=>{const btn=$('#maintenance-toggle'),enabled=!maintenance.enabled,message=$('#maintenance-message').value.trim();if(enabled&&!confirm('¿Activar modo mantenimiento? Los usuarios normales y el escáner quedarán bloqueados hasta que ROOT lo desactive.'))return;busy(btn);try{await call('systemSetMaintenance',{enabled,message});toast(enabled?'Modo mantenimiento activado.':'Modo mantenimiento desactivado.');await loadStatus(true)}catch(e){toast(e.message||String(e),true);busy(btn,false)}};
           bindLegacyActions(integrations);
           refreshBridgeStatus();
+          refreshBackupStatus();
           $('#system-consistency').onclick=runConsistency;
           $('#diag-quick').onclick=()=>runDiagnostic('quick');$('#diag-full').onclick=()=>runDiagnostic('full');$('#diag-roundtrip').onclick=runRoundTrip;$('#diag-concurrency').onclick=runConcurrency;
           renderSessionCalls();

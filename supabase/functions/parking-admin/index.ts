@@ -232,6 +232,49 @@ function buildOwnerPreview(importRows: AnyRow[], housing: AnyRow[], users: AnyRo
   };
 }
 
+
+const BACKUP_TABLES = [
+  'communities',
+  'profiles',
+  'community_members',
+  'community_settings',
+  'dwellings',
+  'vehicles',
+  'temporary_periods',
+  'requests',
+  'incidents',
+  'incident_followups',
+  'audit_log',
+  'qr_controls',
+  'plate_controls'
+] as const;
+
+async function buildBackupExport(adminClient: any) {
+  const exported: Record<string, unknown[]> = {};
+  const counts: Record<string, number> = {};
+
+  for (const table of BACKUP_TABLES) {
+    const { data, error } = await adminClient
+      .from(table)
+      .select('*');
+
+    if (error) {
+      throw new Error(`Backup ${table}: ${error.message}`);
+    }
+
+    exported[table] = data || [];
+    counts[table] = (data || []).length;
+  }
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    version: 'backup-v1',
+    tables: exported,
+    counts
+  };
+}
+
 Deno.serve(async (request) => {
   const origin = request.headers.get('origin');
   if (request.method === 'OPTIONS') return optionsResponse(origin);
@@ -278,10 +321,78 @@ Deno.serve(async (request) => {
   const payload = payloadObject(input.payload);
 
   try {
+
+    if (action === 'backupExport') {
+      if (!actorProfile.data?.is_root) {
+        return jsonResponse(
+          403,
+          { error: 'Acceso exclusivo ROOT.' },
+          origin
+        );
+      }
+
+      const backup = await buildBackupExport(service);
+
+      return jsonResponse(
+        200,
+        backup,
+        origin
+      );
+    }
+
+
     if (action === 'systemPing') {
       if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
       return jsonResponse(200, { ok: true, checkedAt: new Date().toISOString(), service: 'parking-admin' }, origin);
     }
+    if (action === 'legacyBackupStatus') {
+      if (!actorProfile.data.is_root) {
+        return jsonResponse(
+          403,
+          { error: 'Acceso exclusivo ROOT.' },
+          origin
+        );
+      }
+
+      const backup = await legacyBridgeRequest(
+        'backup.status',
+        {}
+      );
+
+      return jsonResponse(
+        200,
+        {
+          ok: true,
+          backup
+        },
+        origin
+      );
+    }
+
+    if (action === 'legacyBackupRunNow') {
+      if (!actorProfile.data.is_root) {
+        return jsonResponse(
+          403,
+          { error: 'Acceso exclusivo ROOT.' },
+          origin
+        );
+      }
+
+      const backup = await legacyBridgeRequest(
+        'backup.runNow',
+        {}
+      );
+
+      return jsonResponse(
+        200,
+        {
+          ok: true,
+          backup
+        },
+        origin
+      );
+    }
+
     if (action === 'legacyBridgeStatus') {
       if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
       const bridge = await legacyBridgeRequest('status', {});

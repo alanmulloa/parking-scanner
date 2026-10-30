@@ -63,6 +63,8 @@ function parkingBridgeHandlePost_(e){
     const body=parkingBridgeParseJson_(e&&e.postData&&e.postData.contents,{}),verified=parkingBridgeVerifyRequest_(body),action=verified.action,payload=verified.payload||{};
     if(action==='ping')return parkingBridgeJson_(200,{ok:true,bridgeVersion:PARKING_BRIDGE_VERSION,checkedAt:parkingBridgeNow_()});
     if(action==='status')return parkingBridgeJson_(200,{ok:true,bridgeVersion:PARKING_BRIDGE_VERSION,checkedAt:parkingBridgeNow_(),data:parkingBridgeStatus_()});
+    if(action==='backup.status')return parkingBridgeJson_(200,{ok:true,data:getSupabaseBackupOperationalStatus()});
+    if(action==='backup.runNow')return parkingBridgeJson_(200,{ok:true,data:runSupabaseManualBackupBridge()});
     if(action==='command.enqueue')return parkingBridgeJson_(200,{ok:true,data:parkingBridgeEnqueue_(payload)});
     if(action==='command.status')return parkingBridgeJson_(200,{ok:true,data:parkingBridgeCommandStatus_(parkingBridgeText_(payload.id))});
     throw new Error('Acción bridge no soportada.');

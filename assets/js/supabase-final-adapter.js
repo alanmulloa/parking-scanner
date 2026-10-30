@@ -1398,6 +1398,12 @@
       case 'systemLegacyBridgeStatus': return parkingAdmin('legacyBridgeStatus', {});
       case 'systemLegacyBridgeAction': return parkingAdmin('legacyBridgeCommand', { domain: payload.domain, command: payload.command, args: payload.args || {} });
       case 'systemLegacyBridgeCommandStatus': return parkingAdmin('legacyBridgeCommandStatus', { id: payload.id });
+
+      case 'systemBackupStatus':
+        return parkingAdmin('legacyBackupStatus', {});
+
+      case 'systemBackupRunNow':
+        return parkingAdmin('legacyBackupRunNow', {});
       case 'systemRoundTripPing': {
         const ping = await timed('Ping', async () => unwrap(await sb.rpc('parking_system_ping')));
         if (!ping.ok) throw ping.error;
