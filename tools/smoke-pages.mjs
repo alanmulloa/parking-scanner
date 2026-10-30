@@ -99,6 +99,14 @@ for (const env of ENVIRONMENTS) {
       /src=["'](\.\/assets\/js\/supabase-poc-adapter\.js[^"']*)["']/
     );
 
+    if (env.name === 'PRE') {
+      if (pocAdapter) {
+        fail('PRE no debería cargar POC adapter');
+      } else {
+        ok('PRE no carga POC adapter');
+      }
+    }
+
     const finalAdapter = extractAsset(
       page.text,
       /src=["'](\.\/assets\/js\/supabase-final-adapter\.js[^"']*)["']/
@@ -112,7 +120,6 @@ for (const env of ENVIRONMENTS) {
     const assets = [
       ['CSS', css],
       ['bundle', bundle],
-      ['POC adapter', pocAdapter],
       ['final adapter', finalAdapter],
       ['app-init', appInit],
     ];
