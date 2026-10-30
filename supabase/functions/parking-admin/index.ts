@@ -402,7 +402,7 @@ Deno.serve(async (request) => {
       if (!actorProfile.data.is_root) return jsonResponse(403, { error: 'Acceso exclusivo ROOT.' }, origin);
       const domain = String(payload.domain || '');
       const command = String(payload.command || '');
-      if (!['mail', 'documents'].includes(domain) || !command) throw new Error('Comando bridge no válido.');
+      if (domain !== 'documents' || !command) throw new Error('Solo se permiten comandos documentales en el bridge.');
       const queued = await legacyBridgeRequest('command.enqueue', { domain, command, args: payloadObject(payload.args), requestedBy: actorAuditEmail });
       await service.from('audit_log').insert({
         community_id: actorCommunityId,
@@ -410,7 +410,7 @@ Deno.serve(async (request) => {
         user_id: actorId,
         actor_email: actorAuditEmail,
         action: 'LEGACY_BRIDGE_COMMAND',
-        entity: domain === 'mail' ? 'CORREO' : 'DOCUMENTOS',
+        entity: 'DOCUMENTOS',
         entity_id: String(queued?.id || ''),
         observations: `Comando heredado solicitado desde Sistema: ${domain}.${command}`,
         source: 'APPLICATION'
