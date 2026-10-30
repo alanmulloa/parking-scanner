@@ -13,7 +13,10 @@ async function audit(){
   try{
     const rows=await call('listAudit'),entities=[...new Set(rows.map(r=>r.Entidad).filter(Boolean))].sort(),actions=[...new Set(rows.map(r=>r.Accion).filter(Boolean))].sort(),users=[...new Map(rows.filter(r=>r.Usuario).map(r=>[r.Usuario,{email:r.Usuario,name:r.UsuarioNombre||r.Usuario}])).values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'es'));
     $('#main').innerHTML=`<div class="head"><h1>Auditoría</h1>${exportButtonsHtml('audit-export')}</div>
-      <div class="filterbar">
+      <div class="mobile-filter-toggle-wrap">
+          <button type="button" class="secondary mobile-filter-toggle" id="audit-filter-toggle">Filtros</button>
+        </div>
+        <div class="filterbar admin-record-filterbar admin-audit-filters">
         <div class="field"><label>Período</label><select id="audit-period"><option value="30" selected>Últimos 30 días</option><option value="today">Hoy</option><option value="7">Últimos 7 días</option><option value="month">Mes actual</option><option value="prevmonth">Mes anterior</option><option value="all">Todo</option><option value="custom">Personalizado</option></select></div>
         <div class="field"><label>Desde</label><input id="audit-from" type="date"></div>
         <div class="field"><label>Hasta</label><input id="audit-to" type="date"></div>
@@ -38,7 +41,17 @@ async function audit(){
           <button type="button" class="secondary" id="audit-next">Siguiente →</button>
         </div>
       </div>`;
-    const period=$('#audit-period'),from=$('#audit-from'),to=$('#audit-to');
+    const auditFilterToggle=$('#audit-filter-toggle');
+      const auditFilterBar=document.querySelector('.admin-audit-filters');
+      if(auditFilterToggle&&auditFilterBar){
+        auditFilterBar.classList.add('mobile-filter-collapsed');
+        auditFilterToggle.onclick=()=>{
+          const collapsed=auditFilterBar.classList.toggle('mobile-filter-collapsed');
+          auditFilterToggle.textContent=collapsed?'Filtros':'Ocultar filtros';
+        };
+      }
+
+      const period=$('#audit-period'),from=$('#audit-from'),to=$('#audit-to');
     const applyPreset=()=>{if(period.value==='custom')return;const [a,b]=auditPresetRange(period.value);from.value=a;to.value=b;render()};
     const filteredRows=()=>{const q=$('#audit-search').value.trim().toLowerCase(),entity=$('#audit-entity').value,action=$('#audit-action').value,user=$('#audit-user').value,a=from.value,b=to.value;return rows.filter(r=>{const d=auditDateOnly(r.FechaHora);return (!a||d>=a)&&(!b||d<=b)&&(!entity||r.Entidad===entity)&&(!action||r.Accion===action)&&(!user||r.Usuario===user)&&Object.values(r).join(' ').toLowerCase().includes(q)})};
     let auditSortDir='desc',auditPage=1,auditPageSize=25;const render=()=>{const filtered=[...filteredRows()].sort((a,b)=>{const av=new Date(a.FechaHora||0).getTime(),bv=new Date(b.FechaHora||0).getTime();return auditSortDir==='asc'?av-bv:bv-av});const totalPages=Math.max(1,Math.ceil(filtered.length/auditPageSize));if(auditPage>totalPages)auditPage=totalPages;if(auditPage<1)auditPage=1;const start=(auditPage-1)*auditPageSize,pageRows=filtered.slice(start,start+auditPageSize);$('#audit-count').textContent=`Mostrando ${filtered.length} de ${rows.length}`;$('#audit-body').innerHTML=pageRows.map(r=>`<tr><td data-label="Fecha">${esc(shortDateTime(r.FechaHora))}</td><td data-label="Usuario"><b>${esc(r.UsuarioNombre||r.Usuario)}</b>${r.UsuarioNombre&&r.Usuario?`<span class="subtle">${esc(r.Usuario)}</span>`:''}</td><td data-label="Acción">${esc(r.Accion)}</td><td data-label="Entidad">${esc(r.Entidad)} · ${esc(r.ID_Entidad)}</td><td data-label="Campo">${esc(r.Campo)}</td><td data-label="Antes">${auditValue(r.ValorAnterior,r.ValorAnteriorNombre)}</td><td data-label="Después">${auditValue(r.ValorNuevo,r.ValorNuevoNombre)}</td></tr>`).join('');$('#audit-empty').classList.toggle('hide',!!filtered.length);const info=$('#audit-page-info'),prev=$('#audit-prev'),next=$('#audit-next');if(info)info.textContent=filtered.length?`Página ${auditPage} de ${totalPages} · ${start+1}-${Math.min(start+auditPageSize,filtered.length)} de ${filtered.length}`:'0 registros';if(prev)prev.disabled=auditPage<=1;if(next)next.disabled=auditPage>=totalPages};
