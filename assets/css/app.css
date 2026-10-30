@@ -1546,3 +1546,17 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     min-height:44px;
   }
 }
+
+/* ADMIN · filtros móviles comunes */
+@media(max-width:720px){
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-filter-toggle-wrap{
+    display:flex;
+    width:100%;
+    margin:0 0 .65rem;
+  }
+
+  body:has(#mobile-nav[data-role="ADMIN"]) .mobile-filter-toggle{
+    width:100%;
+    min-height:44px;
+  }
+}
