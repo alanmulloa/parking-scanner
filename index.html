@@ -1,2 +1,32 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0; url=./scanner/"><title>Parking Comunidad - Escáner</title></head><body><p>Abriendo escáner… <a href="./scanner/">Continuar</a></p></body></html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Urbanización Flores de Riviera</title>
+  <link rel="stylesheet" href="./assets/css/app.css?v=ui-fix-20261030-1">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    window.INITIAL_PUBLIC_SETTINGS = {
+      NombreOficial: 'Urbanización Flores de Riviera',
+      NombreCorto: 'Parking Comunidad',
+      Descripcion: 'Gestión de acceso y parking de la comunidad'
+    };
+    window.INITIAL_TOKEN = new URLSearchParams(location.search).get('q') || '';
+    window.WEB_APP_URL = location.origin + location.pathname;
+    window.EXTERNAL_SCANNER_URL = new URL('./scanner/', location.href).href;
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0"></script>
+  <script src="./assets/js/supabase-poc-config.js"></script>
+  <script src="./assets/js/app.bundle.js?v=ui-fix-20261030-3"></script>
+  <!-- Base Supabase ya validada: viviendas, vehículos, slots, QR y temporales. -->
+  <script src="./assets/js/supabase-poc-adapter.js?v=system-v2-bridge-speed"></script>
+  <!-- Capa final: JIT, bootstrap, control, incidencias, solicitudes, auditoría y ROOT. -->
+  <script src="./assets/js/supabase-final-adapter.js?v=system-v2-bridge-speed"></script>
+  <script src="./assets/js/app-init.js?v=system-v2-bridge-speed"></script>
+</body>
+</html>
