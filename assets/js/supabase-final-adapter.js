@@ -1072,6 +1072,23 @@
     }
   }
 
+  async function saveHousing(payload) {
+    const row = unwrap(
+      await sb.rpc('save_parking_housing', {
+        p_payload: payload || {}
+      })
+    );
+
+    invalidate();
+
+    const profiles = await profilesById();
+
+    return mapHousing(
+      row,
+      profiles.get(row.responsible_user_id)
+    );
+  }
+
   async function createRequest(payload) {
     const created = unwrap(await sb.rpc('create_parking_request', {
       p_vehicle_id: payload.ID_Vehiculo,
@@ -1509,6 +1526,7 @@
         invalidate(); return data;
       }
       case 'saveVehicle': return saveVehicle(payload);
+      case 'saveHousing': return saveHousing(payload);
       case 'renewQr': return renewQr(payload);
       case 'replaceVehicle': return replaceVehicle(payload);
       case 'createRequest': return createRequest(payload);
