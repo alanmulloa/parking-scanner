@@ -1560,3 +1560,12 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     min-height:44px;
   }
 }
+
+/* Sistema - integración única a ancho completo */
+.system-integrations-grid{
+  grid-template-columns:1fr;
+}
+
+.system-integrations-grid > .legacy-integration-card{
+  width:100%;
+}

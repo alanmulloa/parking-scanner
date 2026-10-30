@@ -1329,3 +1329,12 @@ button.vehicle-alert-chip:hover{filter:brightness(.97)}
     grid-template-columns:1fr;
   }
 }
+
+/* Sistema - integración única a ancho completo */
+.system-integrations-grid{
+  grid-template-columns:1fr;
+}
+
+.system-integrations-grid > .legacy-integration-card{
+  width:100%;
+}
