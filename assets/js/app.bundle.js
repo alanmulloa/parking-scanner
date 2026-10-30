@@ -339,7 +339,7 @@ function preferredUiRole(roles=userRoles()){return roles.includes('ADMIN')?'ADMI
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return preferredUiRole(roles)}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','config','profile'];const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){
+async function init(){if(new URLSearchParams(location.search).get('resetPassword')==='1')return recoveryPassword();
   applyParkingSettings(appSettings());
   let publicState={};
   try{
@@ -361,11 +361,110 @@ async function init(){
     else go(restoredStartView());
   }catch(e){login(e.message)}
 }
+
+function forgotPassword(){
+  const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
+  $('#app').innerHTML=`<main class="login"><section class="card">
+    <div class="login-brand">
+      ${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}
+      <div class="mark" style="${logo?'display:none':''}">P</div>
+    </div>
+    <h1>Restablecer contraseña</h1>
+    <p class="muted login-description">${esc(description)}</p>
+    <p class="muted">Introduce el email asociado a tu cuenta.</p>
+    <form id="forgot-form">
+      <div class="field" style="text-align:left">
+        <label>Email</label>
+        <input id="forgot-email" type="email" required autocomplete="email">
+      </div>
+      <button style="margin-top:1rem">Enviar enlace</button>
+    </form>
+    <button type="button" class="secondary" id="forgot-back" style="width:100%;margin-top:.7rem">
+      Volver al inicio de sesión
+    </button>
+    <div id="forgot-result"></div>
+  </section></main>`;
+
+  $('#forgot-back').onclick=()=>login();
+
+  $('#forgot-form').onsubmit=async e=>{
+    e.preventDefault();
+    const b=e.submitter;
+    busy(b);
+    try{
+      await server('requestPasswordReset',$('#forgot-email').value);
+      $('#forgot-result').innerHTML=`<div class="message" style="margin-top:1rem">
+        Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.
+      </div>`;
+      e.target.reset();
+    }catch(x){
+      toast(x.message||'No se pudo solicitar el restablecimiento.',true);
+    }finally{
+      busy(b,false);
+    }
+  };
+}
+
+function recoveryPassword(){
+  const logo=appLogoUrl(),name=appDisplayName();
+  $('#app').innerHTML=`<main class="login"><section class="card">
+    <div class="login-brand">
+      ${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}
+      <div class="mark" style="${logo?'display:none':''}">P</div>
+    </div>
+    <h1>Crear nueva contraseña</h1>
+    <p class="muted">Introduce una nueva contraseña para tu cuenta.</p>
+    <form id="recovery-form">
+      <div class="field" style="text-align:left">
+        <label>Nueva contraseña</label>
+        <input id="recovery-password" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <div class="field" style="text-align:left;margin-top:.8rem">
+        <label>Repetir contraseña</label>
+        <input id="recovery-confirm" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <p class="muted" style="font-size:.8rem">Mínimo 8 caracteres, una letra y un número.</p>
+      <button>Guardar nueva contraseña</button>
+    </form>
+  </section></main>`;
+
+  $('#recovery-form').onsubmit=async e=>{
+    e.preventDefault();
+    const password=$('#recovery-password').value;
+    const confirmPassword=$('#recovery-confirm').value;
+
+    if(password!==confirmPassword){
+      toast('Las contraseñas no coinciden.',true);
+      return;
+    }
+
+    if(password.length<8||!/[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(password)||!/\d/.test(password)){
+      toast('La contraseña debe tener al menos 8 caracteres, una letra y un número.',true);
+      return;
+    }
+
+    const b=e.submitter;
+    busy(b);
+    try{
+      await server('completePasswordReset',password);
+      history.replaceState({},document.title,location.pathname);
+      await server('logout').catch(()=>{});
+      state.token='';
+      state.user=null;
+      localStorage.removeItem('parking_token');
+      login('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
+    }catch(x){
+      toast(x.message||'No se pudo actualizar la contraseña.',true);
+      busy(b,false);
+    }
+  };
+}
+
 function login(message=''){
   const renderLogin=()=>{
     const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
-    $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
-    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}let publicState={};try{publicState=await server('getPublicAppState')}catch(_e){}if(publicState?.maintenance?.enabled&&!state.user?.IsRoot){renderMaintenanceScreen(publicState);return}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><button type="button" class="secondary" id="forgot-password" style="width:100%;margin-top:.7rem">¿Olvidaste tu contraseña?</button><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
+    $('#forgot-password').onclick=()=>forgotPassword();$('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}let publicState={};try{publicState=await server('getPublicAppState')}catch(_e){}if(publicState?.maintenance?.enabled&&!state.user?.IsRoot){renderMaintenanceScreen(publicState);return}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
   if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
@@ -657,15 +756,55 @@ async function housingVehicles(h){
   }catch(e){err(e)}
 }
 function passwordEditor(user){
-  $('#editor').innerHTML=`<div class="card"><div class="head"><div><h2>Contraseña de ${esc(user.Nombre||user.Email)}</h2><p class="muted">Cualquier contraseña asignada por Administración se envía automáticamente a <b>${esc(user.Email)}</b>. Si el usuario cambia su propia contraseña desde Perfil, no se envía correo.</p></div></div><div class="actions"><button type="button" id="password-auto">Generar nueva contraseña y enviar</button></div></div><form class="card form" id="password-form" style="margin-top:1rem"><h2 class="wide">Asignación manual</h2><div class="field wide"><label>Nueva contraseña</label><input name="password" type="password" minlength="8" autocomplete="new-password" required><span class="muted" style="font-size:.8rem">Mínimo 8 caracteres, con al menos una letra y un número.</span></div><div class="wide actions"><button>Guardar y enviar por correo</button><button type="button" class="secondary" id="password-cancel">Cancelar</button></div></form>`;
+  $('#editor').innerHTML=`
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Acceso de ${esc(user.Nombre||user.Email)}</h2>
+          <p class="muted">El método recomendado es enviar a <b>${esc(user.Email)}</b> un enlace seguro para crear o restablecer su contraseña.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" id="password-reset-link">Enviar enlace para crear/restablecer contraseña</button>
+        <button type="button" class="secondary" id="password-cancel">Cancelar</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <h2>Acceso asistido</h2>
+      <p class="muted">Si el propietario necesita ayuda, podés generar una contraseña temporal. Se mostrará una sola vez para comunicarla manualmente y no se enviará por correo.</p>
+      <div class="actions"><button type="button" class="secondary" id="password-temp">Generar contraseña temporal</button></div>
+      <div id="temporary-password-result"></div>
+    </div>`;
+
   $('#password-cancel').onclick=()=>$('#editor').innerHTML='';
-  $('#password-auto').onclick=async e=>{if(!confirm(`¿Generar una nueva contraseña para ${user.Email}?\n\nLa contraseña actual dejará de ser válida y la nueva se enviará por correo.`))return;const b=e.currentTarget;busy(b);try{const out=await call('adminGeneratePassword',{id:user.ID_Usuario});toast(out?.emailQueued?'Nueva contraseña generada. El correo quedó en cola.':'Nueva contraseña generada, pero el correo no pudo quedar en cola.',!out?.emailQueued);$('#editor').innerHTML=''}catch(x){toast(x.message,true);busy(b,false)}};
-  $('#password-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await call('adminSetPassword',{id:user.ID_Usuario,password:new FormData(e.target).get('password')});toast(out?.emailQueued?'Contraseña actualizada. El correo quedó en cola.':'Contraseña actualizada, pero el correo no pudo quedar en cola.',!out?.emailQueued);$('#editor').innerHTML=''}catch(x){toast(x.message,true);busy(b,false)}};
-  $('#editor').scrollIntoView({behavior:'smooth'})
+
+  $('#password-reset-link').onclick=async e=>{
+    if(!confirm(`¿Enviar a ${user.Email} un enlace para crear/restablecer su contraseña?`))return;
+    const b=e.currentTarget;busy(b);
+    try{
+      const out=await call('adminSendPasswordReset',{id:user.ID_Usuario});
+      toast(out?.resetEmailSent?`Enlace enviado a ${out.email||user.Email}.`:'No se pudo confirmar el envío del enlace.',!out?.resetEmailSent);
+    }catch(x){toast(x.message,true)}finally{busy(b,false)}
+  };
+
+  $('#password-temp').onclick=async e=>{
+    if(!confirm(`¿Generar una contraseña temporal para ${user.Email}?\n\nLa contraseña actual dejará de ser válida.`))return;
+    const b=e.currentTarget;busy(b);
+    try{
+      const out=await call('adminGenerateTemporaryPassword',{id:user.ID_Usuario});
+      const password=String(out?.temporaryPassword||'');
+      if(!password)throw new Error('No se recibió la contraseña temporal.');
+      $('#temporary-password-result').innerHTML=`<div class="message" style="margin-top:1rem"><b>Contraseña temporal generada.</b><p class="muted">Copiala ahora. No quedará visible después de cerrar esta pantalla.</p><div class="actions"><code style="font-size:1.05rem">${esc(password)}</code><button type="button" class="secondary" id="copy-temporary-password">Copiar</button></div></div>`;
+      $('#copy-temporary-password').onclick=async()=>{try{await navigator.clipboard.writeText(password);toast('Contraseña copiada.')}catch(_){toast('No se pudo copiar automáticamente.',true)}};
+      toast('Contraseña temporal generada.');
+    }catch(x){toast(x.message,true)}finally{busy(b,false)}
+  };
+
+  $('#editor').scrollIntoView({behavior:'smooth'});
 }
 
 function field([name,label,type],row={}){const val=esc(row[name]||'');if(type==='roles'){const selected=String(row[name]||'').split(',');return `<div class="field wide"><label>${label}</label><div class="actions">${['ADMIN','CONTROL','PROPIETARIO'].map(role=>`<label class="btn secondary" style="cursor:pointer"><input class="role-check" type="checkbox" value="${role}" ${selected.includes(role)?'checked':''}> ${role}</label>`).join('')}</div><span class="muted" style="font-size:.8rem">Uno o dos perfiles. Se admite ADMIN + PROPIETARIO o CONTROL + PROPIETARIO; no ADMIN + CONTROL.</span></div>`}if(type==='owner'){const options=(state.cache.formOptions?.owners||[]).map(u=>`<option value="${esc(u.Email)}" ${u.Email===row[name]?'selected':''}>${esc(ownerLabel(u))}</option>`).join('');return `<div class="field"><label>${label}</label><select name="${name}" required><option value="">Selecciona propietario</option>${options}</select></div>`}if(type==='housing'){const options=(state.cache.formOptions?.housing||[]).map(h=>`<option value="${esc(h.ID_Vivienda)}" ${h.ID_Vivienda===row[name]?'selected':''}>${esc(housingLabel(h))}</option>`).join('');return `<div class="field wide"><label>${label}</label><select name="${name}" required><option value="">Selecciona vivienda</option>${options}</select></div>`}if(type.startsWith('select:'))return `<div class="field"><label>${label}</label><select name="${name}">${type.slice(7).split('|').map(o=>`<option ${o===row[name]?'selected':''}>${o}</option>`).join('')}</select></div>`;if(type==='textarea')return `<div class="field"><label>${label}</label><textarea name="${name}">${val}</textarea></div>`;return `<div class="field"><label>${label}</label><input name="${name}" type="${type}" value="${val}"></div>`}
-function editor(kind,row){if(kind==='vehicles')return vehicleEditor(row);const c=configs[kind],housingInfo=kind==='users'&&row?(()=>{const hs=userAssignedHousing(row);return `<div class="field wide"><label>Viviendas asignadas</label><div class="message">${hs.length?hs.map(h=>`<b>${esc(housingShort(h))}</b>`).join(' · '):'Sin viviendas asignadas.'}</div><span class="muted" style="font-size:.8rem">La asignación se gestiona desde Viviendas mediante el propietario responsable.</span></div>`})():'';$('#editor').innerHTML=`<form class="card form" id="edit-form"><h2 class="wide">${row?'Editar':'Nuevo'} ${c.title.toLowerCase()}</h2>${c.fields.map(f=>field(f,row||{})).join('')}${housingInfo}<div class="wide actions"><button>Guardar</button><button type="button" class="secondary" id="cancel">Cancelar</button></div></form>`;$('#cancel').onclick=()=>$('#editor').innerHTML='';$('#edit-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));if(kind==='users'){const roles=[...e.target.querySelectorAll('.role-check:checked')].map(x=>x.value);if(!roles.length||roles.length>2){toast('Selecciona uno o dos perfiles.',true);busy(b,false);return}if(roles.includes('ADMIN')&&roles.includes('CONTROL')){toast('ADMIN + CONTROL no es una combinación permitida.',true);busy(b,false);return}data.Rol=roles.join(',')}if(row)data[c.id]=row[c.id];try{const out=await call(c.save,data);toast(kind==='users'&&out?.welcomeEmailQueued?'Usuario creado. El correo con la contraseña inicial quedó en cola.':'Datos guardados.');manager(kind)}catch(x){toast(x.message,true);busy(b,false)}};$('#editor').scrollIntoView({behavior:'smooth'})}
+function editor(kind,row){if(kind==='vehicles')return vehicleEditor(row);const c=configs[kind],housingInfo=kind==='users'&&row?(()=>{const hs=userAssignedHousing(row);return `<div class="field wide"><label>Viviendas asignadas</label><div class="message">${hs.length?hs.map(h=>`<b>${esc(housingShort(h))}</b>`).join(' · '):'Sin viviendas asignadas.'}</div><span class="muted" style="font-size:.8rem">La asignación se gestiona desde Viviendas mediante el propietario responsable.</span></div>`})():'';$('#editor').innerHTML=`<form class="card form" id="edit-form"><h2 class="wide">${row?'Editar':'Nuevo'} ${c.title.toLowerCase()}</h2>${c.fields.map(f=>field(f,row||{})).join('')}${housingInfo}<div class="wide actions"><button>Guardar</button><button type="button" class="secondary" id="cancel">Cancelar</button></div></form>`;$('#cancel').onclick=()=>$('#editor').innerHTML='';$('#edit-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);const data=Object.fromEntries(new FormData(e.target));if(kind==='users'){const roles=[...e.target.querySelectorAll('.role-check:checked')].map(x=>x.value);if(!roles.length||roles.length>2){toast('Selecciona uno o dos perfiles.',true);busy(b,false);return}if(roles.includes('ADMIN')&&roles.includes('CONTROL')){toast('ADMIN + CONTROL no es una combinación permitida.',true);busy(b,false);return}data.Rol=roles.join(',')}if(row)data[c.id]=row[c.id];try{const out=await call(c.save,data);toast(kind==='users'&&out?.created&&out?.inviteEmailSent?'Usuario creado. Invitación enviada por correo.':'Datos guardados.');manager(kind)}catch(x){toast(x.message,true);busy(b,false)}};$('#editor').scrollIntoView({behavior:'smooth'})}
 function availableSlotsClient(housingId,excludeId=''){const used=(state.cache.vehicles||[]).filter(v=>v.ID_Vivienda===housingId&&v.Estado==='Activo'&&v.Tipo!=='Moto'&&v.ID_Vehiculo!==excludeId).map(v=>String(v.Slot));return ['1','2'].filter(x=>!used.includes(x))}
 function vehicleEditor(row,contextHousing=null){
   const hOpts=state.cache.formOptions?.housing||[],base=row||{},selectedHousing=base.ID_Vivienda||contextHousing?.ID_Vivienda||'',housingOptions=hOpts.map(h=>`<option value="${esc(h.ID_Vivienda)}" ${h.ID_Vivienda===selectedHousing?'selected':''}>${esc(housingLabel(h))}</option>`).join('');

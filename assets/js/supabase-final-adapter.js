@@ -203,8 +203,18 @@
   }
 
   async function profilesById() {
-    const rows = unwrap(await sb.from('profiles').select('user_id,email,name,state,last_access_at,is_root')) || [];
-    return new Map(rows.map((row) => [row.user_id, row]));
+    return cached('profilesById', async () => {
+      const rows =
+        unwrap(
+          await sb
+            .from('profiles')
+            .select('user_id,email,name,state,last_access_at,is_root')
+        ) || [];
+
+      return new Map(
+        rows.map((row) => [row.user_id, row])
+      );
+    });
   }
 
   async function listHousing() {
@@ -259,14 +269,25 @@
   }
 
   async function joinedReferenceData() {
-    const [housing, vehicles, profiles] = await Promise.all([listHousing(), listVehicles(), profilesById()]);
-    return {
-      housing,
-      vehicles,
-      profiles,
-      housingById: new Map(housing.map((row) => [row.ID_Vivienda, row])),
-      vehicleById: new Map(vehicles.map((row) => [row.ID_Vehiculo, row]))
-    };
+    return cached('joinedReferenceData', async () => {
+      const [housing, vehicles, profiles] = await Promise.all([
+        listHousing(),
+        listVehicles(),
+        profilesById()
+      ]);
+
+      return {
+        housing,
+        vehicles,
+        profiles,
+        housingById: new Map(
+          housing.map((row) => [row.ID_Vivienda, row])
+        ),
+        vehicleById: new Map(
+          vehicles.map((row) => [row.ID_Vehiculo, row])
+        )
+      };
+    });
   }
 
   function mapRequest(row, refs) {
@@ -442,12 +463,107 @@
     const paths = [...rows.map((r) => r.photo_url), ...followupRows.map((r) => r.photo_url)].filter(Boolean);
     const urlPairs = await Promise.all(paths.map(async (path) => [path, await evidenceUrl(path)]));
     const urls = new Map(urlPairs);
+    const followupsByIncident = new Map();
+
+    followupRows.forEach((row) => {
+      const key = row.incident_id || '';
+      if (!key) return;
+
+      if (!followupsByIncident.has(key)) {
+        followupsByIncident.set(key, []);
+      }
+
+      followupsByIncident.get(key).push(
+        mapFollowup(
+          row,
+          urls.get(row.photo_url) || ''
+        )
+      );
+    });
+
     return rows.map((row) => mapIncident(
       row,
       refs,
-      followupRows.filter((f) => f.incident_id === row.id).map((f) => mapFollowup(f, urls.get(f.photo_url) || '')),
+      followupsByIncident.get(row.id) || [],
       urls.get(row.photo_url) || ''
     ));
+  }
+
+
+  async function listControlOpenIncidents(vehicle, plate) {
+    const normalizedPlate = normalizePlate(plate || '');
+    const vehicleId = vehicle?.ID_Vehiculo || vehicle?.id || '';
+
+    const filters = [];
+
+    if (vehicleId) {
+      filters.push(`vehicle_id.eq.${vehicleId}`);
+      filters.push(`related_vehicle_id.eq.${vehicleId}`);
+    }
+
+    if (normalizedPlate) {
+      filters.push(`observed_plate.eq.${normalizedPlate}`);
+      filters.push(`related_plate.eq.${normalizedPlate}`);
+      filters.push(`authorized_plate.eq.${normalizedPlate}`);
+    }
+
+    if (!filters.length) {
+      return [];
+    }
+
+    const rows =
+      unwrap(
+        await sb
+          .from('incidents')
+          .select('*')
+          .neq('state', 'Cerrada')
+          .or(filters.join(','))
+          .order('occurred_at', { ascending: false })
+      ) || [];
+
+    if (!rows.length) {
+      return [];
+    }
+
+    const incidentIds = rows
+      .map((row) => row.id)
+      .filter(Boolean);
+
+    const [followupRows, refs] = await Promise.all([
+      incidentIds.length
+        ? unwrap(
+            await sb
+              .from('incident_followups')
+              .select('*')
+              .in('incident_id', incidentIds)
+              .order('occurred_at')
+          ) || []
+        : [],
+      loadRefs()
+    ]);
+
+    const followupsByIncident = new Map();
+
+    followupRows.forEach((row) => {
+      const key = row.incident_id || '';
+      if (!key) return;
+
+      if (!followupsByIncident.has(key)) {
+        followupsByIncident.set(key, []);
+      }
+
+      followupsByIncident.get(key).push(
+        mapFollowup(row)
+      );
+    });
+
+    return rows.map((row) =>
+      mapIncident(
+        row,
+        refs,
+        followupsByIncident.get(row.id) || []
+      )
+    );
   }
 
   function controlOpenIncidentsFromList(vehicle, plate, incidents) {
@@ -501,8 +617,24 @@
     const vehicle = mapVehicle(result.vehicle, result.temporaryPeriod ? [result.temporaryPeriod] : []);
     const housing = result.housing ? mapHousing(result.housing, refs.profiles.get(result.housing.responsible_user_id)) : null;
     const owner = result.housing?.responsible_user_id ? refs.profiles.get(result.housing.responsible_user_id) : null;
-    const allIncidents = await listIncidents();
-    const openIncidents = controlOpenIncidentsFromList(vehicle, result.currentPlate || (kind === 'MATRICULA' ? value : vehicle?.MatriculaHabitual || ''), allIncidents);
+    const controlPlate =
+      result.currentPlate ||
+      (kind === 'MATRICULA'
+        ? value
+        : vehicle?.MatriculaHabitual || '');
+
+    const relevantIncidents =
+      await listControlOpenIncidents(
+        vehicle,
+        controlPlate
+      );
+
+    const openIncidents =
+      controlOpenIncidentsFromList(
+        vehicle,
+        controlPlate,
+        relevantIncidents
+      );
     return {
       status: result.status,
       source: kind,
@@ -1151,33 +1283,139 @@
   }
 
   async function ownerBundle() {
-    const ownerUserId = await ownerScopeUserId();
-    if (!ownerUserId) return { housing: [], vehicles: [], requests: [], incidents: [] };
+    const boot = await appBootstrap();
 
-    const [allHousing, allVehicles, allRequests, allIncidents] = await Promise.all([
-      listHousing(), listVehicles(), listRequests(), listIncidents()
+    const ownerUserId =
+      boot.user?.ID_Usuario ||
+      boot.user?.user_id ||
+      boot.user?.id ||
+      '';
+
+    if (!ownerUserId) {
+      return {
+        housing: [],
+        vehicles: [],
+        requests: [],
+        incidents: []
+      };
+    }
+
+    const [profileMap, housingRows] = await Promise.all([
+      profilesById(),
+      unwrap(
+        await sb
+          .from('dwellings')
+          .select('*')
+          .eq('responsible_user_id', ownerUserId)
+          .order('block')
+          .order('floor')
+          .order('apartment')
+      ) || []
     ]);
 
-    // Filtrado explícito: no confiar en que RLS reduzca el dataset cuando la
-    // misma sesión también posee ADMIN/ROOT. Al entrar en contexto PROPIETARIO
-    // solo se muestran entidades de sus viviendas.
-    const housing = allHousing.filter((row) => row.ResponsableUserId === ownerUserId);
-    const housingIds = new Set(housing.map((row) => row.ID_Vivienda));
-    const vehicles = allVehicles.filter((row) => housingIds.has(row.ID_Vivienda));
-    const vehicleIds = new Set(vehicles.map((row) => row.ID_Vehiculo));
-    const requests = allRequests.filter((row) => housingIds.has(row.ID_Vivienda) || vehicleIds.has(row.ID_Vehiculo));
-    const incidents = allIncidents.filter((row) => housingIds.has(row.ID_Vivienda) || vehicleIds.has(row.ID_Vehiculo));
+    const housing = housingRows.map((row) =>
+      mapHousing(
+        row,
+        profileMap.get(row.responsible_user_id)
+      )
+    );
 
-    return { housing, vehicles, requests, incidents };
-  }
+    const housingIds = housingRows
+      .map((row) => row.id)
+      .filter(Boolean);
 
-  async function saveSettings(payload) {
-    const boot = await appBootstrap();
-    const allowed = ['NombreOficial', 'Descripcion', 'Direccion', 'EmailContacto', 'LogoUrl', 'ColorPrincipal', 'ColorSecundario', 'ColorAcento'];
-    const rows = allowed.filter((key) => payload[key] !== undefined).map((key) => ({ community_id: boot.communityId, key, value: payload[key] }));
-    if (rows.length) unwrap(await sb.from('community_settings').upsert(rows, { onConflict: 'community_id,key' }));
-    invalidate();
-    return (await appBootstrap(true)).settings;
+    if (!housingIds.length) {
+      return {
+        housing,
+        vehicles: [],
+        requests: [],
+        incidents: []
+      };
+    }
+
+    const [vehicleRows, periods, requestRows] =
+      await Promise.all([
+        unwrap(
+          await sb
+            .from('vehicles')
+            .select('*')
+            .in('dwelling_id', housingIds)
+            .order('habitual_plate')
+        ) || [],
+
+        unwrap(
+          await sb
+            .from('temporary_periods')
+            .select('*')
+            .in(
+              'vehicle_id',
+              (
+                unwrap(
+                  await sb
+                    .from('vehicles')
+                    .select('id')
+                    .in('dwelling_id', housingIds)
+                ) || []
+              ).map((row) => row.id)
+            )
+            .order('starts_at')
+        ) || [],
+
+        unwrap(
+          await sb
+            .from('requests')
+            .select('*')
+            .in('dwelling_id', housingIds)
+            .order('requested_at', { ascending: false })
+        ) || []
+      ]);
+
+    const vehicles = vehicleRows.map((row) =>
+      mapVehicle(row, periods)
+    );
+
+    const refs = {
+      housing,
+      vehicles,
+      profiles: profileMap,
+      housingById: new Map(
+        housing.map((row) => [
+          row.ID_Vivienda,
+          row
+        ])
+      ),
+      vehicleById: new Map(
+        vehicles.map((row) => [
+          row.ID_Vehiculo,
+          row
+        ])
+      )
+    };
+
+    const requests = requestRows.map((row) =>
+      mapRequest(row, refs)
+    );
+
+    const vehicleIds = new Set(
+      vehicles
+        .map((row) => row.ID_Vehiculo)
+        .filter(Boolean)
+    );
+
+    const allIncidents = await listIncidents();
+
+    const incidents = allIncidents.filter(
+      (row) =>
+        housingIds.includes(row.ID_Vivienda) ||
+        vehicleIds.has(row.ID_Vehiculo)
+    );
+
+    return {
+      housing,
+      vehicles,
+      requests,
+      incidents
+    };
   }
 
   async function globalSearch(payload) {
@@ -1307,14 +1545,28 @@
         return { vehicle, events: audits.map((row) => ({ type: row.Accion, title: row.Entidad, date: row.FechaHora, user: row.UsuarioNombre, detail: row.Observaciones })) };
       }
       case 'saveUser': {
-        const data = await parkingAdmin('saveUser', payload);
+        const data = await parkingAdmin('saveUser', {
+          ...payload,
+          AccessRedirectTo:
+            location.origin +
+            location.pathname +
+            '?resetPassword=1'
+        });
         invalidate();
         return data;
       }
-      case 'adminSetPassword':
-        return parkingAdmin('setPassword', { id: payload.id || payload.ID_Usuario, password: payload.password });
-      case 'adminGeneratePassword':
-        return parkingAdmin('generatePassword', { id: payload.id || payload.ID_Usuario });
+      case 'adminGenerateTemporaryPassword':
+        return parkingAdmin('generateTemporaryPassword', {
+          id: payload.id || payload.ID_Usuario
+        });
+      case 'adminSendPasswordReset':
+        return parkingAdmin('sendPasswordReset', {
+          id: payload.id || payload.ID_Usuario,
+          redirectTo:
+            location.origin +
+            location.pathname +
+            '?resetPassword=1'
+        });
       case 'closeUserSessions':
         return parkingAdmin('closeSessions', { id: payload.id || payload.ID_Usuario });
       case 'updateProfile': {
@@ -1469,6 +1721,51 @@
 
   server = async function finalSupabaseServer(fn, ...args) {
     if (fn === 'loginWithPassword') return login(args[0], args[1]);
+
+    if (fn === 'requestPasswordReset') {
+      const email = String(args[0] || '').trim().toLowerCase();
+
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        throw new Error('Introduce un email válido.');
+      }
+
+      const redirectTo = location.origin + location.pathname + '?resetPassword=1';
+
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+
+      if (error) {
+        throw new Error('No se pudo solicitar el restablecimiento. Inténtalo de nuevo.');
+      }
+
+      return { ok: true };
+    }
+
+    if (fn === 'completePasswordReset') {
+      const password = String(args[0] || '');
+
+      if (
+        password.length < 8 ||
+        !/[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(password) ||
+        !/\d/.test(password)
+      ) {
+        throw new Error('La contraseña debe tener al menos 8 caracteres, una letra y un número.');
+      }
+
+      const session = await sb.auth.getSession();
+
+      if (session.error || !session.data.session) {
+        throw new Error('El enlace de recuperación no es válido o ha caducado. Solicita uno nuevo.');
+      }
+
+      const updated = await sb.auth.updateUser({ password });
+
+      if (updated.error) {
+        throw new Error(updated.error.message || 'No se pudo actualizar la contraseña.');
+      }
+
+      return { ok: true };
+    }
+
     if (fn === 'logout') {
       try {
         const boot = await appBootstrap();

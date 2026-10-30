@@ -7,7 +7,7 @@ function preferredUiRole(roles=userRoles()){return roles.includes('ADMIN')?'ADMI
 function activeUiRole(){const roles=userRoles(),saved=loadUiState().activeRole;if(saved&&roles.includes(saved))return saved;return preferredUiRole(roles)}
 function setActiveUiRole(role){if(!userRoles().includes(role))return;saveUiState({activeRole:role});state.activeRole=role;shell();go(defaultViewForRole(role))}
 function restoredStartView(){const ui=loadUiState(),role=activeUiRole(),view=ui.view||'';const adminViews=['dashboard','search','dataReview','users','housing','vehicles','incidents','requests','audit','config','profile'];const allowed={ADMIN:adminViews,CONTROL:['control','search','incidents','profile'],PROPIETARIO:['ownerHome','ownerHousing','ownerVehicles','ownerIncidents','ownerRequests','profile']};return (allowed[role]||[]).includes(view)?view:defaultViewForRole(role)}
-async function init(){
+async function init(){if(new URLSearchParams(location.search).get('resetPassword')==='1')return recoveryPassword();
   applyParkingSettings(appSettings());
   let publicState={};
   try{
@@ -29,11 +29,110 @@ async function init(){
     else go(restoredStartView());
   }catch(e){login(e.message)}
 }
+
+function forgotPassword(){
+  const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
+  $('#app').innerHTML=`<main class="login"><section class="card">
+    <div class="login-brand">
+      ${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}
+      <div class="mark" style="${logo?'display:none':''}">P</div>
+    </div>
+    <h1>Restablecer contraseña</h1>
+    <p class="muted login-description">${esc(description)}</p>
+    <p class="muted">Introduce el email asociado a tu cuenta.</p>
+    <form id="forgot-form">
+      <div class="field" style="text-align:left">
+        <label>Email</label>
+        <input id="forgot-email" type="email" required autocomplete="email">
+      </div>
+      <button style="margin-top:1rem">Enviar enlace</button>
+    </form>
+    <button type="button" class="secondary" id="forgot-back" style="width:100%;margin-top:.7rem">
+      Volver al inicio de sesión
+    </button>
+    <div id="forgot-result"></div>
+  </section></main>`;
+
+  $('#forgot-back').onclick=()=>login();
+
+  $('#forgot-form').onsubmit=async e=>{
+    e.preventDefault();
+    const b=e.submitter;
+    busy(b);
+    try{
+      await server('requestPasswordReset',$('#forgot-email').value);
+      $('#forgot-result').innerHTML=`<div class="message" style="margin-top:1rem">
+        Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.
+      </div>`;
+      e.target.reset();
+    }catch(x){
+      toast(x.message||'No se pudo solicitar el restablecimiento.',true);
+    }finally{
+      busy(b,false);
+    }
+  };
+}
+
+function recoveryPassword(){
+  const logo=appLogoUrl(),name=appDisplayName();
+  $('#app').innerHTML=`<main class="login"><section class="card">
+    <div class="login-brand">
+      ${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}
+      <div class="mark" style="${logo?'display:none':''}">P</div>
+    </div>
+    <h1>Crear nueva contraseña</h1>
+    <p class="muted">Introduce una nueva contraseña para tu cuenta.</p>
+    <form id="recovery-form">
+      <div class="field" style="text-align:left">
+        <label>Nueva contraseña</label>
+        <input id="recovery-password" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <div class="field" style="text-align:left;margin-top:.8rem">
+        <label>Repetir contraseña</label>
+        <input id="recovery-confirm" type="password" minlength="8" required autocomplete="new-password">
+      </div>
+      <p class="muted" style="font-size:.8rem">Mínimo 8 caracteres, una letra y un número.</p>
+      <button>Guardar nueva contraseña</button>
+    </form>
+  </section></main>`;
+
+  $('#recovery-form').onsubmit=async e=>{
+    e.preventDefault();
+    const password=$('#recovery-password').value;
+    const confirmPassword=$('#recovery-confirm').value;
+
+    if(password!==confirmPassword){
+      toast('Las contraseñas no coinciden.',true);
+      return;
+    }
+
+    if(password.length<8||!/[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(password)||!/\d/.test(password)){
+      toast('La contraseña debe tener al menos 8 caracteres, una letra y un número.',true);
+      return;
+    }
+
+    const b=e.submitter;
+    busy(b);
+    try{
+      await server('completePasswordReset',password);
+      history.replaceState({},document.title,location.pathname);
+      await server('logout').catch(()=>{});
+      state.token='';
+      state.user=null;
+      localStorage.removeItem('parking_token');
+      login('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
+    }catch(x){
+      toast(x.message||'No se pudo actualizar la contraseña.',true);
+      busy(b,false);
+    }
+  };
+}
+
 function login(message=''){
   const renderLogin=()=>{
     const logo=appLogoUrl(),name=appDisplayName(),description=appDescription();
-    $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
-    $('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}let publicState={};try{publicState=await server('getPublicAppState')}catch(_e){}if(publicState?.maintenance?.enabled&&!state.user?.IsRoot){renderMaintenanceScreen(publicState);return}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
+    $('#app').innerHTML=`<main class="login"><section class="card"><div class="login-brand">${logo?`<img class="login-logo" src="${esc(logo)}" alt="Logo de ${esc(name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">`:''}<div class="mark" style="${logo?'display:none':''}">P</div></div><h1>${esc(name)}</h1><p class="muted login-description">${esc(description)}</p><p class="muted">Accede con tu email y contraseña.</p>${message?`<div class="message bad">${esc(message)}</div>`:''}<form id="login-form"><div class="field" style="text-align:left"><label>Email</label><input id="email" type="email" required autocomplete="username"></div><div class="field" style="text-align:left;margin-top:.8rem"><label>Contraseña</label><input id="password" type="password" required autocomplete="current-password"></div><button>Entrar</button></form><button type="button" class="secondary" id="forgot-password" style="width:100%;margin-top:.7rem">¿Olvidaste tu contraseña?</button><p class="muted" style="font-size:.8rem;margin-top:1rem">Si todavía no tienes contraseña, solicítala al administrador.</p></section></main>`;
+    $('#forgot-password').onclick=()=>forgotPassword();$('#login-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;busy(b);try{const out=await server('loginWithPassword',$('#email').value,$('#password').value);state.token=out.token;state.user=out.user;state.cache={};localStorage.setItem('parking_token',out.token);try{const boot=await call('bootstrap');state.user=boot.user||state.user;state.cache.bootstrap=boot;applyParkingSettings(boot.settings)}catch(_e){}let publicState={};try{publicState=await server('getPublicAppState')}catch(_e){}if(publicState?.maintenance?.enabled&&!state.user?.IsRoot){renderMaintenanceScreen(publicState);return}const roles=userRoles(),startRole=preferredUiRole(roles);saveUiState({activeRole:startRole,view:defaultViewForRole(startRole)});state.activeRole=startRole;shell();if(INITIAL_TOKEN&&activeUiRole()==='CONTROL'){state.view='control';rememberCurrentView('control');renderNav();await control(INITIAL_TOKEN)}else go(defaultViewForRole(activeUiRole()))}catch(x){toast(x.message,true);busy(b,false)}};
   };
   renderLogin();
   if(!Object.keys(appSettings()).length){server('getPublicParkingSettings').then(settings=>{state.cache.bootstrap=Object.assign({},state.cache.bootstrap||{},{settings});applyParkingSettings(settings);if(!state.token)renderLogin()}).catch(e=>console.warn('No se pudo cargar la configuración pública',e))}
