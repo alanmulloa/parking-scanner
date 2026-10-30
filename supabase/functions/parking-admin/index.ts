@@ -555,10 +555,26 @@ Deno.serve(async (request) => {
         const authUpdate = await service.auth.admin.updateUserById(userId, { email, email_confirm: true });
         if (authUpdate.error) throw authUpdate.error;
       } else {
-        const initialPassword = passwordValue();
-        const authCreate = await service.auth.admin.createUser({ email, password: initialPassword, email_confirm: true, user_metadata: { migration_pending: false, created_from: 'PARKING_STAGING', password_delivery_pending: true } });
-        if (authCreate.error || !authCreate.data.user) throw authCreate.error || new Error('No se pudo crear el usuario.');
-        userId = authCreate.data.user.id;
+        const redirectTo = String(payload.AccessRedirectTo || '').trim();
+        if (!redirectTo) throw new Error('No se indico la URL de activacion del usuario.');
+
+        const authInvite = await service.auth.admin.inviteUserByEmail(
+          email,
+          {
+            redirectTo,
+            data: {
+              name,
+              migration_pending: false,
+              created_from: 'PARKING_APP'
+            }
+          }
+        );
+
+        if (authInvite.error || !authInvite.data.user) {
+          throw authInvite.error || new Error('No se pudo invitar al usuario.');
+        }
+
+        userId = authInvite.data.user.id;
         created = true;
       }
 
@@ -570,7 +586,7 @@ Deno.serve(async (request) => {
       const member = await service.from('community_members').upsert({ community_id: actorCommunityId, user_id: userId, roles, state }, { onConflict: 'community_id,user_id' });
       if (member.error) throw member.error;
       await service.from('audit_log').insert({ community_id: actorCommunityId, actor_user_id: actorId, user_id: actorId, actor_email: actorAuditEmail, action: created ? 'ALTA' : 'MODIFICACION', entity: 'USUARIOS', entity_id: userId, observations: 'Gestión de usuario desde preproducción Supabase.', source: 'APPLICATION' });
-      return jsonResponse(200, { ok: true, user_id: userId, created, welcomeEmailQueued: false, accessDeliveryPending: created }, origin);
+      return jsonResponse(200, { ok: true, user_id: userId, created, inviteEmailSent: created, accessDeliveryPending: false }, origin);
     }
 
     const targetId = String(payload.id || payload.ID_Usuario || '');
@@ -578,6 +594,31 @@ Deno.serve(async (request) => {
     const target = await service.from('profiles').select('user_id,email,is_root').eq('user_id', targetId).single();
     if (target.error) throw target.error;
     if (target.data.is_root) throw new Error('La identidad ROOT se gestiona únicamente mediante el procedimiento técnico seguro.');
+
+    if (action === 'sendPasswordReset') {
+      const redirectTo = String(payload.redirectTo || '').trim();
+      if (!redirectTo) throw new Error('No se indicó la URL de recuperación.');
+
+      const email = String(target.data.email || '').trim().toLowerCase();
+      if (!email) throw new Error('El usuario no tiene un email válido.');
+
+      const reset = await authClient.auth.resetPasswordForEmail(email, { redirectTo });
+      if (reset.error) throw reset.error;
+
+      await service.from('audit_log').insert({
+        community_id: actorCommunityId,
+        actor_user_id: actorId,
+        user_id: actorId,
+        actor_email: actorAuditEmail,
+        action: 'PASSWORD_RESET_SENT',
+        entity: 'USUARIOS',
+        entity_id: targetId,
+        observations: 'Administración envió un enlace seguro para crear/restablecer la contraseña mediante Supabase Auth.',
+        source: 'APPLICATION'
+      });
+
+      return jsonResponse(200, { ok: true, email, resetEmailSent: true }, origin);
+    }
 
     if (action === 'generateTemporaryPassword') {
       const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -620,37 +661,6 @@ Deno.serve(async (request) => {
 
       if (updated.error) throw updated.error;
 
-      let emailQueued = false;
-      let emailQueueId = '';
-      let emailQueueError = '';
-
-      try {
-        const queued = await legacyBridgeRequest(
-          'command.enqueue',
-          {
-            domain: 'mail',
-            command: 'sendTemporaryPassword',
-            args: {
-              email: String(target.data.email || '').trim().toLowerCase(),
-              password
-            },
-            requestedBy: actorAuditEmail
-          }
-        );
-
-        emailQueued = Boolean(queued?.id);
-        emailQueueId = String(queued?.id || '');
-      } catch (error) {
-        emailQueueError =
-          error instanceof Error
-            ? error.message
-            : 'No se pudo encolar el correo.';
-        console.error(
-          'No se pudo encolar correo de contraseña temporal:',
-          error
-        );
-      }
-
       await service.from('audit_log').insert({
         community_id: actorCommunityId,
         actor_user_id: actorId,
@@ -659,10 +669,7 @@ Deno.serve(async (request) => {
         action: 'PASSWORD_TEMPORARY_GENERATED',
         entity: 'USUARIOS',
         entity_id: targetId,
-        observations:
-          emailQueued
-            ? 'Administración generó una contraseña temporal y solicitó su envío por correo. El valor no fue almacenado.'
-            : 'Administración generó una contraseña temporal. El correo no pudo quedar en cola y el valor no fue almacenado.',
+        observations: 'Administración generó una contraseña temporal como acceso asistido. La contraseña se muestra una sola vez y no se envía por correo.',
         source: 'APPLICATION'
       });
 
@@ -671,10 +678,7 @@ Deno.serve(async (request) => {
         {
           ok: true,
           temporaryPassword: password,
-          email: target.data.email,
-          emailQueued,
-          emailQueueId,
-          emailQueueError
+          email: target.data.email
         },
         origin
       );

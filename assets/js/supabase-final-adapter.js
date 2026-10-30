@@ -1545,13 +1545,27 @@
         return { vehicle, events: audits.map((row) => ({ type: row.Accion, title: row.Entidad, date: row.FechaHora, user: row.UsuarioNombre, detail: row.Observaciones })) };
       }
       case 'saveUser': {
-        const data = await parkingAdmin('saveUser', payload);
+        const data = await parkingAdmin('saveUser', {
+          ...payload,
+          AccessRedirectTo:
+            location.origin +
+            location.pathname +
+            '?resetPassword=1'
+        });
         invalidate();
         return data;
       }
       case 'adminGenerateTemporaryPassword':
         return parkingAdmin('generateTemporaryPassword', {
           id: payload.id || payload.ID_Usuario
+        });
+      case 'adminSendPasswordReset':
+        return parkingAdmin('sendPasswordReset', {
+          id: payload.id || payload.ID_Usuario,
+          redirectTo:
+            location.origin +
+            location.pathname +
+            '?resetPassword=1'
         });
       case 'closeUserSessions':
         return parkingAdmin('closeSessions', { id: payload.id || payload.ID_Usuario });
