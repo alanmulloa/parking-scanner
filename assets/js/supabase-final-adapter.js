@@ -1595,12 +1595,16 @@
         }
 
         const overallStarted = performance.now();
-        const [database, auth, adminEdge, legacyEdge] = await Promise.all([
+        const [database, auth, rls, adminEdge, legacyEdge] = await Promise.all([
           timed('Base de datos', async () => unwrap(await sb.rpc('root_system_status'))),
-          timed('Auth / RLS', async () => {
+          timed('Supabase Auth', async () => {
             const user = await sessionUser();
-            const boot = await appBootstrap();
-            if (!boot.user.IsRoot || !user?.id) throw new Error('La sesión ROOT no pudo verificarse.');
+            if (!user?.id) throw new Error('La sesión de Supabase Auth no pudo verificarse.');
+            return user;
+          }),
+          timed('RLS / bootstrap', async () => {
+            const boot = await appBootstrap(true);
+            if (!boot.user.IsRoot) throw new Error('ROOT no verificado por las políticas de acceso.');
             return boot;
           }),
           timed('parking-admin', async () => parkingAdmin('systemPing', {})),
@@ -1610,7 +1614,8 @@
         const status = database.value || {};
         const services = [
           { label: 'Base de datos', ok: database.ok, detail: database.ok ? 'PostgreSQL / Supabase disponible' : String(database.error?.message || 'No disponible'), ms: database.ms, level: database.level },
-          { label: 'Auth / RLS', ok: auth.ok, detail: auth.ok ? 'Sesión ROOT y políticas verificadas' : String(auth.error?.message || 'No disponible'), ms: auth.ms, level: auth.level },
+          { label: 'Supabase Auth', ok: auth.ok, detail: auth.ok ? 'Sesión autenticada válida' : String(auth.error?.message || 'No disponible'), ms: auth.ms, level: auth.level },
+          { label: 'RLS / bootstrap', ok: rls.ok, detail: rls.ok ? 'Permisos ROOT y bootstrap verificados' : String(rls.error?.message || 'No disponible'), ms: rls.ms, level: rls.level },
           { label: 'Edge · parking-admin', ok: adminEdge.ok, detail: adminEdge.ok ? 'Función autenticada disponible' : String(adminEdge.error?.message || 'No disponible'), ms: adminEdge.ms, level: adminEdge.level },
           { label: 'Edge · legacy-auth-migrate', ok: legacyEdge.ok, detail: legacyEdge.ok ? 'Endpoint disponible' : String(legacyEdge.error?.message || 'No disponible'), ms: legacyEdge.ms, level: legacyEdge.level }
         ];
@@ -1667,8 +1672,19 @@
         const tests = [];
         const database = await timed('Base de datos', async () => unwrap(await sb.rpc('root_system_diagnostics')));
         tests.push({ label: database.label, detail: database.ok ? `Esquema ${database.value?.schemaVersion || 'Supabase'}` : String(database.error?.message || 'Error'), ok: database.ok, ms: database.ms, level: database.level });
-        const auth = await timed('Auth / RLS', async () => { const boot = await appBootstrap(true); if (!boot.user.IsRoot) throw new Error('ROOT no verificado'); return boot; });
-        tests.push({ label: auth.label, detail: auth.ok ? 'Sesión ROOT y bootstrap correctos' : String(auth.error?.message || 'Error'), ok: auth.ok, ms: auth.ms, level: auth.level });
+        const auth = await timed('Supabase Auth', async () => {
+          const user = await sessionUser();
+          if (!user?.id) throw new Error('Sesión no válida');
+          return user;
+        });
+        tests.push({ label: auth.label, detail: auth.ok ? 'Sesión autenticada válida' : String(auth.error?.message || 'Error'), ok: auth.ok, ms: auth.ms, level: auth.level });
+
+        const rls = await timed('RLS / bootstrap', async () => {
+          const boot = await appBootstrap(true);
+          if (!boot.user.IsRoot) throw new Error('ROOT no verificado');
+          return boot;
+        });
+        tests.push({ label: rls.label, detail: rls.ok ? 'Permisos ROOT y bootstrap correctos' : String(rls.error?.message || 'Error'), ok: rls.ok, ms: rls.ms, level: rls.level });
         const admin = await timed('Edge · parking-admin', async () => parkingAdmin('systemPing', {}));
         tests.push({ label: admin.label, detail: admin.ok ? 'Disponible' : String(admin.error?.message || 'Error'), ok: admin.ok, ms: admin.ms, level: admin.level });
         const legacy = await timed('Edge · legacy-auth-migrate', async () => edgeOptions('legacy-auth-migrate'));
