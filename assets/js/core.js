@@ -1,11 +1,37 @@
 const state={token:localStorage.getItem('parking_token')||'',user:null,view:'',cache:{bootstrap:{settings:(typeof INITIAL_PUBLIC_SETTINGS!=='undefined'&&INITIAL_PUBLIC_SETTINGS)||{}}},scanResult:null,scanner:null,libs:{},navSeq:0};
-const APP_FRONTEND_VERSION='2.0.0';
+const APP_FRONTEND_VERSION='2.0.0-preprod.4';
 function appSettings(){return state.cache?.bootstrap?.settings||{}}
 function appDisplayName(){return appSettings().NombreOficial||'Parking Comunidad'}
 function appDescription(){return appSettings().Descripcion||appSettings().NombreCorto||'Gestión de acceso y parking de la comunidad'}
 function appLogoUrl(){return appSettings().LogoUrl||''}
 function appBrandHtml(compact=false){const logo=appLogoUrl(),name=appDisplayName();return `<span class="brand-identity ${compact?'compact':''}">${logo?`<img class="brand-logo" src="${esc(logo)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span class="brand-fallback" style="display:none">P</span>`:`<span class="brand-fallback">P</span>`}<span class="brand-name">${esc(name)}</span></span>`}
-function applyParkingSettings(settings){settings=settings||{};const root=document.documentElement;if(settings.ColorPrincipal)root.style.setProperty('--brand',settings.ColorPrincipal);if(settings.ColorSecundario)root.style.setProperty('--dark',settings.ColorSecundario);if(settings.ColorAcento)root.style.setProperty('--accent',settings.ColorAcento);document.title=settings.NombreOficial||'Parking Comunidad'}
+function applyParkingSettings(settings){
+  settings=settings||{};const root=document.documentElement;
+  if(settings.ColorPrincipal)root.style.setProperty('--brand',settings.ColorPrincipal);
+  if(settings.ColorSecundario)root.style.setProperty('--dark',settings.ColorSecundario);
+  if(settings.ColorAcento)root.style.setProperty('--accent',settings.ColorAcento);
+  document.title=settings.NombreOficial||'Parking Comunidad';
+  const logo=String(settings.LogoUrl||'').trim();
+  if(logo){
+    let favicon=document.querySelector('link[data-parking-favicon]');
+    if(!favicon){favicon=document.createElement('link');favicon.rel='icon';favicon.dataset.parkingFavicon='1';document.head.appendChild(favicon)}
+    favicon.href=logo;
+    let apple=document.querySelector('link[data-parking-apple-icon]');
+    if(!apple){apple=document.createElement('link');apple.rel='apple-touch-icon';apple.dataset.parkingAppleIcon='1';document.head.appendChild(apple)}
+    apple.href=logo;
+  }else{
+    document.querySelector('link[data-parking-favicon]')?.remove();
+    document.querySelector('link[data-parking-apple-icon]')?.remove();
+  }
+}
+function renderMaintenanceScreen(publicState={}){
+  const maintenance=publicState.maintenance||{},settings=Object.assign({},window.INITIAL_PUBLIC_SETTINGS||{},publicState.settings||{});
+  applyParkingSettings(settings);
+  const name=settings.NombreOficial||'Parking Comunidad',logo=settings.LogoUrl||'';
+  $('#app').innerHTML=`<main class="maintenance-page"><section class="card maintenance-card"><div class="maintenance-brand">${logo?`<img src="${esc(logo)}" alt="Logo de ${esc(name)}">`:'<div class="mark">P</div>'}</div><div class="eyebrow">MANTENIMIENTO</div><h1>${esc(name)}</h1><p>${esc(maintenance.message||'Sistema temporalmente en mantenimiento. Volveremos a estar disponibles en breve.')}</p><div class="maintenance-note">El acceso y el escáner están temporalmente pausados para evitar cambios durante la actualización.</div><div class="actions maintenance-actions"><button type="button" class="secondary" id="maintenance-retry">Comprobar de nuevo</button><button type="button" class="secondary" id="maintenance-root-login">Acceso técnico ROOT</button></div></section></main>`;
+  const retry=$('#maintenance-retry');if(retry)retry.onclick=()=>location.reload();
+  const rootLogin=$('#maintenance-root-login');if(rootLogin)rootLogin.onclick=()=>login('Modo mantenimiento activo. Acceso exclusivo ROOT.');
+}
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SERVER_TIMEOUT_MS=18000;
 const RETRYABLE_ACTIONS=new Set(['bootstrap','dashboard','listUsers','managerData','listHousing','listVehicles','formOptions','listIncidents','listIncidentsPayload','listAudit','listRequests','ownerBundle','listTemporaryPeriods','globalSearch','housingDetail','vehicleHistory']);
@@ -39,6 +65,7 @@ async function call(action,payload={}){
     try{const value=await server('api',state.token,action,payload);recordClientCall(action,performance.now()-callStarted,true);return value}catch(e){
       last=e;
       if(/sesión|session/i.test(e.message)){recordClientCall(action,performance.now()-callStarted,false);localStorage.removeItem('parking_token');state.token='';state.user=null;login(e.message);throw e}
+      if(/mantenimiento/i.test(e.message||'')){try{const publicState=await server('getPublicAppState');renderMaintenanceScreen(publicState)}catch(_e){}recordClientCall(action,performance.now()-callStarted,false);throw e}
       if(i+1<attempts)await sleep(650);
     }
   }
