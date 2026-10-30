@@ -32,9 +32,33 @@ const tests = [
   ],
   [
     'contraseña temporal no se guarda en auditoría',
-    admin.includes(
-      'El valor no fue almacenado.'
-    )
+    (() => {
+      const start = admin.indexOf("action === 'generateTemporaryPassword'");
+      if (start < 0) return false;
+
+      const end = admin.indexOf("if (action ===", start + 10);
+      const block = admin.slice(
+        start,
+        end > start ? end : admin.length
+      );
+
+      const auditStart = block.indexOf("audit_log");
+      if (auditStart < 0) return false;
+
+      const auditEnd = block.indexOf("});", auditStart);
+      if (auditEnd < 0) return false;
+
+      const auditBlock = block.slice(
+        auditStart,
+        auditEnd + 3
+      );
+
+      return (
+        !auditBlock.includes('password: password') &&
+        !auditBlock.includes('temporaryPassword: password') &&
+        !auditBlock.includes("observations: password")
+      );
+    })()
   ],
   [
     'adapter expone adminGenerateTemporaryPassword',
