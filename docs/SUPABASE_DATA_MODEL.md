@@ -1,6 +1,6 @@
 # Modelo relacional Supabase
 
-Las migraciones `111` a `117` complementan el esquema POC sin modificar migraciones remotas previas. `temporary_periods` es la única fuente de verdad de matrículas temporales; la migración `113` copia valores legacy válidos, pone excepciones en cuarentena privada y elimina las tres columnas desnormalizadas de `vehicles`. La `114` endurece Storage, `116` retiene credenciales hasta validación explícita y `117` valida RLS para los 68 propietarios puros.
+Las migraciones `111` a `117` complementan el esquema Supabase sin modificar migraciones remotas previas. `temporary_periods` es la única fuente de verdad de matrículas temporales; la migración `113` copia valores legacy válidos, pone excepciones en cuarentena privada y elimina las tres columnas desnormalizadas de `vehicles`. La `114` endurece Storage, `116` retiene credenciales hasta validación explícita y `117` valida RLS para los 68 propietarios puros.
 
 ```mermaid
 erDiagram

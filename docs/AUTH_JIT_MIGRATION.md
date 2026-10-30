@@ -27,7 +27,7 @@ El libro contiene exclusivamente `v2`, 1.000 iteraciones. No se recorta ni norma
 7. Marca la credencial migrada y conserva hash y salt hasta validar explícitamente primer y segundo login.
 8. Devuelve la sesión. El segundo login ya entra directamente por Supabase Auth.
 
-Los fallos son genéricos para no enumerar emails. Cinco fallos bloquean el JIT durante 15 minutos. La función restringe CORS a `ALLOWED_ORIGIN` y no registra secretos. Está desplegada en la POC, pero el frontend todavía no la utiliza.
+Los fallos son genéricos para no enumerar emails. Cinco fallos bloquean el JIT durante 15 minutos. La función restringe CORS a `ALLOWED_ORIGIN` y no registra secretos. Está desplegada y el frontend final la utiliza para la migración JIT de credenciales legacy.
 
 ## Despliegue de prueba
 
