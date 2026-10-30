@@ -1734,7 +1734,16 @@
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
 
       if (error) {
-        throw new Error('No se pudo solicitar el restablecimiento. Inténtalo de nuevo.');
+        console.error('[Supabase Auth] resetPasswordForEmail', {
+          message: error.message,
+          status: error.status,
+          code: error.code,
+          redirectTo
+        });
+
+        throw new Error(
+          `Reset falló: ${error.message || error.code || error.status || 'Error desconocido'}`
+        );
       }
 
       return { ok: true };
