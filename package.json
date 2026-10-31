@@ -9,7 +9,9 @@
   "scripts": {
     "test": "node tools/preprod-tests/system-v2-parity.mjs && node tools/preprod-tests/legacy-bridge-parity.mjs && node tools/preprod-tests/password-delivery-parity.mjs",
     "test:smoke:pre": "playwright test tools/preprod-tests/smoke-pre.spec.js",
-    "test:pre": "npm run test && npm run test:smoke:pre"
+    "test:pre": "npm run test && npm run test:smoke:pre",
+    "build:frontend": "node tools/frontend/build-bundle.mjs",
+    "check:frontend": "npm run build:frontend && git diff --exit-code -- assets/js/app.bundle.js"
   },
   "repository": {
     "type": "git",
