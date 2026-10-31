@@ -11,7 +11,8 @@
     "test:smoke:pre": "playwright test tools/preprod-tests/smoke-pre.spec.js",
     "test:pre": "npm run test && npm run test:smoke:pre",
     "build:frontend": "node tools/frontend/build-bundle.mjs",
-    "check:frontend": "npm run build:frontend && git diff --exit-code -- assets/js/app.bundle.js"
+    "check:frontend": "npm run build:frontend && git diff --exit-code -- assets/js/app.bundle.js",
+    "build:vite": "vite build"
   },
   "repository": {
     "type": "git",
@@ -26,6 +27,7 @@
   },
   "homepage": "https://github.com/floresderiviera/parking-comunidad#readme",
   "devDependencies": {
-    "@playwright/test": "^1.64.1"
+    "@playwright/test": "^1.64.1",
+    "vite": "^8.3.5"
   }
 }
