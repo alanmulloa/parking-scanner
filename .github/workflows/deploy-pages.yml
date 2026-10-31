@@ -33,17 +33,24 @@ jobs:
           ref: supabase-poc
           path: pre-src
 
-      - name: Validate preproduction
+      - name: Validate and build preproduction
         working-directory: pre-src
         run: |
           set -e
+
+          npm ci
 
           for f in tools/preprod-tests/*.mjs; do
             echo "===== $f ====="
             node "$f"
           done
 
-          node --check assets/js/app.bundle.js
+          npm run build:vite
+
+          cmp -s assets/js/app.bundle.js dist/assets/js/app.bundle.js
+          echo "Vite bundle matches committed frontend bundle"
+
+          node --check dist/assets/js/app.bundle.js
           node --check assets/js/core.js
 
       - name: Build Pages artifact
@@ -65,7 +72,13 @@ jobs:
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='dist' \
             pre-src/ _site/preproduccion/
+
+          # El bundle de PRE se publica desde el build de Vite.
+          cp pre-src/dist/assets/js/app.bundle.js \
+            _site/preproduccion/assets/js/app.bundle.js
 
           # PRE usa el index.html de la rama supabase-poc.
           # El rsync anterior lo publica como /preproduccion/index.html.
